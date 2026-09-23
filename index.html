@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#07111f">
+    <title>BARCH AERO-CANYON RACING</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/game.css">
+    
+    <!-- Three.js r128 via public CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+<!-- WebGL Viewport -->
+<canvas id="viewport-canvas"></canvas>
+
+<!-- Speed Lines 2D Overlay -->
+<canvas id="speed-lines-canvas"></canvas>
+
+<!-- Top Tactical Flight Telemetry -->
+<div id="top-hud">
+    <div class="hud-panel">
+        <div class="telemetry-item">
+            <span class="telemetry-label">AIRSPEED</span>
+            <div><span id="hud-speed" class="telemetry-value">0</span><span class="telemetry-unit">KM/H</span></div>
+        </div>
+        <div class="telemetry-item">
+            <span class="telemetry-label">ALTITUDE</span>
+            <div><span id="hud-alt" class="telemetry-value">0</span><span class="telemetry-unit">M</span></div>
+        </div>
+        <div class="telemetry-item" id="hud-mode-display-item">
+            <span class="telemetry-label">MODE</span>
+            <div id="hud-mode-badge" style="font-size:12px; font-weight:800; color:#00ffff;">CIRCUIT</div>
+        </div>
+    </div>
+
+    <div class="hud-panel">
+        <div class="telemetry-item" id="pos-or-cargo-item">
+            <span id="pos-or-cargo-label" class="telemetry-label">POSITION</span>
+            <div id="position-badge">1ST</div>
+        </div>
+        <div class="telemetry-item" id="lap-or-target-item">
+            <span id="lap-or-target-label" class="telemetry-label">LAP</span>
+            <div id="hud-lap" class="telemetry-value">1 / 2</div>
+        </div>
+        <button id="btn-pause-game" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:6px 12px; font-weight:800; font-family:inherit; cursor:pointer;">PAUSE</button>
+        <button id="btn-audio-toggle" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:6px 10px; font-weight:800; font-family:inherit; cursor:pointer;">AUDIO: OFF</button>
+    </div>
+</div>
+
+<!-- Center Bottom Nitro Energy Gauge -->
+<div id="nitro-container">
+    <div class="nitro-header">
+        <span>NITRO CAPACITY</span>
+        <span id="nitro-val-txt">40%</span>
+    </div>
+    <div class="nitro-track">
+        <div id="nitro-fill-bar" class="nitro-fill"></div>
+    </div>
+</div>
+
+<!-- Stunt Combo Banner Notification -->
+<div id="stunt-alert">
+    <div id="stunt-title-txt" class="stunt-title">SNAP ROLL</div>
+    <div id="stunt-bonus-txt" class="stunt-bonus">+22% NITRO</div>
+</div>
+
+<!-- Mobile Touch Controls Overlay -->
+<div id="touch-controls">
+    <div id="touch-stick-zone" class="touch-stick-zone">
+        <div id="touch-stick-knob" class="touch-stick-knob"></div>
+    </div>
+
+    <div class="touch-action-pad">
+        <button id="btn-touch-roll-l" class="touch-btn">ROLL L</button>
+        <button id="btn-touch-roll-r" class="touch-btn">ROLL R</button>
+        <button id="btn-touch-knife" class="touch-btn">KNIFE</button>
+        <button id="btn-touch-cobra" class="touch-btn">COBRA</button>
+        <button id="btn-touch-boost" class="touch-btn touch-btn-boost" style="grid-column: span 2; width: 100%; height: 50px;">NITRO BOOST</button>
+    </div>
+</div>
+
+<!-- Briefing & Mode Launch Modal -->
+<div id="start-modal" class="overlay-screen">
+    <div class="glass-modal" style="max-width: 500px;">
+        <h1>Aero-Canyon Racing</h1>
+        <p style="font-size: 13px; color: #aaccff; margin-bottom: 8px; letter-spacing: 0.5px;">HIGH-VELOCITY INDUSTRIAL VTOL FLIGHT</p>
+
+        <!-- Mode Select Tabs -->
+        <div style="font-size:11px; font-weight:800; color:rgba(255,255,255,0.6); text-align:left;">SELECT MISSION MODE</div>
+        <div class="mode-row">
+            <button class="mode-select-btn active" data-mode="CIRCUIT_RACE">CIRCUIT GRAND PRIX</button>
+            <button class="mode-select-btn" data-mode="EXTRACTION_SOLO">CARGO SOLO</button>
+            <button class="mode-select-btn" data-mode="EXTRACTION_VERSUS">CARGO VERSUS AI</button>
+        </div>
+
+        <!-- Sector Level Cards -->
+        <div style="font-size:11px; font-weight:800; color:rgba(255,255,255,0.6); text-align:left; margin-top:8px;">CAMPAIGN SECTOR</div>
+        <div class="sector-row">
+            <button class="sector-card-btn active" data-sector="1">
+                <div style="font-weight:900; font-size:14px; color:#F4A426;">SECTOR 01: DOWNTOWN CANYONS</div>
+                <div style="font-size:11px; color:#aaccff;">Daylight urban corridors with wide sky-lanes</div>
+            </button>
+            <button class="sector-card-btn" data-sector="2">
+                <div style="font-weight:900; font-size:14px; color:#F4A426;">SECTOR 02: INDUSTRIAL PORT & CRANES</div>
+                <div style="font-size:11px; color:#aaccff;">Overcast twilight with dense gantries and chicanes</div>
+            </button>
+            <button class="sector-card-btn" data-sector="3">
+                <div style="font-weight:900; font-size:14px; color:#F4A426;">SECTOR 03: STRATOSPHERE MONOLITHS</div>
+                <div style="font-size:11px; color:#aaccff;">High-altitude storm run with vertical climbs</div>
+            </button>
+        </div>
+
+        <div style="display:flex; gap:10px; margin: 14px 0 10px 0;">
+            <button id="btn-open-hangar" class="cta-button" style="background:rgba(255,255,255,0.12); flex:1;">HANGAR / LOADOUT</button>
+            <button id="btn-open-settings" class="cta-button" style="background:rgba(255,255,255,0.12); flex:1;">SETTINGS</button>
+        </div>
+
+        <button id="btn-launch-race" class="cta-button" style="background:linear-gradient(135deg, var(--primary-teal), #075251); font-size:17px;">LAUNCH MISSION</button>
+        <div id="tier-display-badge" class="tier-indicator">HARDWARE PROFILE: DETECTING...</div>
+    </div>
+</div>
+
+<!-- Hangar / Loadout Modal -->
+<div id="hangar-modal" class="overlay-screen hidden">
+    <div class="glass-modal" style="max-width: 520px; max-height:85vh; overflow-y:auto;">
+        <h1 style="color:#00ffff;">DRONE HANGAR</h1>
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.4); padding:8px 14px; border-radius:8px; border:1px solid var(--border-glass);">
+            <span style="font-size:12px; font-weight:800; color:#88aacc;">RESERVE CREDITS</span>
+            <span id="hangar-credits-txt" style="font-size:18px; font-weight:900; color:#F4A426;">600</span>
+        </div>
+
+        <div style="font-size:11px; font-weight:800; color:rgba(255,255,255,0.6); text-align:left; margin-top:14px;">AIRFRAME LIVERY SKINS</div>
+        <div id="skin-cards-list" class="skin-cards-grid"></div>
+
+        <div style="font-size:11px; font-weight:800; color:rgba(255,255,255,0.6); text-align:left; margin-top:10px;">TACTICAL UPGRADES</div>
+        <div id="upgrade-cards-list" class="upgrade-list"></div>
+
+        <button id="btn-close-hangar" class="cta-button" style="margin-top:12px;">SAVE & RETURN</button>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-modal" class="overlay-screen hidden">
+    <div class="glass-modal" style="max-width: 440px;">
+        <h1 style="color:#aaccff;">SYSTEM SETTINGS</h1>
+        <div class="settings-group">
+            <div class="settings-row">
+                <span>GRAPHICS PROFILE</span>
+                <select id="setting-graphics-tier" class="settings-select">
+                    <option value="AUTO">AUTO-DETECT</option>
+                    <option value="1">TIER 1 (MOBILE LOW)</option>
+                    <option value="2">TIER 2 (MID-RANGE)</option>
+                    <option value="3">TIER 3 (DESKTOP ULTRA)</option>
+                </select>
+            </div>
+            <div class="settings-row">
+                <span>MASTER AUDIO</span>
+                <input type="range" min="0" max="1" step="0.05" value="0.8" class="settings-slider" id="slider-master-vol">
+            </div>
+            <div class="settings-row">
+                <span>HAPTIC FEEDBACK</span>
+                <input type="checkbox" id="chk-haptic" checked style="accent-color:var(--primary-teal); width:18px; height:18px;">
+            </div>
+            <div class="settings-row">
+                <span>INVERT PITCH</span>
+                <input type="checkbox" id="chk-invert-pitch" style="accent-color:var(--primary-teal); width:18px; height:18px;">
+            </div>
+        </div>
+
+        <div class="instruction-grid" style="font-size:11px; margin-top:10px;">
+            <strong>CONTROLS SUMMARY:</strong><br>
+            WASD / Flight Stick: Steer & Throttle<br>
+            Space / Nitro: Afterburner & Hyper-Overdrive<br>
+            Q & E / Roll: Snap Aileron Rolls (+22% Nitro)<br>
+            C / Knife: Hold Knife-Edge (Slice narrow slits)<br>
+            X / Cobra: Cobra Airbrake (Dumps 62% speed)
+        </div>
+
+        <button id="btn-close-settings" class="cta-button">CONFIRM SETTINGS</button>
+    </div>
+</div>
+
+<!-- Pause Modal -->
+<div id="pause-modal" class="overlay-screen hidden">
+    <div class="glass-modal" style="max-width: 360px;">
+        <h1 style="color:#F4A426;">MISSION PAUSED</h1>
+        <div style="display:flex; flex-direction:column; gap:12px; margin:20px 0;">
+            <button id="btn-resume-game" class="cta-button">RESUME FLIGHT</button>
+            <button id="btn-restart-from-pause" class="cta-button" style="background:rgba(255,255,255,0.12);">RESTART MISSION</button>
+            <button id="btn-menu-from-pause" class="cta-button" style="background:rgba(255,255,255,0.12);">MAIN MENU</button>
+        </div>
+    </div>
+</div>
+
+<!-- Mission Finished Modal -->
+<div id="end-modal" class="overlay-screen hidden">
+    <div class="glass-modal">
+        <h1 id="end-title" style="color:#F4A426;">MISSION ACCOMPLISHED</h1>
+        <p id="end-rank-desc" style="font-size: 16px; margin: 12px 0;"></p>
+        <div id="end-lap-times" style="background:rgba(0,0,0,0.5); padding:10px; border-radius:8px; font-family:monospace; margin-bottom:16px; font-size:13px; color:#00ffff;"></div>
+        <div id="end-rewards-txt" style="font-size: 14px; font-weight: 800; color: #F4A426; margin-bottom: 16px;"></div>
+        <button id="btn-restart-race" class="cta-button">NEXT MISSION</button>
+    </div>
+</div>
+
+<!-- Main Game Application Bootstrap -->
+<script type="module">
+import { Coordinator } from './js/coordinator.js';
+import { CONFIG } from './js/config.js';
+import { SoundEngine } from './js/audio/sound_engine.js';
+import { InputManager } from './js/input/input_manager.js';
+import { TouchControls } from './js/input/touch_controls.js';
+import { DesktopControls } from './js/input/desktop_controls.js';
+import { Drone } from './js/engine/drone.js';
+import { StuntFSM } from './js/engine/stunt_fsm.js';
+import { CameraRig } from './js/engine/camera_rig.js';
+import { TrackBuilder } from './js/engine/track_builder.js';
+import { AiRacer } from './js/engine/ai_racer.js';
+import { ExtractionEngine } from './js/engine/extraction_engine.js';
+import { HangarSettingsManager } from './js/ui/hangar_settings.js';
+import { RacingHUD } from './js/ui/hud.js';
+
+window.addEventListener('load', () => {
+    // 1. Hardware Profiler & Coordinator
+    const coordinator = new Coordinator();
+    const tier = coordinator.tier;
+
+    const tierBadge = document.getElementById('tier-display-badge');
+    if (tierBadge) {
+        tierBadge.textContent = `HARDWARE PROFILE: ${tier.name} (DPR: ${tier.dpr}, SHADOWS: ${tier.shadows ? 'ENABLED' : 'OFF'})`;
+    }
+
+    // 2. Audio & Input Architecture
+    const soundEngine = new SoundEngine();
+    const inputManager = new InputManager();
+
+    if (coordinator.profile.isTouch) {
+        const touchControls = new TouchControls(inputManager);
+        touchControls.init();
+    } else {
+        const desktopControls = new DesktopControls(inputManager);
+        desktopControls.init();
+        window._desktopControls = desktopControls;
+    }
+
+    const audioBtn = document.getElementById('btn-audio-toggle');
+    if (audioBtn) {
+        audioBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            soundEngine.init();
+            soundEngine.resume();
+            audioBtn.textContent = soundEngine.enabled ? 'AUDIO: ON' : 'AUDIO: OFF';
+            audioBtn.style.color = soundEngine.enabled ? '#00ffff' : '#ffffff';
+        });
+    }
+
+    // 3. Three.js Scene, Camera & Renderer
+    const canvas = document.getElementById('viewport-canvas');
+    const renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: tier.name === 'DESKTOP_HIGH',
+        powerPreference: 'high-performance'
+    });
+    renderer.setPixelRatio(tier.dpr);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x07111f);
+
+    if (tier.shadows) {
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    }
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x07111f, 0.0018);
+
+    const camera = new THREE.PerspectiveCamera(CONFIG.CAMERA.BASE_FOV, window.innerWidth / window.innerHeight, 0.1, 2200);
+    const cameraRig = new CameraRig(camera);
+
+    // 4. Lighting Rig
+    scene.add(new THREE.AmbientLight(0x334455, 1.2));
+    const sun = new THREE.DirectionalLight(0xfff0dd, 2.2);
+    sun.position.set(120, 220, 100);
+    if (tier.shadows) {
+        sun.castShadow = true;
+        sun.shadow.mapSize.width = tier.shadowMapSize;
+        sun.shadow.mapSize.height = tier.shadowMapSize;
+        sun.shadow.camera.near = 10;
+        sun.shadow.camera.far = 600;
+        sun.shadow.camera.left = -200;
+        sun.shadow.camera.right = 200;
+        sun.shadow.camera.top = 200;
+        sun.shadow.camera.bottom = -200;
+    }
+    scene.add(sun);
+
+    const cyanRim = new THREE.DirectionalLight(0x0E7C7B, 1.4);
+    cyanRim.position.set(-100, -50, -80);
+    scene.add(cyanRim);
+
+    // 5. Instantiate Player Drone & HUD
+    const playerDrone = new Drone(scene, false);
+    const hud = new RacingHUD();
+    const stuntFsm = new StuntFSM(soundEngine, (title, bonus) => {
+        hud.showStuntAlert(title, bonus);
+    });
+
+    // 6. Hangar & Settings Manager
+    const hangarManager = new HangarSettingsManager(
+        coordinator,
+        soundEngine,
+        (skin) => {
+            playerDrone.applySkin(skin);
+        },
+        () => {}
+    );
+
+    // Apply saved skin and upgrades on boot
+    const initialSkin = CONFIG.SKINS.find(s => s.id === hangarManager.profile.selectedSkinId);
+    playerDrone.applySkin(initialSkin);
+    playerDrone.applyUpgrades(hangarManager.getUpgradedStats());
+
+    // 7. Track & Extraction Mode Systems
+    let track = null;
+    let extractionEngine = null;
+    let aiRacers = [];
+
+    let gameState = 'START';
+    window._gameState = gameState;
+    let currentLap = 1;
+    let nextGateIndex = 1;
+    let raceTotalTime = 0;
+
+    function setupSectorAndMode(sectorId, mode) {
+        const sector = CONFIG.SECTORS.find(s => s.id === sectorId) || CONFIG.SECTORS[0];
+
+        // Apply sector atmosphere
+        scene.fog.density = sector.fogDensity;
+        scene.fog.color.setHex(sector.skyColor);
+        renderer.setClearColor(sector.skyColor);
+        sun.color.setHex(sector.sunColor);
+
+        // Clean previous systems
+        if (track) track.dispose();
+        if (extractionEngine) extractionEngine.dispose();
+        aiRacers.forEach(ai => scene.remove(ai.drone.group));
+        aiRacers = [];
+
+        // Build Track & City
+        track = new TrackBuilder(scene, tier, sector);
+
+        // Position player at origin or start gate
+        const startPos = track.spline.getPointAt(0);
+        const startTangent = track.spline.getTangentAt(0).normalize();
+        playerDrone.position.copy(startPos);
+        playerDrone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), startTangent);
+
+        // Mode specific setup
+        const modeBadge = document.getElementById('hud-mode-badge');
+        const posOrCargoLabel = document.getElementById('pos-or-cargo-label');
+        const lapOrTargetLabel = document.getElementById('lap-or-target-label');
+
+        if (mode === CONFIG.MODES.CIRCUIT_RACE) {
+            if (modeBadge) modeBadge.textContent = 'CIRCUIT';
+            if (posOrCargoLabel) posOrCargoLabel.textContent = 'POSITION';
+            if (lapOrTargetLabel) lapOrTargetLabel.textContent = 'LAP';
+
+            // Spawn AI Racers
+            for (let i = 0; i < CONFIG.AI.RACER_COUNT; i++) {
+                aiRacers.push(new AiRacer(scene, track.spline, i, CONFIG.AI.RACER_COUNT));
+            }
+        } else {
+            // Extraction Mode (Solo or Versus)
+            if (modeBadge) modeBadge.textContent = mode === CONFIG.MODES.EXTRACTION_SOLO ? 'CARGO SOLO' : 'CARGO VERSUS';
+            if (posOrCargoLabel) posOrCargoLabel.textContent = 'PAYLOAD';
+            if (lapOrTargetLabel) lapOrTargetLabel.textContent = 'TARGET';
+
+            extractionEngine = new ExtractionEngine(scene, soundEngine, (alertTitle, delivered, aiDelivered, total) => {
+                hud.showStuntAlert(alertTitle, `COLLECTED: ${delivered}/${total}`);
+                const posBadge = document.getElementById('position-badge');
+                if (posBadge) posBadge.textContent = `${delivered}/${total}`;
+
+                if (delivered >= total || (mode === CONFIG.MODES.EXTRACTION_VERSUS && (delivered + aiDelivered) >= total)) {
+                    finishRace(true);
+                }
+            });
+
+            extractionEngine.buildBaseZone();
+            extractionEngine.spawnPayloads(track.buildingAABBs, sector.payloads);
+
+            if (mode === CONFIG.MODES.EXTRACTION_VERSUS) {
+                for (let i = 0; i < 2; i++) {
+                    aiRacers.push(new AiRacer(scene, track.spline, i, 2));
+                }
+            }
+        }
+    }
+
+    // 8. Modal Buttons
+    const startModal = document.getElementById('start-modal');
+    const endModal = document.getElementById('end-modal');
+    const btnLaunch = document.getElementById('btn-launch-race');
+    const btnRestart = document.getElementById('btn-restart-race');
+    const btnRestartPause = document.getElementById('btn-restart-from-pause');
+    const btnMenuPause = document.getElementById('btn-menu-from-pause');
+
+    const beginRace = () => {
+        soundEngine.init();
+        soundEngine.resume();
+        startModal.classList.add('hidden');
+
+        // Apply updated loadout
+        playerDrone.applyUpgrades(hangarManager.getUpgradedStats());
+
+        setupSectorAndMode(hangarManager.selectedSectorId, hangarManager.selectedMode);
+
+        gameState = 'RACING';
+        window._gameState = gameState;
+        currentLap = 1;
+        nextGateIndex = 1;
+        raceTotalTime = 0;
+    };
+
+    if (btnLaunch) btnLaunch.addEventListener('click', beginRace);
+    if (btnRestart) btnRestart.addEventListener('click', () => {
+        endModal.classList.add('hidden');
+        beginRace();
+    });
+
+    if (btnRestartPause) btnRestartPause.addEventListener('click', () => {
+        document.getElementById('pause-modal').classList.add('hidden');
+        beginRace();
+    });
+
+    if (btnMenuPause) btnMenuPause.addEventListener('click', () => {
+        document.getElementById('pause-modal').classList.add('hidden');
+        startModal.classList.remove('hidden');
+        gameState = 'START';
+        window._gameState = gameState;
+    });
+
+    // 9. Resize Handler
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // 10. Simulation Loop
+    const clock = new THREE.Clock();
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.05);
+
+        if (window._desktopControls) {
+            window._desktopControls.update();
+        }
+
+        if (window._gameState === 'RACING') {
+            raceTotalTime += dt;
+
+            // Update Player Physics
+            const inputState = inputManager.getState();
+            playerDrone.updatePhysics(inputState, stuntFsm, dt);
+
+            if (hangarManager.selectedMode === CONFIG.MODES.CIRCUIT_RACE) {
+                // Circuit Mode Logic: Gates & Laps
+                const targetGate = track.gates[nextGateIndex % track.gates.length];
+                const distToGate = playerDrone.position.distanceTo(targetGate.position);
+
+                if (distToGate < CONFIG.TRACK.CHECKPOINT_RADIUS) {
+                    soundEngine.playGateChime();
+                    targetGate.mesh.material.color.setHex(0x00ff88);
+                    setTimeout(() => {
+                        targetGate.mesh.material.color.setHex(targetGate.index === 0 ? 0xE8580A : 0x00ffff);
+                    }, 400);
+
+                    nextGateIndex++;
+                    if (nextGateIndex % track.gates.length === 0) {
+                        currentLap++;
+                        const currentSector = CONFIG.SECTORS.find(s => s.id === hangarManager.selectedSectorId) || CONFIG.SECTORS[0];
+                        if (currentLap > currentSector.laps) {
+                            finishRace(false);
+                        }
+                    }
+                }
+
+                // AI Racers & Drafting
+                let isPlayerDrafting = false;
+                aiRacers.forEach((ai) => {
+                    ai.update(dt);
+                    ai.checkPlayerCollision(playerDrone, cameraRig);
+
+                    if (ai.isPlayerDrafting(playerDrone)) {
+                        isPlayerDrafting = true;
+                        playerDrone.nitroAmount = Math.min(CONFIG.NITRO.MAX_CAPACITY, playerDrone.nitroAmount + CONFIG.FLIGHT.DRAFTING_BOOST_RATE * dt);
+                    }
+                });
+
+                // Calculate Rank
+                let rank = 1;
+                const playerProgress = (currentLap - 1) + (nextGateIndex / track.gates.length);
+                aiRacers.forEach((ai) => {
+                    const aiProgress = (ai.currentLap - 1) + ai.trackProgress;
+                    if (aiProgress > playerProgress) rank++;
+                });
+
+                // Update HUD
+                hud.update(playerDrone, currentLap, rank, CONFIG.AI.RACER_COUNT + 1, isPlayerDrafting);
+            } else if (extractionEngine) {
+                // Extraction Mode Logic
+                const stats = hangarManager.getUpgradedStats();
+                const isVersus = hangarManager.selectedMode === CONFIG.MODES.EXTRACTION_VERSUS;
+                extractionEngine.update(playerDrone, stats.winchRadius, aiRacers, isVersus, dt);
+
+                // Update AI Racers if in versus mode
+                if (isVersus) {
+                    aiRacers.forEach((ai) => {
+                        ai.update(dt);
+                        ai.checkPlayerCollision(playerDrone, cameraRig);
+                    });
+                }
+
+                // Telemetry
+                const hudSpeed = document.getElementById('hud-speed');
+                const hudAlt = document.getElementById('hud-alt');
+                const hudLap = document.getElementById('hud-lap');
+                if (hudSpeed) hudSpeed.textContent = Math.round(playerDrone.speedKmh);
+                if (hudAlt) hudAlt.textContent = Math.round(playerDrone.position.y);
+                if (hudLap) hudLap.textContent = `${extractionEngine.deliveredCount} / ${extractionEngine.totalCount}`;
+
+                hud.renderSpeedLines(playerDrone.speedKmh, playerDrone.nitroStage);
+            }
+
+            // Audio Telemetry
+            soundEngine.updateTelemetry(playerDrone.speedKmh, inputState.forward, playerDrone.nitroStage > 1, playerDrone.nitroStage === 3);
+        }
+
+        // Camera Tracking & Scene Rendering
+        cameraRig.update(playerDrone, dt);
+        renderer.render(scene, camera);
+    }
+
+    function finishRace(isExtraction) {
+        window._gameState = 'FINISHED';
+        endModal.classList.remove('hidden');
+
+        const rewardCredits = isExtraction ? 350 : 250;
+        hangarManager.profile.credits += rewardCredits;
+        hangarManager.saveProfile();
+
+        const endTitle = document.getElementById('end-title');
+        const endRankDesc = document.getElementById('end-rank-desc');
+        const endLapTimes = document.getElementById('end-lap-times');
+        const endRewards = document.getElementById('end-rewards-txt');
+
+        if (isExtraction) {
+            endTitle.textContent = 'SECTOR SECURED';
+            endRankDesc.textContent = `All payloads successfully extracted to Base!`;
+        } else {
+            const rankBadge = document.getElementById('position-badge').textContent;
+            endTitle.textContent = rankBadge === '1ST' ? 'CIRCUIT VICTORY' : 'CIRCUIT FINISHED';
+            endRankDesc.textContent = `Final Placement: ${rankBadge} against AI competitors`;
+        }
+
+        endLapTimes.textContent = `Mission Time: ${raceTotalTime.toFixed(2)}s | Top Velocity: ${Math.round(playerDrone.speedKmh)} km/h`;
+        if (endRewards) endRewards.textContent = `+${rewardCredits} CREDITS AWARDED (Current Balance: ${hangarManager.profile.credits} CR)`;
+    }
+
+    animate();
+});
+</script>
+</body>
+</html>
