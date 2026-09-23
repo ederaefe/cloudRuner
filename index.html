@@ -1045,7 +1045,7 @@ window.addEventListener('load', () => {
         gameState = 'RACING';
         window._gameState = gameState;
         currentLap = 1;
-        nextGateIndex = 1;
+        nextGateIndex = 0;  // Drone spawns before gate 0 at spline t=0
         raceTotalTime = 0;
         stuntsCompletedCount = 0;
         maxSpeedInRace = 0;
@@ -1302,7 +1302,7 @@ window.addEventListener('load', () => {
             const vel = playerDrone.velocity;
             const isInvalidPos = !Number.isFinite(pos.x) || !Number.isFinite(pos.y) || !Number.isFinite(pos.z) ||
                                  !Number.isFinite(vel.x) || !Number.isFinite(vel.y) || !Number.isFinite(vel.z);
-            const isOutOfBounds = pos.y < -65 || pos.y > 380 || (track && pos.length() > 680);
+            const isOutOfBounds = pos.y < -65 || pos.y > 380 || (track && pos.length() > 2800);
 
             if (isInvalidPos || isOutOfBounds) {
                 hud.showStuntAlert('COURSE REALIGNMENT', 'RETURNING TO TRACK');
@@ -1403,7 +1403,7 @@ window.addEventListener('load', () => {
             playerDrone.updateParticles(dt);
             
             // Emit speed streak particles from camera perspective (zero-allocation)
-            if (playerDrone.particleSystem && playerDrone.speedKmh > 140) {
+            if (playerDrone.particleSystem && playerDrone.speedKmh > 55) {
                 _cameraForward.set(0, 0, -1).applyQuaternion(camera.quaternion);
                 playerDrone.particleSystem.emitSpeedStreak(camera.position, _cameraForward, playerDrone.speedKmh);
             }
@@ -1443,7 +1443,7 @@ window.addEventListener('load', () => {
 
         let pilotGrade = 'B';
         let gradeTitle = 'B-CLASS STRIKER';
-        if (rankPlacement === 1 && stuntsCompletedCount >= 2 && maxSpeedInRace > 220) {
+        if (rankPlacement === 1 && stuntsCompletedCount >= 2 && maxSpeedInRace > 130) {
             pilotGrade = 'S';
             gradeTitle = 'S-CLASS AEGIS ACE';
         } else if (rankPlacement === 1 || stuntsCompletedCount >= 1) {

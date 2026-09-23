@@ -317,5 +317,34 @@ This enables zero-latency P2P mesh synchronization via WebRTC DataChannels (`Pee
   * Added Section 18 covering Autopilot instantiation, override timer, input manager assist flags, altitude hold toggling, target altitude stepping (+5m/-10m), emergency hover stop engagement and safety release, hands-on manual steering override, and CustomizationSidebar tab switching across all 6 panels.
   * Total passing assertions expanded to **176/176** verified tests.
 
+### Completed: Open-World Scale Calibration, Sci-Fi Variable-Geometry Airframe & Holographic Guidance Ribbon
+
+* **Wide Open-World Spatial Scaling (`js/config.js`, `js/engine/track_builder.js`, `index.html`)**:
+  * Scaled the 3D spline loop 3x across the XZ plane (spanning ~1800m+ across the terrain) while expanding canyon floor dimensions to 8000x8000m and sky dome radius to 5000m.
+  * Increased building spread outward (2200m–3800m across sectors) and halved monolithic heights, transforming dense canyon corridors into distant horizon silhouettes and expansive sky space.
+  * Increased corridor setback to 80m, freeing the hovercar from tight claustrophobic walls into high-altitude open airways.
+  * Scaled down visual airframe mesh to 0.45x, reinforcing the sensation of a nimble craft traversing a massive landscape.
+  * Expanded camera base distance (10.0m), height (3.2m), and field-of-view (75.0 deg) with relaxed spring stiffness (5.5) for a serene, floating chase camera.
+
+* **Progressive Non-Linear Throttle & Spline Adaptive Curvature (`js/engine/drone.js`, `js/config.js`)**:
+  * Adopted an exponential throttle response curve ($y = x^{1.7}$) delivering gentle low-speed fine maneuvering with an organic build-up of thrust as throttle is committed.
+  * Reduced maximum cruise ceiling to 95 km/h with measured acceleration (42.0 m/s^2), eliminating instant lunging in favor of a grounded hovercar feel.
+  * Added ADAS Spline Lane-Assist: calculates the nearest spline waypoint and applies gentle horizontal lateral centering force within 60m radius without overriding player intent.
+  * Dynamic Track Curvature Alignment: blends a subtle fraction of the track tangent into the heading vector during curves, allowing turns to glide naturally with the landscape.
+
+* **Variable-Geometry Sci-Fi Jet Airframe Transformation (`js/engine/drone.js`)**:
+  * Engineered a multi-stage articulated aerodynamic morphing system dynamically responding to steering input with exponential filter damping (`dt * 5.2`):
+    1. *Fuselage & Canopy Aero-Twist*: Fore-body bows smoothly into the turn apex with subtle organic yaw flex.
+    2. *Swept Main Wings Differential Camber*: Main wings rotate in yaw and roll, with the inner wing sweeping rearward while the outer wing flexes upward for aerodynamic roll assistance.
+    3. *Articulated Forward Canards*: Dual forward aero-flaps mounted on the forward fuselage pitch differentially to simulate active vortex lift generation into turns.
+    4. *Thrust Vectoring Tilt-Nacelles*: Wingtip nacelles vector thrust differentially in pitch and roll to actively pivot the craft through curves.
+    5. *Twin Tail Fins Dynamic Rudder Cant*: Dual angled tail fins articulate their cant angle and rudder yaw deflection sympathetically.
+
+* **Sleek Translucent Holographic Track Ribbon (`js/engine/track_builder.js`)**:
+  * Restored a lightweight, semi-transparent holographic light ribbon (`opacity: 0.16`, `side: DoubleSide`, `depthWrite: false`) spanning the 240-segment spline path beneath the hovering craft.
+  * Sits directly underneath the floating circular gates to provide essential visual continuity and speed reference, preventing the craft from appearing detached from the racing circuit.
+  * Framed by glowing neon edge boundary lines (`opacity: 0.48`, linewidth 2) defining the flight corridor with minimalist elegance.
+
+
 
 

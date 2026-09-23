@@ -167,12 +167,11 @@ export class StuntFSM {
             default: {
                 // Standard car-like yaw steering
                 this.currentYaw -= inputState.steerYaw * flightCfg.YAW_RATE * dt;
-                
-                // Visual chassis banking based on turn rate (level camera horizon)
+
+                // Visual chassis banking: lean into the turn, ease back upright slowly (zen weight-shift)
                 const targetRoll = -inputState.steerYaw * flightCfg.BANKING_TILT;
-                const rollRate = (inputState.flyAssistEnabled !== false && Math.abs(inputState.steerYaw) < 0.08)
-                    ? (CONFIG.ASSIST?.FLY_ASSIST?.AUTO_LEVEL_RATE || 8.0) * 1.5
-                    : 8.0;
+                const isSteering = Math.abs(inputState.steerYaw) > 0.08;
+                const rollRate = isSteering ? 4.5 : 2.2; // Lean in gently, ease out even slower
                 this.currentRoll = THREE.MathUtils.lerp(this.currentRoll, targetRoll, dt * rollRate);
 
                 // Locked level horizon: pitch held firmly at 0.0

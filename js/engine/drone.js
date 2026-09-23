@@ -106,6 +106,7 @@ export class Drone {
         fuselage.scale.set(1.4, 0.65, 1.0);
         fuselage.castShadow = true;
         this.group.add(fuselage);
+        this.fuselage = fuselage;
 
         // Cockpit canopy
         const canopyGeo = new THREE.SphereGeometry(0.45, 12, 12);
@@ -113,6 +114,7 @@ export class Drone {
         const canopy = new THREE.Mesh(canopyGeo, matCanopy);
         canopy.position.set(0, 0.28, 0.5);
         this.group.add(canopy);
+        this.canopy = canopy;
 
         // 2. Swept Main Wings
         const wingShape = new THREE.Shape();
@@ -127,12 +129,43 @@ export class Drone {
         const wingR = new THREE.Mesh(wingGeoR, this.matBody);
         wingR.castShadow = true;
         this.group.add(wingR);
+        this.wingR = wingR;
 
         const wingGeoL = wingGeoR.clone();
         wingGeoL.scale(-1, 1, 1);
         const wingL = new THREE.Mesh(wingGeoL, this.matBody);
         wingL.castShadow = true;
         this.group.add(wingL);
+        this.wingL = wingL;
+
+        // Articulated Forward Aerodynamic Canards (Sci-Fi Aero Flaps)
+        const canardShape = new THREE.Shape();
+        canardShape.moveTo(0, 0.2);
+        canardShape.lineTo(1.1, -0.2);
+        canardShape.lineTo(0.9, -0.45);
+        canardShape.lineTo(0, -0.15);
+        canardShape.closePath();
+
+        const canardGeoR = new THREE.ExtrudeGeometry(canardShape, { depth: 0.04, bevelEnabled: false });
+        canardGeoR.rotateX(Math.PI / 2);
+
+        const canardGroupR = new THREE.Group();
+        canardGroupR.position.set(0.65, 0.12, 0.85);
+        const canardMeshR = new THREE.Mesh(canardGeoR, this.matAccent);
+        canardMeshR.castShadow = true;
+        canardGroupR.add(canardMeshR);
+        this.group.add(canardGroupR);
+        this.canardR = canardGroupR;
+
+        const canardGroupL = new THREE.Group();
+        canardGroupL.position.set(-0.65, 0.12, 0.85);
+        const canardGeoL = canardGeoR.clone();
+        canardGeoL.scale(-1, 1, 1);
+        const canardMeshL = new THREE.Mesh(canardGeoL, this.matAccent);
+        canardMeshL.castShadow = true;
+        canardGroupL.add(canardMeshL);
+        this.group.add(canardGroupL);
+        this.canardL = canardGroupL;
 
         // 3. Wingtip Articulated Tilt-Rotor Nacelles
         const nacelleGeo = new THREE.CylinderGeometry(0.22, 0.24, 1.1, 12);
@@ -168,12 +201,14 @@ export class Drone {
         finR.rotation.z = -0.35;
         finR.rotation.y = -0.1;
         this.group.add(finR);
+        this.finR = finR;
 
         const finL = new THREE.Mesh(finGeo, this.matAccent);
         finL.position.set(-0.75, 0.5, -1.8);
         finL.rotation.z = 0.35;
         finL.rotation.y = 0.1;
         this.group.add(finL);
+        this.finL = finL;
 
         // 5. Navigation Strobe Light (Blinking white/red)
         const strobeLight = new THREE.PointLight(0xff3333, 1.2, 8);
@@ -291,6 +326,9 @@ export class Drone {
 
         this.group.add(rearGearR);
         this.landingGear.push(rearGearR);
+
+        // Scale drone down — it should feel small and nimble against a vast open world
+        this.group.scale.set(0.45, 0.45, 0.45);
     }
 
     applySkin(skin) {
@@ -328,6 +366,11 @@ export class Drone {
         if (!frameDt || Number.isNaN(frameDt)) return;
         const safeDt = Math.min(frameDt, MAX_ACCUMULATED_TIME);
         this.physicsAccumulator += safeDt;
+
+        // Record steering input for smooth aerodynamic body transformation
+        this.currentSteer = (typeof inputState.steerYaw === 'number')
+            ? inputState.steerYaw
+            : ((typeof inputState.turn === 'number') ? inputState.turn : 0);
 
         // Substep physics loop (Task 1: Fixed-Timestep Accumulator at 120 Hz)
         while (this.physicsAccumulator >= FIXED_DT) {
@@ -385,33 +428,33 @@ export class Drone {
             this.nitroAmount = Math.min(maxNitro, this.nitroAmount + nitroCfg.NATURAL_RECHARGE_RATE * dt);
         }
 
-        // Determine target hovercar speed based directly on user input
+        // Determine target hovercar speed — apply cubic curve for progressive, breathing acceleration
         let targetSpeedKmh = 0.0;
-        const forwardInput = (typeof inputState.forward === 'number') ? inputState.forward : 0;
+        const rawForward = (typeof inputState.forward === 'number') ? inputState.forward : 0;
+        // Raise input to power 1.7: gentle start, strong top-end push (sign-preserving)
+        const forwardInput = rawForward >= 0
+            ? Math.pow(rawForward, 1.7)
+            : -Math.pow(-rawForward, 1.7);
 
         if (inputState.hoverStopActive) {
             targetSpeedKmh = 0.0;
             const decelDamp = Math.max(0, 1.0 - (CONFIG.ASSIST?.HOVER_STOP?.DECEL_RATE || 160.0) * dt / 22.0);
             this.velocity.multiplyScalar(decelDamp);
             if (this.velocity.length() < 0.15) this.velocity.set(0, 0, 0);
-            this.targetNacelleAngle = Math.PI / 2.0; // 90° VTOL vertical hover posture
+            this.targetNacelleAngle = Math.PI / 2.0;
             this.landingGearExtended = true;
-        } else if (this.nitroStage === 3 && forwardInput >= 0) {
+        } else if (this.nitroStage === 3 && rawForward >= 0) {
             targetSpeedKmh = flightCfg.STAGE3_BOOST_SPEED;
-        } else if (this.nitroStage === 2 && forwardInput >= 0) {
+        } else if (this.nitroStage === 2 && rawForward >= 0) {
             targetSpeedKmh = flightCfg.STAGE2_BOOST_SPEED;
         } else if (forwardInput > 0) {
-            // Proportional forward throttle: 0 to maxCruiseSpeed
             targetSpeedKmh = maxCruiseSpeed * Math.min(1.0, forwardInput);
         } else if (forwardInput < 0) {
-            // Active braking and reverse drive
             targetSpeedKmh = -flightCfg.REVERSE_SPEED * Math.min(1.0, Math.abs(forwardInput));
         } else {
-            // Neutral stick / no keys: smooth coasting to stationary 0 km/h hover
             targetSpeedKmh = 0.0;
         }
 
-        // Turbulence drag modifier (Task 6)
         if (this.isTurbulenceActive) {
             targetSpeedKmh *= 0.78;
         }
@@ -423,7 +466,6 @@ export class Drone {
             const targetSpeedMs = targetSpeedKmh / 3.6;
             _fwdVector.set(0, 0, 1).applyQuaternion(this.quaternion);
 
-            // Compute current forward velocity component
             let currentSpeedMs = this.velocity.dot(_fwdVector);
             if (!Number.isFinite(currentSpeedMs)) currentSpeedMs = 0;
 
@@ -438,12 +480,14 @@ export class Drone {
                 newSpeedMs = Math.max(targetSpeedMs, currentSpeedMs - speedStep);
             }
 
-            // Snap micro-speeds to zero for stationary hover
-            if (Math.abs(newSpeedMs) < 0.08 && Math.abs(forwardInput) < 0.05 && this.nitroStage === 1) {
+            if (Math.abs(newSpeedMs) < 0.08 && Math.abs(rawForward) < 0.05 && this.nitroStage === 1) {
                 newSpeedMs = 0;
             }
 
+            // Apply horizontal throttle only — altitude hold controller owns velocity.y
+            const savedVy = this.velocity.y;
             this.velocity.copy(_fwdVector).multiplyScalar(newSpeedMs);
+            this.velocity.y = savedVy;
         }
 
         // ADAS: Electronic Stability Control (ESC) - dampens lateral hover slide
@@ -454,21 +498,70 @@ export class Drone {
             GATE_MAGNETISM_DIST: 28.0,
             GATE_MAGNETISM_FORCE: 14.0,
             AUTO_ELEVATION_RATE: 6.0,
-            HOVER_HEIGHT_DEFAULT: 18.0
+            HOVER_HEIGHT_DEFAULT: 22.0,
+            LANE_ASSIST_FORCE: 5.5,
+            LANE_ASSIST_DIST: 60.0,
+            TRACK_ALIGN_GAIN: 0.28
         };
 
         if (stuntFsm && typeof stuntFsm.isDriftActive === 'function' ? !stuntFsm.isDriftActive() : true) {
             _fwdVector.set(0, 0, 1).applyQuaternion(this.quaternion);
             const fwdMag = this.velocity.dot(_fwdVector);
             _tangentScratch.copy(_fwdVector).multiplyScalar(fwdMag);
-            _tangentScratch.y = this.velocity.y; // Preserve vertical glide
+            _tangentScratch.y = this.velocity.y;
             this.velocity.lerp(_tangentScratch, dt * (adasCfg.ESC_LATERAL_STABILITY * 12.0));
+        }
+
+        // ADAS: Spline Lane-Assist + Adaptive Yaw Alignment (zen track follow)
+        const trackSpline = this.trackSpline || trackBuilder?.spline;
+        if (trackSpline && this.velocity.length() > 1.0 && !stuntFsm.isDriftActive?.()) {
+            // Find the nearest point on the spline (coarse binary search across 40 samples)
+            let nearestT = this.splineProgress || 0;
+            let nearestDistSq = Infinity;
+            const steps = 40;
+            for (let si = 0; si < steps; si++) {
+                const t = si / steps;
+                const pt = trackSpline.getPointAt(t);
+                const dSq = this.position.distanceToSquared(pt);
+                if (dSq < nearestDistSq) { nearestDistSq = dSq; nearestT = t; }
+            }
+            this.splineProgress = nearestT;
+
+            const laneRadius = adasCfg.LANE_ASSIST_DIST || 60.0;
+            if (nearestDistSq < laneRadius * laneRadius) {
+                const nearestPt = trackSpline.getPointAt(nearestT);
+                const trackTangent = trackSpline.getTangentAt(nearestT).normalize();
+
+                // Lane-assist: lateral offset → gentle corrective position nudge
+                _tangentScratch.subVectors(nearestPt, this.position);
+                _tangentScratch.y = 0; // horizontal only
+                const lateralDist = _tangentScratch.length();
+                if (lateralDist > 2.0) {
+                    const assistStrength = (adasCfg.LANE_ASSIST_FORCE || 5.5) *
+                        Math.min(1.0, lateralDist / 30.0) * dt * 0.4;
+                    this.position.addScaledVector(_tangentScratch.normalize(), assistStrength);
+                }
+
+                // Adaptive yaw: blend a fraction of track tangent into drone heading
+                // — makes turns feel like the world is cooperating, not fighting you
+                const alignGain = adasCfg.TRACK_ALIGN_GAIN || 0.28;
+                const speedRatio = Math.min(1.0, this.speedKmh / (flightCfg.MAX_CRUISE_SPEED || 95.0));
+                const blendAmount = alignGain * speedRatio * dt * 2.5;
+                _fwdVector.set(0, 0, 1).applyQuaternion(this.quaternion);
+                _fwdVector.lerp(trackTangent, blendAmount).normalize();
+                // Only apply if roughly going the same direction (dot > 0.5)
+                if (_fwdVector.dot(trackTangent) > 0.5) {
+                    _crossScratch.crossVectors(new THREE.Vector3(0, 1, 0), _fwdVector).normalize();
+                    _quatScratch.setFromAxisAngle(new THREE.Vector3(0, 1, 0),
+                        Math.atan2(_fwdVector.x, _fwdVector.z));
+                }
+            }
         }
 
         // ADAS: Static Hover Altitude Hold & Auto-Elevation Glide
         if (!inputState.hoverStopActive) {
             let targetY = inputState.targetAltitude || adasCfg.HOVER_HEIGHT_DEFAULT;
-            
+
             // Auto-elevation toward upcoming holographic ring
             if (trackBuilder && trackBuilder.gates && trackBuilder.gates.length > 0) {
                 const targetGate = trackBuilder.gates[(this.nextGateIndex || 0) % trackBuilder.gates.length];
@@ -486,7 +579,7 @@ export class Drone {
             this.velocity.y += (targetVy - this.velocity.y) * (1 - Math.exp(-(adasCfg.AUTO_ELEVATION_RATE || 6.0) * dt));
         }
 
-        // ADAS: Gate Trajectory Magnetism (Funnel into upcoming floating circles)
+        // ADAS: Gate Trajectory Magnetism
         if (trackBuilder && trackBuilder.gates && trackBuilder.gates.length > 0 && this.velocity.length() > 3.0) {
             const targetGate = trackBuilder.gates[(this.nextGateIndex || 0) % trackBuilder.gates.length];
             if (targetGate && targetGate.position) {
@@ -494,24 +587,24 @@ export class Drone {
                 const magnetDist = adasCfg.GATE_MAGNETISM_DIST || 28.0;
                 if (distToGate < magnetDist && distToGate > 3.5) {
                     _tangentScratch.subVectors(targetGate.position, this.position);
-                    _tangentScratch.y *= 0.4; // Favor horizontal trajectory alignment
+                    _tangentScratch.y *= 0.4;
                     const pullStrength = (1.0 - (distToGate / magnetDist)) * (adasCfg.GATE_MAGNETISM_FORCE || 14.0);
                     this.position.addScaledVector(_tangentScratch.normalize(), pullStrength * dt * 0.35);
                 }
             }
         }
 
-        // Task 2: Ground-Effect Aerodynamic Repulsion Engine
+        // Ground-Effect Aerodynamic Repulsion
         this.applyGroundEffect(dt, trackBuilder);
 
-        // ADAS: Dynamic 4-Point Hover Raycast Cushioning & Wall Deflection
+        // ADAS: Dynamic Hover Raycast Cushioning & Wall Deflection
         this.applyHoverDeflection(dt, trackBuilder, inputState);
 
         // Apply position delta
         this.position.addScaledVector(this.velocity, dt);
         this.speedKmh = Math.hypot(this.velocity.x, this.velocity.z) * 3.6;
 
-        // Task 10: Smooth Course Realignment & Spline Projection Guard
+        // Course realignment stub (player drives freely in hovercar mode)
         this.checkCourseRealignment(dt, trackBuilder);
     }
 
@@ -582,9 +675,62 @@ export class Drone {
         // Smooth nacelle transition
         this.currentNacelleAngle = THREE.MathUtils.lerp(this.currentNacelleAngle, this.targetNacelleAngle, dt * 8.0);
 
-        this.tiltNacelles.forEach(n => {
-            n.rotation.x = this.currentNacelleAngle;
-        });
+        // Sci-Fi Jet Variable-Geometry Transformation at Curvings & Turns
+        // Damped smoothly with exponential filter — breathing and organic, never jarring
+        const targetMorph = Math.max(-1.0, Math.min(1.0, this.currentSteer || 0));
+        this.turnMorph = THREE.MathUtils.lerp(this.turnMorph || 0, targetMorph, dt * 5.2);
+        const morph = this.turnMorph;
+
+        // 1. Fuselage dynamic bow & organic aero-twist
+        if (this.fuselage) {
+            this.fuselage.rotation.y = -morph * 0.09;
+            this.fuselage.rotation.z = -morph * 0.05;
+        }
+        if (this.canopy) {
+            this.canopy.rotation.y = -morph * 0.07;
+            this.canopy.rotation.z = -morph * 0.04;
+        }
+
+        // 2. Swept Main Wings variable-sweep & dihedral camber
+        if (this.wingR && this.wingL) {
+            // Right wing flexes into turn geometry
+            this.wingR.rotation.y = -morph * 0.14;
+            this.wingR.rotation.z = -morph * 0.11;
+            // Left wing flexes sympathetically
+            this.wingL.rotation.y = -morph * 0.14;
+            this.wingL.rotation.z = -morph * 0.11;
+        }
+
+        // 3. Articulated Forward Aerodynamic Canards / Aero Flaps
+        if (this.canardR && this.canardL) {
+            // Differential pitch flaring for aerodynamic turn bite
+            this.canardR.rotation.x = -morph * 0.35;
+            this.canardL.rotation.x = morph * 0.35;
+            this.canardR.rotation.z = -morph * 0.12;
+            this.canardL.rotation.z = -morph * 0.12;
+        }
+
+        // 4. Wingtip Nacelles Differential Thrust Vectoring
+        if (this.tiltNacelles && this.tiltNacelles.length >= 2) {
+            // Outer nacelle pitches down/vectors thrust, inner feathers back
+            this.tiltNacelles[0].rotation.x = this.currentNacelleAngle - morph * 0.16;
+            this.tiltNacelles[1].rotation.x = this.currentNacelleAngle + morph * 0.16;
+            // Wingtip roll cant
+            this.tiltNacelles[0].rotation.z = -morph * 0.18;
+            this.tiltNacelles[1].rotation.z = -morph * 0.18;
+        } else {
+            this.tiltNacelles.forEach(n => {
+                n.rotation.x = this.currentNacelleAngle;
+            });
+        }
+
+        // 5. Twin Tail Fins Dynamic Rudder Splay & Cant
+        if (this.finR && this.finL) {
+            this.finR.rotation.y = -0.1 - morph * 0.32;
+            this.finL.rotation.y = 0.1 - morph * 0.32;
+            this.finR.rotation.z = -0.35 - morph * 0.14;
+            this.finL.rotation.z = 0.35 - morph * 0.14;
+        }
 
         // Rotor blur effect at high speeds
         this.rotorBlurIntensity = THREE.MathUtils.lerp(this.rotorBlurIntensity, cruiseRatio, dt * 5.0);

@@ -24,7 +24,7 @@ export const CONFIG = {
             laps: 2,
             payloads: 4,
             requiredSectorId: null,
-            fogDensity: 0.0018,
+            fogDensity: 0.0008,
             sunColor: 0xfff0dd,
             skyColor: 0x07111f,
             zenithColor: 0x040814,
@@ -32,8 +32,8 @@ export const CONFIG = {
             gridColor: 0x00e5ff,
             trackEmissive: 0x00f0ff,
             trackEdge: 0x0E7C7B,
-            buildingSpread: 650,
-            buildingHeightMax: 130,
+            buildingSpread: 2200,
+            buildingHeightMax: 65,
             buildingColors: [0x0F8B8D, 0x1E3D59, 0xEC9A29, 0x17B978, 0x2B4162, 0xFF6E40, 0x38A3A5, 0x57CC99],
             beaconColors: [0x00ffff, 0xff0055, 0xffaa00],
             trimColor: 0x00ffff,
@@ -47,7 +47,7 @@ export const CONFIG = {
             laps: 3,
             payloads: 6,
             requiredSectorId: 1,
-            fogDensity: 0.0024,
+            fogDensity: 0.0012,
             sunColor: 0xffaa77,
             skyColor: 0x0b1724,
             zenithColor: 0x060c16,
@@ -55,8 +55,8 @@ export const CONFIG = {
             gridColor: 0xffaa00,
             trackEmissive: 0xff8800,
             trackEdge: 0xff5500,
-            buildingSpread: 800,
-            buildingHeightMax: 170,
+            buildingSpread: 2600,
+            buildingHeightMax: 85,
             buildingColors: [0xDDA15E, 0xBC6C25, 0x3A506B, 0xE76F51, 0x264653, 0xF4A261, 0xE63946, 0x457B9D],
             beaconColors: [0xffaa00, 0xff3300, 0x00e5ff],
             trimColor: 0xffa500,
@@ -70,7 +70,7 @@ export const CONFIG = {
             laps: 3,
             payloads: 8,
             requiredSectorId: 2,
-            fogDensity: 0.0030,
+            fogDensity: 0.0014,
             sunColor: 0x88ccff,
             skyColor: 0x050c18,
             zenithColor: 0x090218,
@@ -78,8 +78,8 @@ export const CONFIG = {
             gridColor: 0x9d4edd,
             trackEmissive: 0x00ffff,
             trackEdge: 0x7209b7,
-            buildingSpread: 950,
-            buildingHeightMax: 220,
+            buildingSpread: 3000,
+            buildingHeightMax: 110,
             buildingColors: [0x240046, 0x3C096C, 0x5A189A, 0x7B2CBF, 0x9D4EDD, 0x00F5D4, 0x7209B7, 0x4361EE],
             beaconColors: [0xff00ff, 0x00ffff, 0x7000ff],
             trimColor: 0xff00aa,
@@ -94,7 +94,7 @@ export const CONFIG = {
             laps: 4,
             payloads: 10,
             requiredSectorId: 3,
-            fogDensity: 0.0035,
+            fogDensity: 0.0016,
             sunColor: 0xff4422,
             skyColor: 0x14041a,
             zenithColor: 0x12000d,
@@ -102,8 +102,8 @@ export const CONFIG = {
             gridColor: 0xff2a4b,
             trackEmissive: 0xffc400,
             trackEdge: 0xff0044,
-            buildingSpread: 1100,
-            buildingHeightMax: 280,
+            buildingSpread: 3400,
+            buildingHeightMax: 140,
             buildingColors: [0x621708, 0x941B0C, 0xBC3908, 0xF6AA1C, 0xD4A373, 0x3F0008, 0xE63946, 0xFB8500],
             beaconColors: [0xff0033, 0xffbb00, 0xff0077],
             trimColor: 0xffc400,
@@ -120,7 +120,7 @@ export const CONFIG = {
             gravityMultiplier: 0.42,
             dragMultiplier: 0.45,
             isLowGravity: true,
-            fogDensity: 0.0012,
+            fogDensity: 0.0006,
             sunColor: 0xffffff,
             skyColor: 0x020307,
             zenithColor: 0x000002,
@@ -128,8 +128,8 @@ export const CONFIG = {
             gridColor: 0x00ffff,
             trackEmissive: 0x00ffff,
             trackEdge: 0x0E7C7B,
-            buildingSpread: 1200,
-            buildingHeightMax: 320,
+            buildingSpread: 3800,
+            buildingHeightMax: 160,
             buildingColors: [0x1a1a24, 0x222233, 0x333344, 0x00ffff, 0x444455, 0x11111a],
             beaconColors: [0x00ffff, 0xff0055, 0xffffff],
             trimColor: 0x00ffff,
@@ -284,19 +284,19 @@ export const CONFIG = {
 
     // Aircraft Kinematics & Aerodynamics (Hovercar Configuration)
     FLIGHT: {
-        BASE_SPEED: 0.0,       // Direct throttle: neutral stick idles at 0 km/h hover
+        BASE_SPEED: 0.0,
         IDLE_SPEED: 0.0,
-        MAX_CRUISE_SPEED: 95.0, // Comfortable hovercar cruise – feels grounded & controllable
+        MAX_CRUISE_SPEED: 95.0,
         REVERSE_SPEED: 25.0,
         STAGE2_BOOST_SPEED: 140.0,
         STAGE3_BOOST_SPEED: 190.0,
-        ACCELERATION: 42.0,    // Gradual build-up, not instant lunge
+        ACCELERATION: 42.0,
         BRAKING_DECEL: 55.0,
         ROLL_RATE: 2.0,
-        PITCH_RATE: 0.0,       // Pitch locked to 0 – no helicopter nose-dives
-        YAW_RATE: 1.6,         // Smooth car-like heading changes, not snap turns
-        BANKING_TILT: 0.40,    // Pronounced chassis lean into turns (aircraft-like body roll)
-        PITCH_TILT: 0.0,       // Fixed level flight
+        PITCH_RATE: 0.0,
+        YAW_RATE: 1.2,         // Slow, zen turn rate — world opens up around you
+        BANKING_TILT: 0.42,    // Pronounced body lean into turns
+        PITCH_TILT: 0.0,
         VERTICAL_THRUST: 38.0,
         INDUCED_DRAG: 0.032,
         DRAFTING_DISTANCE: 22.0,
@@ -306,13 +306,16 @@ export const CONFIG = {
     // Flight Assist, Fixed Altitude Hold, Autopilot & Hovercar ADAS
     ASSIST: {
         HOVERCAR_ADAS: {
-            ESC_LATERAL_STABILITY: 0.92, // Anti-slide electronic stability
+            ESC_LATERAL_STABILITY: 0.92,
             WALL_REPULSION_DIST: 4.5,
             WALL_REPULSION_FORCE: 35.0,
             GATE_MAGNETISM_DIST: 28.0,
             GATE_MAGNETISM_FORCE: 14.0,
             AUTO_ELEVATION_RATE: 6.0,
-            HOVER_HEIGHT_DEFAULT: 18.0
+            HOVER_HEIGHT_DEFAULT: 22.0,
+            LANE_ASSIST_FORCE: 5.5,    // Soft lateral push toward track centerline
+            LANE_ASSIST_DIST: 60.0,    // Activation radius from nearest spline point
+            TRACK_ALIGN_GAIN: 0.28     // Fraction of track tangent blended into player yaw
         },
         FLY_ASSIST: {
             AUTO_LEVEL_RATE: 8.0,
@@ -398,13 +401,13 @@ export const CONFIG = {
 
     // Camera Rig & Psychophysics
     CAMERA: {
-        BASE_FOV: 70.0,
-        STAGE2_FOV: 88.0,
-        STAGE3_FOV: 104.0,
-        BASE_DISTANCE: 6.4,
-        BASE_HEIGHT: 2.1,
-        SPRING_STIFFNESS: 10.5,
-        SPRING_DAMPING: 6.0,
+        BASE_FOV: 75.0,
+        STAGE2_FOV: 90.0,
+        STAGE3_FOV: 108.0,
+        BASE_DISTANCE: 10.0,
+        BASE_HEIGHT: 3.2,
+        SPRING_STIFFNESS: 5.5,   // Loose — camera drifts serenely into position
+        SPRING_DAMPING: 4.2,
         SHAKE_INTENSITY: 0.24
     },
 

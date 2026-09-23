@@ -128,10 +128,13 @@ export class CameraRig {
         if (!drone) return;
         this.isEpilogue = false;
         const camCfg = CONFIG.CAMERA;
-        _idealOffset.set(0, camCfg.BASE_HEIGHT, -camCfg.BASE_DISTANCE).applyQuaternion(drone.quaternion);
+        // Use yaw-only to keep horizon level on spawn
+        const spawnEuler = new THREE.Euler().setFromQuaternion(drone.quaternion, 'YXZ');
+        const yawOnlyQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, spawnEuler.y, 0, 'YXZ'));
+        _idealOffset.set(0, camCfg.BASE_HEIGHT, -camCfg.BASE_DISTANCE).applyQuaternion(yawOnlyQuat);
         this.currentPos.copy(drone.position).add(_idealOffset);
         this.velocity.set(0, 0, 0);
-        _forwardLook.set(0, 0.4, 6.0).applyQuaternion(drone.quaternion);
+        _forwardLook.set(0, 0.4, 6.0).applyQuaternion(yawOnlyQuat);
         this.currentLookAt.copy(drone.position).add(_forwardLook);
         this.camera.position.copy(this.currentPos);
         this.camera.lookAt(this.currentLookAt);
@@ -203,7 +206,8 @@ export class CameraRig {
 
         const camCfg = CONFIG.CAMERA;
 
-        // 1. Calculate ideal camera offset in drone's local space
+        // 1. Calculate ideal camera offset using yaw-only quaternion (no roll inheritance)
+        //    The drone's body banks visually, but the chase cam keeps the horizon level.
         let dist = camCfg.BASE_DISTANCE;
         let height = camCfg.BASE_HEIGHT;
 
@@ -225,8 +229,12 @@ export class CameraRig {
         this.camera.fov = this.currentFov;
         this.camera.updateProjectionMatrix();
 
+        // Build a yaw-only quaternion from the drone's euler to keep camera level
+        const _euler = new THREE.Euler().setFromQuaternion(drone.quaternion, 'YXZ');
+        const _yawOnlyQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, _euler.y, 0, 'YXZ'));
+
         // Target position in world space (zero-allocation)
-        _idealOffset.set(0, height, -dist).applyQuaternion(drone.quaternion);
+        _idealOffset.set(0, height, -dist).applyQuaternion(_yawOnlyQuat);
         _targetPos.copy(drone.position).add(_idealOffset);
 
         // Spring-damper physics towards target position
@@ -246,8 +254,8 @@ export class CameraRig {
         this.velocity.addScaledVector(_springForce, dt);
         this.currentPos.addScaledVector(this.velocity, dt);
 
-        // Smooth look-at tracking point slightly ahead of drone
-        _forwardLook.set(0, 0.4, 6.0).applyQuaternion(drone.quaternion);
+        // Smooth look-at tracking point slightly ahead of drone (yaw-only, level horizon)
+        _forwardLook.set(0, 0.4, 6.0).applyQuaternion(_yawOnlyQuat);
         _targetPos.copy(drone.position).add(_forwardLook);
         this.currentLookAt.lerp(_targetPos, dt * 10.0);
 

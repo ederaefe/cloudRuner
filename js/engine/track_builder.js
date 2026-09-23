@@ -113,39 +113,38 @@ export class TrackBuilder {
     }
 
     buildTrackSpline() {
-        // High-velocity 3D urban canyon loop with altitude climbs, dives, and sharp chicanes
+        // Wide open circuit — scaled 3x on XZ so the drone feels small in a vast world
         const basePoints = [
-            [0, 15, 0],
-            [60, 25, 120],
-            [140, 50, 220],
-            [80, 80, 360],
-            [-60, 45, 450],
-            [-180, 20, 380],
-            [-240, 60, 240],
-            [-200, 95, 100],
-            [-80, 70, -40],
-            [40, 30, -120],
-            [160, 10, -80],
-            [100, 12, -20]
+            [0,    18,   0],
+            [180,  28,   360],
+            [420,  55,   660],
+            [240,  85,   1080],
+            [-180, 48,   1350],
+            [-540, 22,   1140],
+            [-720, 65,   720],
+            [-600, 100,  300],
+            [-240, 75,   -120],
+            [120,  32,   -360],
+            [480,  12,   -240],
+            [300,  14,   -60]
         ];
 
-        // Task 11: Seed-based deterministic waypoint modulation
+        // Seed-based deterministic waypoint modulation (small jitter relative to new scale)
         const seedScale = 0.22;
-        const rawPoints = basePoints.map((bp, idx) => {
-            const rx = (this.rng.random() - 0.5) * 45 * seedScale;
-            const ry = (this.rng.random() - 0.5) * 25 * seedScale;
-            const rz = (this.rng.random() - 0.5) * 45 * seedScale;
-            return new THREE.Vector3(bp[0] + rx, Math.max(12, bp[1] + ry), bp[2] + rz);
+        const rawPoints = basePoints.map((bp) => {
+            const rx = (this.rng.random() - 0.5) * 80 * seedScale;
+            const ry = (this.rng.random() - 0.5) * 30 * seedScale;
+            const rz = (this.rng.random() - 0.5) * 80 * seedScale;
+            return new THREE.Vector3(bp[0] + rx, Math.max(14, bp[1] + ry), bp[2] + rz);
         });
 
-        // Task 20: Gaussian altitude smoothing kernel across cyclic waypoints
+        // Gaussian altitude smoothing kernel across cyclic waypoints
         const n = rawPoints.length;
         const smoothedPoints = [];
         for (let i = 0; i < n; i++) {
             const prev = rawPoints[(i - 1 + n) % n];
             const curr = rawPoints[i];
             const next = rawPoints[(i + 1) % n];
-            // 3-point Gaussian kernel [0.25, 0.5, 0.25]
             const smoothY = prev.y * 0.22 + curr.y * 0.56 + next.y * 0.22;
             smoothedPoints.push(new THREE.Vector3(curr.x, smoothY, curr.z));
         }
@@ -154,7 +153,7 @@ export class TrackBuilder {
     }
 
     createSkyDome() {
-        const skyGeo = new THREE.SphereGeometry(1800, 24, 16);
+        const skyGeo = new THREE.SphereGeometry(5000, 24, 16);
         const posAttr = skyGeo.attributes && skyGeo.attributes.position;
         if (posAttr && typeof posAttr.count === 'number' && typeof posAttr.getY === 'function') {
             const colorAttr = new Float32Array(posAttr.count * 3);
@@ -183,9 +182,8 @@ export class TrackBuilder {
     }
 
     createDistantSkylineSilhouettes() {
-        // Task 19: Distant Parallax Horizon Skyline Silhouettes
         const count = 36;
-        const radius = 1200;
+        const radius = 4000;
         const silhouetteMat = new THREE.MeshBasicMaterial({
             color: this.sector.zenithColor || 0x040814,
             side: THREE.DoubleSide,
@@ -239,7 +237,7 @@ export class TrackBuilder {
     }
 
     createCanyonFloor() {
-        const floorGeo = new THREE.PlaneGeometry(2400, 2400, 1, 1);
+        const floorGeo = new THREE.PlaneGeometry(8000, 8000, 1, 1);
         floorGeo.rotateX(-Math.PI / 2);
 
         const gridHex = (this.sector.gridColor !== undefined) ? this.sector.gridColor : 0x00e5ff;
@@ -296,46 +294,83 @@ export class TrackBuilder {
     }
 
     createTrackRibbon() {
-        // Open-air aerial flight guides linking floating circles (replaces solid roadbed)
-        const segments = 180;
+        // Slightly visible holographic ribbon track providing visual continuity between floating rings
+        const segments = 240;
+        const halfWidth = (CONFIG.TRACK.RIBBON_WIDTH || 12.0) * 0.45; // ~5.4m half-width
         const trackEmissiveHex = (this.sector.trackEmissive !== undefined) ? this.sector.trackEmissive : 0x00f0ff;
         const trackEdgeHex = (this.sector.trackEdge !== undefined) ? this.sector.trackEdge : 0x0E7C7B;
 
-        const centerPts = [];
-        const upperPts = [];
-        const lowerPts = [];
+        const positions = [];
+        const uvs = [];
+        const indices = [];
+
+        const leftPts = [];
+        const rightPts = [];
+        const _worldUp = new THREE.Vector3(0, 1, 0);
 
         for (let i = 0; i <= segments; i++) {
             const t = i / segments;
             const pt = this.spline.getPointAt(t);
-            centerPts.push(pt.clone());
-            upperPts.push(pt.clone().add(new THREE.Vector3(0, 4.0, 0)));
-            lowerPts.push(pt.clone().add(new THREE.Vector3(0, -4.0, 0)));
+            const tan = this.spline.getTangentAt(t).normalize();
+            
+            // Perpendicular horizontal normal along curve
+            const norm = new THREE.Vector3().crossVectors(tan, _worldUp).normalize();
+            if (norm.lengthSq() < 0.01) norm.set(1, 0, 0);
+
+            // Position ribbon slightly below hover altitude, directly threading through gate bases
+            const center = new THREE.Vector3(pt.x, pt.y - 1.1, pt.z);
+            const pLeft = center.clone().addScaledVector(norm, -halfWidth);
+            const pRight = center.clone().addScaledVector(norm, halfWidth);
+
+            positions.push(pLeft.x, pLeft.y, pLeft.z);
+            positions.push(pRight.x, pRight.y, pRight.z);
+
+            uvs.push(0, t * 60);
+            uvs.push(1, t * 60);
+
+            leftPts.push(pLeft.clone().add(new THREE.Vector3(0, 0.06, 0)));
+            rightPts.push(pRight.clone().add(new THREE.Vector3(0, 0.06, 0)));
+
+            if (i < segments) {
+                const base = i * 2;
+                indices.push(base, base + 1, base + 2);
+                indices.push(base + 1, base + 3, base + 2);
+            }
         }
 
-        const centerMat = new THREE.LineBasicMaterial({
+        const ribbonGeo = new THREE.BufferGeometry();
+        ribbonGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        ribbonGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        ribbonGeo.setIndex(indices);
+        ribbonGeo.computeVertexNormals();
+
+        // Elegant, translucent ethereal holographic light ribbon
+        const ribbonMat = new THREE.MeshBasicMaterial({
             color: trackEmissiveHex,
             transparent: true,
-            opacity: 0.85,
+            opacity: 0.16, // Subtle zen visibility without feeling heavy or walled
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+
+        const ribbonMesh = new THREE.Mesh(ribbonGeo, ribbonMat);
+        this.scene.add(ribbonMesh);
+
+        // Glowing perimeter border guide rails
+        const railMat = new THREE.LineBasicMaterial({
+            color: trackEdgeHex,
+            transparent: true,
+            opacity: 0.48,
             linewidth: 2
         });
 
-        const corridorMat = new THREE.LineBasicMaterial({
-            color: trackEdgeHex,
-            transparent: true,
-            opacity: 0.35,
-            linewidth: 1
-        });
+        const leftRail = new THREE.Line(new THREE.BufferGeometry().setFromPoints(leftPts), railMat);
+        const rightRail = new THREE.Line(new THREE.BufferGeometry().setFromPoints(rightPts), railMat);
 
-        const centerLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(centerPts), centerMat);
-        const upperLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(upperPts), corridorMat);
-        const lowerLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(lowerPts), corridorMat);
+        this.scene.add(leftRail);
+        this.scene.add(rightRail);
 
-        this.scene.add(centerLine);
-        this.scene.add(upperLine);
-        this.scene.add(lowerLine);
-
-        this.trackObjects.push(centerLine, upperLine, lowerLine);
+        this.trackObjects.push(ribbonMesh, leftRail, rightRail);
     }
 
     createHolographicGates() {
@@ -553,9 +588,9 @@ export class TrackBuilder {
             const norm = splineNormals[sampleIdx];
             const side = (i % 2 === 0) ? 1 : -1;
 
-            // Safe corridor setback with controlled variation for near-miss opportunities
+            // Push buildings far from the flight corridor — open sky feel, not a canyon tunnel
             const trackWidth = CONFIG.TRACK.RIBBON_WIDTH || 12;
-            const corridorSetback = (trackWidth * 0.5) + 22 + ((i * 7) % 24);
+            const corridorSetback = (trackWidth * 0.5) + 80 + ((i * 7) % 40);
             const lateralJitter = ((i * 13) % 15) - 7.5;
 
             const bw = 22 + ((i * 11) % 26);
