@@ -1,0 +1,557 @@
+/*
+================================================================================
+BARCH AERO-CANYON RACING - GLASSMORPHISM RACING HUD STYLES
+Mobile-first high-speed tactical flight interface
+================================================================================
+*/
+
+:root {
+    --primary-teal: #0E7C7B;
+    --accent-orange: #E8580A;
+    --nitro-amber: #F4A426;
+    --hyper-cyan: #00ffff;
+    --dark-slate: #07111f;
+    --card-bg: rgba(7, 17, 31, 0.72);
+    --border-glass: rgba(255, 255, 255, 0.16);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--dark-slate);
+    font-family: 'Rajdhani', -apple-system, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+}
+
+#viewport-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1;
+    display: block;
+}
+
+/* Speed Lines Canvas Overlay */
+#speed-lines-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s ease-out;
+}
+
+/* Top Tactical Telemetry Bar */
+#top-hud {
+    position: absolute;
+    top: env(safe-area-inset-top, 14px);
+    left: clamp(12px, 3vw, 24px);
+    right: clamp(12px, 3vw, 24px);
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    pointer-events: none;
+}
+
+.hud-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border-glass);
+    border-radius: 12px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    pointer-events: auto;
+}
+
+.telemetry-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.telemetry-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.6);
+    letter-spacing: 1px;
+}
+
+.telemetry-value {
+    font-size: clamp(16px, 4vw, 22px);
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+
+.telemetry-unit {
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.5);
+    margin-left: 2px;
+}
+
+/* Position Badge */
+#position-badge {
+    font-size: clamp(20px, 5vw, 28px);
+    font-weight: 900;
+    color: var(--nitro-amber);
+    text-shadow: 0 0 10px rgba(244, 164, 38, 0.6);
+    letter-spacing: 0.5px;
+}
+
+/* Nitro Boost Energy Gauge (Center Bottom) */
+#nitro-container {
+    position: absolute;
+    bottom: env(safe-area-inset-bottom, 20px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: clamp(200px, 42vw, 360px);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    pointer-events: none;
+}
+
+.nitro-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.nitro-track {
+    width: 100%;
+    height: 10px;
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid var(--border-glass);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.nitro-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--primary-teal), var(--nitro-amber));
+    border-radius: 5px;
+    transition: width 0.08s linear;
+}
+
+.nitro-fill.stage2 {
+    background: linear-gradient(90deg, var(--nitro-amber), var(--accent-orange));
+    box-shadow: 0 0 12px var(--accent-orange);
+}
+
+.nitro-fill.stage3 {
+    background: linear-gradient(90deg, var(--hyper-cyan), #ffffff);
+    box-shadow: 0 0 18px var(--hyper-cyan);
+}
+
+/* Stunt Banner Alert Notification */
+#stunt-alert {
+    position: absolute;
+    top: 24%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    background: rgba(7, 17, 31, 0.85);
+    border-left: 4px solid var(--hyper-cyan);
+    border-right: 4px solid var(--hyper-cyan);
+    border-top: 1px solid var(--border-glass);
+    border-bottom: 1px solid var(--border-glass);
+    padding: 8px 24px;
+    border-radius: 4px;
+    z-index: 15;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    text-align: center;
+}
+
+#stunt-alert.active {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.05);
+}
+
+.stunt-title {
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--hyper-cyan);
+    letter-spacing: 1.5px;
+}
+
+.stunt-bonus {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--nitro-amber);
+}
+
+/* Touch Controls Overlay */
+#touch-controls {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    pointer-events: none;
+    display: none;
+}
+
+.touch-stick-zone {
+    position: absolute;
+    bottom: env(safe-area-inset-bottom, 25px);
+    left: clamp(20px, 5vw, 40px);
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 2px solid var(--border-glass);
+    pointer-events: auto;
+    touch-action: none;
+}
+
+.touch-stick-knob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 50px;
+    height: 50px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-teal), #084948);
+    border: 2px solid var(--hyper-cyan);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+}
+
+/* Touch Action Buttons (Right Side) */
+.touch-action-pad {
+    position: absolute;
+    bottom: env(safe-area-inset-bottom, 25px);
+    right: clamp(20px, 5vw, 40px);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    pointer-events: auto;
+}
+
+.touch-btn {
+    width: 60px;
+    height: 60px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid var(--border-glass);
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+    touch-action: none;
+    transition: transform 0.08s, background 0.08s;
+}
+
+.touch-btn:active {
+    transform: scale(0.92);
+    background: rgba(14, 124, 123, 0.7);
+    border-color: var(--hyper-cyan);
+}
+
+.touch-btn-boost {
+    background: linear-gradient(135deg, var(--accent-orange), #a33b00);
+    border-color: var(--nitro-amber);
+    box-shadow: 0 0 15px rgba(232, 88, 10, 0.4);
+}
+
+.touch-btn-boost:active {
+    background: var(--nitro-amber);
+}
+
+/* Modal / Menu Screens */
+.overlay-screen {
+    position: absolute;
+    inset: 0;
+    background: rgba(7, 17, 31, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.3s ease;
+}
+
+.overlay-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.glass-modal {
+    background: var(--card-bg);
+    border: 1px solid var(--border-glass);
+    border-radius: 16px;
+    padding: clamp(20px, 4vw, 32px);
+    width: 90%;
+    max-width: 440px;
+    color: #ffffff;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+}
+
+.glass-modal h1 {
+    font-size: clamp(22px, 5vw, 30px);
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: var(--nitro-amber);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.instruction-grid {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border-glass);
+    border-radius: 10px;
+    padding: 12px;
+    margin: 16px 0;
+    text-align: left;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #cccccc;
+}
+
+.instruction-grid strong {
+    color: var(--hyper-cyan);
+}
+
+.cta-button {
+    width: 100%;
+    padding: 14px 20px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--primary-teal), #075251);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.cta-button:active {
+    transform: scale(0.97);
+}
+
+.tier-indicator {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 12px;
+}
+
+/* Mode & Sector Selectors */
+.mode-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin: 12px 0;
+}
+
+.mode-select-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    color: #fff;
+    padding: 10px 6px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.mode-select-btn.active {
+    background: var(--primary-teal);
+    border-color: var(--hyper-cyan);
+    box-shadow: 0 0 12px rgba(0, 255, 255, 0.4);
+}
+
+.sector-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 12px 0;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.sector-card-btn {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    padding: 10px;
+    color: #fff;
+    text-align: left;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.sector-card-btn.active {
+    border-color: var(--nitro-amber);
+    background: rgba(244, 164, 38, 0.12);
+}
+
+/* Hangar & Skin Carousel */
+.skin-cards-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 14px 0;
+}
+
+.skin-card {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.skin-card.selected {
+    border-color: var(--hyper-cyan);
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+.skin-color-preview {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+}
+
+.skin-name {
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.skin-action-btn {
+    width: 100%;
+    padding: 6px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 800;
+    cursor: pointer;
+    border: none;
+}
+
+.skin-action-btn.unlocked {
+    background: var(--primary-teal);
+    color: #fff;
+}
+
+.skin-action-btn.locked {
+    background: var(--accent-orange);
+    color: #fff;
+}
+
+/* Upgrades List */
+.upgrade-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 14px 0;
+}
+
+.upgrade-item {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border-glass);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+}
+
+.upgrade-btn {
+    background: var(--nitro-amber);
+    color: #07111f;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.upgrade-btn.maxed {
+    background: rgba(255, 255, 255, 0.2);
+    color: #888;
+    cursor: default;
+}
+
+/* Settings Sliders & Form */
+.settings-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 16px 0;
+    text-align: left;
+}
+
+.settings-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.settings-slider {
+    width: 140px;
+    accent-color: var(--primary-teal);
+}
+
+.settings-select {
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--border-glass);
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+}
