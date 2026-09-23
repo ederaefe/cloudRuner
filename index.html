@@ -543,6 +543,71 @@
     </div>
 </div>
 
+<!-- Tactical Customizations, Manual & Settings All-In-One Sidebar Drawer -->
+<div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+<aside id="customization-sidebar" class="customization-sidebar">
+    <div class="sidebar-header">
+        <div class="sidebar-title-group">
+            <div class="sidebar-app-title">BARCH FLIGHT DECK</div>
+            <div class="sidebar-user-stats">
+                <span id="sidebar-credits-txt">600 CR</span>
+                <span class="sidebar-stat-divider">|</span>
+                <span id="sidebar-rank-txt">SECTOR 01</span>
+            </div>
+        </div>
+        <button id="btn-close-sidebar" class="sidebar-close-btn" aria-label="Close sidebar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+
+    <!-- Navigation Tabs: MANUAL, SETTINGS, HANGAR, UPGRADES, SECTORS, MODES -->
+    <nav class="sidebar-nav-tabs">
+        <button class="sidebar-nav-btn active" data-tab="manual">MANUAL</button>
+        <button class="sidebar-nav-btn" data-tab="settings">SETTINGS</button>
+        <button class="sidebar-nav-btn" data-tab="hangar">HANGAR</button>
+        <button class="sidebar-nav-btn" data-tab="upgrades">UPGRADES</button>
+        <button class="sidebar-nav-btn" data-tab="sectors">SECTORS</button>
+        <button class="sidebar-nav-btn" data-tab="modes">MODES</button>
+    </nav>
+
+    <!-- Sidebar Content Panels -->
+    <div class="sidebar-content-area">
+        <!-- Tab 1: User Manuals & Assist Guide -->
+        <div id="sidebar-tab-manual" class="sidebar-tab-panel active">
+            <div id="sidebar-manual-content"></div>
+        </div>
+
+        <!-- Tab 2: System Settings & Avionics Toggles -->
+        <div id="sidebar-tab-settings" class="sidebar-tab-panel">
+            <div id="sidebar-settings-content"></div>
+        </div>
+
+        <!-- Tab 3: Drone Airframe Skins -->
+        <div id="sidebar-tab-hangar" class="sidebar-tab-panel">
+            <div id="sidebar-skins-list" class="sidebar-skins-grid"></div>
+        </div>
+
+        <!-- Tab 4: Tactical Flight Upgrades -->
+        <div id="sidebar-tab-upgrades" class="sidebar-tab-panel">
+            <div id="sidebar-upgrades-list"></div>
+        </div>
+
+        <!-- Tab 5: Campaign Sectors -->
+        <div id="sidebar-tab-sectors" class="sidebar-tab-panel">
+            <div id="sidebar-sectors-list"></div>
+        </div>
+
+        <!-- Tab 6: Flight Missions & Modes -->
+        <div id="sidebar-tab-modes" class="sidebar-tab-panel">
+            <div id="sidebar-modes-list"></div>
+        </div>
+    </div>
+
+    <div class="sidebar-footer">
+        <button id="sidebar-btn-academy" class="cta-button" style="width:100%; font-size:12px; padding:10px;">OPEN FLIGHT ACADEMY</button>
+    </div>
+</aside>
+
 <!-- Main Game Application Bootstrap -->
 <script type="module">
 import { Coordinator } from './js/coordinator.js';
@@ -563,6 +628,7 @@ import { ParticleSystem } from './js/engine/particle_system.js';
 import { PreloadScreen } from './js/ui/preload_screen.js';
 import { CustomizationSidebar } from './js/ui/sidebar.js';
 import { ControlsGuide } from './js/ui/controls_guide.js';
+import { Autopilot } from './js/engine/autopilot.js';
 
 window.addEventListener('load', () => {
     // 1. Hardware Profiler & Coordinator
@@ -644,8 +710,64 @@ window.addEventListener('load', () => {
     // 5. Instantiate Player Drone & HUD
     const playerDrone = new Drone(scene, false, null, tier);
     const hud = new RacingHUD();
+    const autopilot = new Autopilot();
     let stuntsCompletedCount = 0;
     let maxSpeedInRace = 0;
+
+    // Global assist helpers for input modules and sidebar
+    window._showAssistAlert = (title, msg) => { hud.showStuntAlert(title, msg); };
+    window._inputManager = inputManager;
+    window._playerDrone = playerDrone;
+
+    // Flight Assist Control Bar Event Listeners
+    const btnHudAuto = document.getElementById('btn-hud-auto');
+    if (btnHudAuto) {
+        btnHudAuto.addEventListener('click', () => {
+            const state = inputManager.toggleAutopilot();
+            hud.showStuntAlert('AUTOPILOT HAND-OFF', state ? 'CO-PILOT ENGAGED' : 'MANUAL RESTORED');
+        });
+    }
+
+    const btnHudAlt = document.getElementById('btn-hud-alt');
+    if (btnHudAlt) {
+        btnHudAlt.addEventListener('click', () => {
+            const currentY = playerDrone ? playerDrone.position.y : null;
+            const state = inputManager.toggleAltitudeHold(currentY);
+            hud.showStuntAlert('ALTITUDE HOLD', state ? `LOCKED: ${Math.round(inputManager.state.targetAltitude)}M` : 'ALT HOLD DISENGAGED');
+        });
+    }
+
+    const btnHudAltDown = document.getElementById('btn-hud-alt-down');
+    if (btnHudAltDown) {
+        btnHudAltDown.addEventListener('click', () => {
+            const target = inputManager.adjustTargetAltitude(-5);
+            hud.showStuntAlert('TARGET ALTITUDE', `${target} METERS (-5M)`);
+        });
+    }
+
+    const btnHudAltUp = document.getElementById('btn-hud-alt-up');
+    if (btnHudAltUp) {
+        btnHudAltUp.addEventListener('click', () => {
+            const target = inputManager.adjustTargetAltitude(5);
+            hud.showStuntAlert('TARGET ALTITUDE', `${target} METERS (+5M)`);
+        });
+    }
+
+    const btnHudStop = document.getElementById('btn-hud-stop');
+    if (btnHudStop) {
+        btnHudStop.addEventListener('click', () => {
+            const state = inputManager.toggleHoverStop();
+            hud.showStuntAlert('VTOL HOVER STOP', state ? 'FULL STOP AIRBRAKE ENGAGED' : 'HOVER BRAKE RELEASED');
+        });
+    }
+
+    const btnHudAssist = document.getElementById('btn-hud-assist');
+    if (btnHudAssist) {
+        btnHudAssist.addEventListener('click', () => {
+            const state = inputManager.toggleFlyAssist();
+            hud.showStuntAlert('FLIGHT ASSIST', state ? 'AUTO-LEVELING ACTIVE' : 'ASSIST DISABLED');
+        });
+    }
 
     const stuntFsm = new StuntFSM(soundEngine, (title, bonus) => {
         hud.showStuntAlert(title, bonus);
