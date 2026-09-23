@@ -165,7 +165,7 @@ export class CustomizationSidebar {
                     <div class="sidebar-skin-title">${skin.name}</div>
                     <div class="sidebar-skin-status">${isSelected ? 'ACTIVE AIRFRAME' : (isUnlocked ? 'READY TO FLY' : (skin.isCampaignExclusive ? 'CAMPAIGN CLIMAX' : `${skin.cost} CREDITS`))}</div>
                 </div>
-                <button class="sidebar-action-btn ${isUnlocked ? 'unlocked' : 'locked'} ${isSelected ? 'active' : ''}">
+                <button class="sidebar-action-btn ${isUnlocked ? 'unlocked' : 'locked'} ${isSelected ? 'active' : ''}" data-tooltip="${isSelected ? 'Airframe currently equipped' : (isUnlocked ? 'Equip this VTOL skin' : (skin.isCampaignExclusive ? 'Complete Sector 4 Climax to unlock' : `Purchase for ${skin.cost} Credits`))}">
                     ${actionLabel}
                 </button>
             `;

@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+    <defs>
+        <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#050b14"/>
+            <stop offset="50%" stop-color="#0a192f"/>
+            <stop offset="100%" stop-color="#07111f"/>
+        </linearGradient>
+        
+        <linearGradient id="cyan-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#00ffff"/>
+            <stop offset="100%" stop-color="#0e7c7b"/>
+        </linearGradient>
+
+        <linearGradient id="amber-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#f4a426"/>
+            <stop offset="100%" stop-color="#e8580a"/>
+        </linearGradient>
+
+        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="8" result="blur"/>
+            <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+        <filter id="subtle-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+    </defs>
+
+    <!-- Background Badge Hexagonal Base -->
+    <rect width="512" height="512" rx="110" fill="url(#bg-grad)"/>
+    <path d="M 256 32 L 448 128 L 448 384 L 256 480 L 64 384 L 64 128 Z" fill="none" stroke="rgba(0, 255, 255, 0.15)" stroke-width="4"/>
+    <path d="M 256 48 L 432 136 L 432 376 L 256 464 L 80 376 L 80 136 Z" fill="rgba(0, 255, 255, 0.03)" stroke="rgba(0, 255, 255, 0.3)" stroke-width="2" stroke-dasharray="12, 6"/>
+
+    <!-- Wing & Airframe Vector Paths -->
+    <!-- Swept Swept Wing Body -->
+    <path d="M 256 120 L 370 290 L 330 310 L 256 260 L 182 310 L 142 290 Z" fill="url(#cyan-glow)" filter="url(#subtle-glow)"/>
+    <path d="M 256 120 L 350 280 L 330 300 L 256 250 L 182 300 L 162 280 Z" fill="#07111f" opacity="0.4"/>
+
+    <!-- Main Fuselage Core -->
+    <polygon points="256,90 282,240 256,360 230,240" fill="#ffffff" filter="url(#subtle-glow)"/>
+    <polygon points="256,110 272,235 256,340 240,235" fill="url(#cyan-glow)"/>
+
+    <!-- Dual VTOL Rotor Turbines (Left & Right) -->
+    <!-- Left Rotor Ring -->
+    <circle cx="130" cy="270" r="52" fill="#050b14" stroke="url(#cyan-glow)" stroke-width="6" filter="url(#glow)"/>
+    <circle cx="130" cy="270" r="34" fill="none" stroke="rgba(0, 255, 255, 0.5)" stroke-width="2"/>
+    <!-- Turbine Blades -->
+    <path d="M 130 226 L 130 314 M 86 270 L 174 270 M 99 239 L 161 301 M 161 239 L 99 301" stroke="url(#cyan-glow)" stroke-width="3"/>
+    <circle cx="130" cy="270" r="14" fill="url(#amber-glow)"/>
+
+    <!-- Right Rotor Ring -->
+    <circle cx="382" cy="270" r="52" fill="#050b14" stroke="url(#cyan-glow)" stroke-width="6" filter="url(#glow)"/>
+    <circle cx="382" cy="270" r="34" fill="none" stroke="rgba(0, 255, 255, 0.5)" stroke-width="2"/>
+    <!-- Turbine Blades -->
+    <path d="M 382 226 L 382 314 M 338 270 L 426 270 M 351 239 L 413 301 M 413 239 L 351 301" stroke="url(#cyan-glow)" stroke-width="3"/>
+    <circle cx="382" cy="270" r="14" fill="url(#amber-glow)"/>
+
+    <!-- Afterburner Shockwave Trails -->
+    <path d="M 240 365 L 256 440 L 272 365 Z" fill="url(#amber-glow)" filter="url(#glow)"/>
+    <path d="M 246 365 L 256 420 L 266 365 Z" fill="#ffffff"/>
+
+    <!-- Tactical Speed Arc Brackets -->
+    <path d="M 100 160 A 180 180 0 0 1 412 160" fill="none" stroke="url(#amber-glow)" stroke-width="4" stroke-linecap="round" stroke-dasharray="160 40"/>
+</svg>

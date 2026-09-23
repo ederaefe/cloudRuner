@@ -8,6 +8,11 @@
     <meta name="theme-color" content="#07111f">
     <title>BARCH AERO-CANYON RACING</title>
     
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="alternate icon" type="image/png" href="favicon.svg">
+    <link rel="apple-touch-icon" href="favicon.svg">
+    <link rel="manifest" href="manifest.json">
+    
     <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/game.css">
     
@@ -64,9 +69,9 @@
             <span id="lap-or-target-label" class="telemetry-label">LAP</span>
             <div id="hud-lap" class="telemetry-value">1 / 2</div>
         </div>
-        <button id="btn-toggle-sidebar" class="hud-quick-btn" title="Toggle Customizations Sidebar (TAB)">CUSTOMIZE [TAB]</button>
-        <button id="btn-pause-game" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:6px 12px; font-weight:800; font-family:inherit; cursor:pointer;">PAUSE</button>
-        <button id="btn-audio-toggle" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:6px 10px; font-weight:800; font-family:inherit; cursor:pointer;">AUDIO: OFF</button>
+        <button id="btn-toggle-sidebar" class="hud-quick-btn" data-tooltip="Open Hangar, Upgrades & Mission Customizations (TAB)" data-tooltip-pos="bottom">CUSTOMIZE [TAB]</button>
+        <button id="btn-pause-game" data-tooltip="Pause Game & Flight Systems (ESC)" data-tooltip-pos="bottom" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:6px 12px; font-weight:800; font-family:inherit; cursor:pointer;">PAUSE</button>
+        <button id="btn-audio-toggle" data-tooltip="Toggle Master Turbine & Sound Effects" data-tooltip-pos="bottom" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:6px 10px; font-weight:800; font-family:inherit; cursor:pointer;">AUDIO: OFF</button>
     </div>
 </div>
 
@@ -145,20 +150,20 @@
         </div>
 
         <div style="display:flex; gap:8px; margin: 14px 0 10px 0;">
-            <button id="btn-open-sidebar-menu" class="cta-button" style="background:rgba(0,255,255,0.18); border:1px solid #00ffff; color:#00ffff; flex:1;">CUSTOMIZE [TAB]</button>
-            <button id="btn-open-help" class="cta-button" style="background:rgba(255,255,255,0.12); flex:1;">CONTROLS</button>
-            <button id="btn-open-settings" class="cta-button" style="background:rgba(255,255,255,0.12); flex:1;">SETTINGS</button>
+            <button id="btn-open-sidebar-menu" class="cta-button" data-tooltip="Open Drone Hangar & Customization Drawer" style="background:rgba(0,255,255,0.18); border:1px solid #00ffff; color:#00ffff; flex:1;">CUSTOMIZE [TAB]</button>
+            <button id="btn-open-help" class="cta-button" data-tooltip="View Flight Academy & Keyboard Controls" style="background:rgba(255,255,255,0.12); flex:1;">CONTROLS</button>
+            <button id="btn-open-settings" class="cta-button" data-tooltip="Adjust Graphics, Audio & Flight Sensitivity" style="background:rgba(255,255,255,0.12); flex:1;">SETTINGS</button>
         </div>
 
         <div style="display:flex; gap:8px; margin-bottom:8px;">
-            <button id="btn-copy-flight-link" class="cta-button" style="background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.25); font-size:12px; flex:1;">SHARE FLIGHT LINK</button>
-            <label class="cta-button" style="background:rgba(0,255,255,0.12); border:1px solid rgba(0,255,255,0.4); font-size:12px; flex:1; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+            <button id="btn-copy-flight-link" class="cta-button" data-tooltip="Copy Direct URL with Sector & Mode Parameters" style="background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.25); font-size:12px; flex:1;">SHARE FLIGHT LINK</button>
+            <label class="cta-button" data-tooltip="Import Recorded .aeroghost Flight Telemetry File" style="background:rgba(0,255,255,0.12); border:1px solid rgba(0,255,255,0.4); font-size:12px; flex:1; cursor:pointer; display:flex; align-items:center; justify-content:center;">
                 LOAD .AEROGHOST
                 <input type="file" id="input-ghost-file" accept=".aeroghost,.json" style="display:none;">
             </label>
         </div>
 
-        <button id="btn-launch-race" class="cta-button" style="background:linear-gradient(135deg, var(--primary-teal), #075251); font-size:17px;">LAUNCH MISSION</button>
+        <button id="btn-launch-race" class="cta-button" data-tooltip="Engage VTOL Rotors & Launch Mission" style="background:linear-gradient(135deg, var(--primary-teal), #075251); font-size:17px;">LAUNCH MISSION</button>
         <div id="tier-display-badge" class="tier-indicator">HARDWARE PROFILE: DETECTING...</div>
     </div>
 </div>

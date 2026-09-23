@@ -9,6 +9,8 @@ const CACHE_NAME = 'barch-aero-v4';
 const STATIC_ASSETS = [
     './',
     './index.html',
+    './favicon.svg',
+    './manifest.json',
     './css/game.css',
     './js/coordinator.js',
     './js/config.js',
