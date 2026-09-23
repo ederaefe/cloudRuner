@@ -832,6 +832,17 @@ window.addEventListener('load', () => {
     let raceTotalTime = 0;
 
     let selectedSkylineId = coordinator.skyline || 'EVENING_GLOOMY';
+    window._activeSkylineId = selectedSkylineId;
+    window._setAtmosphericSkyline = (skylineId) => {
+        selectedSkylineId = skylineId;
+        coordinator.skyline = skylineId;
+        window._activeSkylineId = skylineId;
+        setupSectorAndMode(hangarManager.selectedSectorId, hangarManager.selectedMode);
+        document.querySelectorAll('#skyline-selection-list button').forEach(b => {
+            b.classList.toggle('active', b.dataset.sky === skylineId);
+        });
+        hud.showToast(`ATMOSPHERE: ${skylineId.replace('_', ' ')}`, 'info');
+    };
 
     function setupSectorAndMode(sectorId, mode) {
         const sector = CONFIG.SECTORS.find(s => s.id === sectorId) || CONFIG.SECTORS[0];
@@ -1233,8 +1244,11 @@ window.addEventListener('load', () => {
             maxSpeedInRace = Math.max(maxSpeedInRace, playerDrone.speedKmh);
             checkDRS(dt * 1000);
 
-            // Update Player Physics with Fixed-Timestep Accumulator, ADAS gate tracking, and Track context
+            // Autonomous Autopilot navigation & co-pilot hand-off
             const inputState = inputManager.getState();
+            autopilot.update(playerDrone, inputState, track, nextGateIndex, extractionEngine, dt);
+
+            // Update Player Physics with Fixed-Timestep Accumulator, ADAS gate tracking, and Track context
             playerDrone.nextGateIndex = nextGateIndex;
             playerDrone.updatePhysics(inputState, stuntFsm, dt, track);
 
@@ -1357,7 +1371,7 @@ window.addEventListener('load', () => {
                 });
 
                 // Update HUD with sector laps and teamwork feedback
-                hud.update(playerDrone, currentLap, rank, aiRacers.length + 1, isPlayerDrafting, currentSector.laps, isTeamwork);
+                hud.update(playerDrone, currentLap, rank, aiRacers.length + 1, isPlayerDrafting, currentSector.laps, isTeamwork, inputState);
             } else if (extractionEngine) {
                 // Extraction Mode Logic
                 const stats = hangarManager.getUpgradedStats();
@@ -1370,6 +1384,8 @@ window.addEventListener('load', () => {
                         ai.checkPlayerCollision(playerDrone, cameraRig);
                     });
                 }
+
+                hud.update(playerDrone, 1, 1, 1, false, 1, false, inputState);
 
                 // Telemetry
                 const hudSpeed = document.getElementById('hud-speed');
