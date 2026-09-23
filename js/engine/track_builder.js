@@ -12,45 +12,287 @@ const _up = new THREE.Vector3(0, 1, 0);
 const _normal = new THREE.Vector3();
 const _colNormal = new THREE.Vector3();
 
+function createProceduralTexture(width, height, drawFn) {
+    if (typeof document === 'undefined' || !document.createElement) {
+        return null;
+    }
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) drawFn(ctx, width, height);
+        if (typeof THREE !== 'undefined' && THREE.CanvasTexture) {
+            const tex = new THREE.CanvasTexture(canvas);
+            if (THREE.RepeatWrapping) {
+                tex.wrapS = THREE.RepeatWrapping;
+                tex.wrapT = THREE.RepeatWrapping;
+            }
+            return tex;
+        }
+    } catch (e) {
+        return null;
+    }
+    return null;
+}
+
+// Task 11: Deterministic Mulberry32 Seedable PRNG
+export class SeededRNG {
+    constructor(seedStr = 'BARCH-ALPHA') {
+        let hash = 0;
+        const s = String(seedStr);
+        for (let i = 0; i < s.length; i++) {
+            hash = ((hash << 5) - hash) + s.charCodeAt(i);
+            hash |= 0;
+        }
+        this.s = (hash >>> 0) || 123456789;
+    }
+
+    random() {
+        let t = (this.s += 0x6D2B79F5);
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    }
+
+    range(min, max) {
+        return min + this.random() * (max - min);
+    }
+}
+
 export class TrackBuilder {
-    constructor(scene, tier, sector = null) {
+    constructor(scene, tier, sector = null, seed = 'BARCH-ALPHA', skyline = null) {
         this.scene = scene;
         this.tier = tier;
-        this.sector = sector || CONFIG.SECTORS[0];
+        let baseSector = sector || CONFIG.SECTORS[0];
+        if (skyline) {
+            this.skyline = skyline;
+            this.sector = {
+                ...baseSector,
+                sunColor: skyline.sunColor !== undefined ? skyline.sunColor : baseSector.sunColor,
+                skyColor: skyline.skyColor !== undefined ? skyline.skyColor : baseSector.skyColor,
+                zenithColor: skyline.zenithColor !== undefined ? skyline.zenithColor : baseSector.zenithColor,
+                horizonColor: skyline.horizonColor !== undefined ? skyline.horizonColor : baseSector.horizonColor,
+                fogDensity: skyline.fogDensity !== undefined ? skyline.fogDensity : baseSector.fogDensity,
+                gridColor: skyline.gridColor !== undefined ? skyline.gridColor : baseSector.gridColor,
+                windowGlow: skyline.windowGlow !== undefined ? skyline.windowGlow : baseSector.windowGlow
+            };
+        } else {
+            this.sector = baseSector;
+            this.skyline = null;
+        }
+        this.seed = seed;
+        this.rng = new SeededRNG(seed);
         this.spline = null;
         this.gates = [];
         this.instancedProps = [];
         this.trackObjects = [];
         this.skyBridges = [];
+        this.tunnels = [];
         this.buildingAABBs = [];
         this.launchPad = null;
         this.lastNearMissTime = 0;
+        this.skyDome = null;
+        this.canyonFloor = null;
+        this.trackMesh = null;
+        this.trackMaterial = null;
+        this.trackTexture = null;
+        this.buildingTexture = null;
+        this.turbulenceZones = [];
 
         this.buildTrackSpline();
+        this.createSkyDome();
+        this.createDistantSkylineSilhouettes();
+        this.createCanyonFloor();
         this.createTrackRibbon();
         this.createHolographicGates();
         this.createLaunchPad();
         this.populateInstancedEnvironment();
+        this.createProceduralTunnels();
+        this.createAtmosphericTurbulencePockets();
     }
 
     buildTrackSpline() {
         // High-velocity 3D urban canyon loop with altitude climbs, dives, and sharp chicanes
-        const points = [
-            new THREE.Vector3(0, 15, 0),
-            new THREE.Vector3(60, 25, 120),
-            new THREE.Vector3(140, 50, 220),
-            new THREE.Vector3(80, 80, 360),
-            new THREE.Vector3(-60, 45, 450),
-            new THREE.Vector3(-180, 20, 380),
-            new THREE.Vector3(-240, 60, 240),
-            new THREE.Vector3(-200, 95, 100),
-            new THREE.Vector3(-80, 70, -40),
-            new THREE.Vector3(40, 30, -120),
-            new THREE.Vector3(160, 10, -80),
-            new THREE.Vector3(100, 12, -20)
+        const basePoints = [
+            [0, 15, 0],
+            [60, 25, 120],
+            [140, 50, 220],
+            [80, 80, 360],
+            [-60, 45, 450],
+            [-180, 20, 380],
+            [-240, 60, 240],
+            [-200, 95, 100],
+            [-80, 70, -40],
+            [40, 30, -120],
+            [160, 10, -80],
+            [100, 12, -20]
         ];
 
-        this.spline = new THREE.CatmullRomCurve3(points, true, 'centripetal', 0.5);
+        // Task 11: Seed-based deterministic waypoint modulation
+        const seedScale = 0.22;
+        const rawPoints = basePoints.map((bp, idx) => {
+            const rx = (this.rng.random() - 0.5) * 45 * seedScale;
+            const ry = (this.rng.random() - 0.5) * 25 * seedScale;
+            const rz = (this.rng.random() - 0.5) * 45 * seedScale;
+            return new THREE.Vector3(bp[0] + rx, Math.max(12, bp[1] + ry), bp[2] + rz);
+        });
+
+        // Task 20: Gaussian altitude smoothing kernel across cyclic waypoints
+        const n = rawPoints.length;
+        const smoothedPoints = [];
+        for (let i = 0; i < n; i++) {
+            const prev = rawPoints[(i - 1 + n) % n];
+            const curr = rawPoints[i];
+            const next = rawPoints[(i + 1) % n];
+            // 3-point Gaussian kernel [0.25, 0.5, 0.25]
+            const smoothY = prev.y * 0.22 + curr.y * 0.56 + next.y * 0.22;
+            smoothedPoints.push(new THREE.Vector3(curr.x, smoothY, curr.z));
+        }
+
+        this.spline = new THREE.CatmullRomCurve3(smoothedPoints, true, 'centripetal', 0.5);
+    }
+
+    createSkyDome() {
+        const skyGeo = new THREE.SphereGeometry(1800, 24, 16);
+        const posAttr = skyGeo.attributes && skyGeo.attributes.position;
+        if (posAttr && typeof posAttr.count === 'number' && typeof posAttr.getY === 'function') {
+            const colorAttr = new Float32Array(posAttr.count * 3);
+            const zenith = new THREE.Color(this.sector.zenithColor || 0x040814);
+            const horizon = new THREE.Color(this.sector.horizonColor || this.sector.skyColor || 0x07111f);
+            const tempCol = new THREE.Color();
+
+            for (let i = 0; i < posAttr.count; i++) {
+                const ny = Math.max(0, Math.min(1.0, (posAttr.getY(i) + 400) / 2200));
+                tempCol.copy(horizon).lerp(zenith, Math.pow(ny, 0.75));
+                colorAttr[i * 3] = tempCol.r;
+                colorAttr[i * 3 + 1] = tempCol.g;
+                colorAttr[i * 3 + 2] = tempCol.b;
+            }
+            skyGeo.setAttribute('color', new THREE.BufferAttribute(colorAttr, 3));
+        }
+
+        const skyMat = new THREE.MeshBasicMaterial({
+            vertexColors: true,
+            side: THREE.BackSide,
+            fog: false
+        });
+
+        this.skyDome = new THREE.Mesh(skyGeo, skyMat);
+        this.scene.add(this.skyDome);
+    }
+
+    createDistantSkylineSilhouettes() {
+        // Task 19: Distant Parallax Horizon Skyline Silhouettes
+        const count = 36;
+        const radius = 1200;
+        const silhouetteMat = new THREE.MeshBasicMaterial({
+            color: this.sector.zenithColor || 0x040814,
+            side: THREE.DoubleSide,
+            fog: false
+        });
+
+        const silhouetteGroup = new THREE.Group();
+
+        for (let i = 0; i < count; i++) {
+            const angle = (i / count) * Math.PI * 2;
+            const w = 45 + this.rng.random() * 65;
+            const h = 80 + this.rng.random() * 160;
+            const geo = new THREE.PlaneGeometry(w, h);
+            geo.translate(0, h / 2 - 20, 0);
+
+            const mesh = new THREE.Mesh(geo, silhouetteMat);
+            mesh.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+            mesh.lookAt(0, 0, 0);
+            silhouetteGroup.add(mesh);
+        }
+
+        this.scene.add(silhouetteGroup);
+        this.silhouetteGroup = silhouetteGroup;
+    }
+
+    createProceduralTunnels() {
+        if (!this.spline) return;
+        // Task 16: Procedural Hexagonal Enclosed Service Tunnels
+        const tunnelRadius = 14;
+        const hexGeo = new THREE.CylinderGeometry(tunnelRadius, tunnelRadius, 4, 6, 1, true);
+        hexGeo.rotateX(Math.PI / 2);
+
+        const hexMat = new THREE.MeshStandardMaterial({
+            color: 0x141824,
+            metalness: 0.8,
+            roughness: 0.3,
+            wireframe: false
+        });
+
+        const framePoints = [0.38, 0.40, 0.42, 0.76, 0.78, 0.80];
+        framePoints.forEach(t => {
+            const pt = this.spline.getPointAt(t);
+            const tangent = this.spline.getTangentAt(t).normalize();
+
+            const ringMesh = new THREE.Mesh(hexGeo, hexMat);
+            ringMesh.position.copy(pt);
+            ringMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+            this.scene.add(ringMesh);
+            this.tunnels.push(ringMesh);
+        });
+    }
+
+    createCanyonFloor() {
+        const floorGeo = new THREE.PlaneGeometry(2400, 2400, 1, 1);
+        floorGeo.rotateX(-Math.PI / 2);
+
+        const gridHex = (this.sector.gridColor !== undefined) ? this.sector.gridColor : 0x00e5ff;
+        const gridRgb = '#' + gridHex.toString(16).padStart(6, '0');
+
+        const floorTexture = createProceduralTexture(256, 256, (ctx, w, h) => {
+            ctx.fillStyle = '#03070f';
+            ctx.fillRect(0, 0, w, h);
+
+            // Cybernetic grid lines
+            ctx.strokeStyle = gridRgb;
+            ctx.lineWidth = 1.5;
+            ctx.globalAlpha = 0.35;
+
+            const step = 32;
+            for (let x = 0; x <= w; x += step) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+                ctx.stroke();
+            }
+            for (let y = 0; y <= h; y += step) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+            }
+
+            // Tech node intersections
+            ctx.fillStyle = gridRgb;
+            ctx.globalAlpha = 0.65;
+            for (let x = 0; x <= w; x += step) {
+                for (let y = 0; y <= h; y += step) {
+                    ctx.fillRect(x - 2, y - 2, 4, 4);
+                }
+            }
+        });
+
+        if (floorTexture) {
+            floorTexture.repeat.set(75, 75);
+        }
+
+        const floorMat = new THREE.MeshStandardMaterial({
+            color: 0x111622,
+            map: floorTexture,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+
+        this.canyonFloor = new THREE.Mesh(floorGeo, floorMat);
+        this.canyonFloor.position.y = -24;
+        this.canyonFloor.receiveShadow = this.tier.shadows;
+        this.scene.add(this.canyonFloor);
     }
 
     createTrackRibbon() {
@@ -60,13 +302,22 @@ export class TrackBuilder {
 
         const ribbonGeo = new THREE.BufferGeometry();
         const positions = [];
+        const uvs = [];
         const indices = [];
 
         for (let i = 0; i <= segments; i++) {
             const t = i / segments;
             const pt = this.spline.getPointAt(t);
             const tangent = this.spline.getTangentAt(t).normalize();
-            _normal.crossVectors(tangent, _up).normalize();
+            
+            // Task 3: Calculate curvature and banking angle for superelevation
+            const nextT = Math.min(1.0, t + 0.005);
+            const nextTangent = this.spline.getTangentAt(nextT).normalize();
+            const turnRate = (nextTangent.x * tangent.z - nextTangent.z * tangent.x) / 0.005;
+            const bankAngle = Math.max(-0.55, Math.min(0.55, turnRate * 0.4));
+            
+            const localUp = _up.clone().applyAxisAngle(tangent, bankAngle);
+            _normal.crossVectors(tangent, localUp).normalize();
 
             // Left and right track edge coordinates
             const pL = pt.clone().addScaledVector(_normal, -width / 2);
@@ -74,6 +325,10 @@ export class TrackBuilder {
 
             positions.push(pL.x, pL.y, pL.z);
             positions.push(pR.x, pR.y, pR.z);
+
+            const v = (i / segments) * 60.0;
+            uvs.push(0, v);
+            uvs.push(1, v);
 
             if (i < segments) {
                 const base = i * 2;
@@ -83,29 +338,100 @@ export class TrackBuilder {
         }
 
         ribbonGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        ribbonGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
         ribbonGeo.setIndex(indices);
         ribbonGeo.computeVertexNormals();
 
-        const ribbonMat = new THREE.MeshStandardMaterial({
-            color: 0x0c1524,
-            roughness: 0.6,
-            metalness: 0.4,
+        // High-tech procedural track ribbon texture with directional speed chevrons
+        const trackEmissiveHex = (this.sector.trackEmissive !== undefined) ? this.sector.trackEmissive : 0x00f0ff;
+        const trackEmissiveRgb = '#' + trackEmissiveHex.toString(16).padStart(6, '0');
+        const trackEdgeHex = (this.sector.trackEdge !== undefined) ? this.sector.trackEdge : 0x0E7C7B;
+        const trackEdgeRgb = '#' + trackEdgeHex.toString(16).padStart(6, '0');
+
+        this.trackTexture = createProceduralTexture(128, 256, (ctx, w, h) => {
+            // Dark carbon roadbed base
+            ctx.fillStyle = '#090d16';
+            ctx.fillRect(0, 0, w, h);
+
+            // Subtle carbon-weave pattern
+            ctx.fillStyle = '#0f1724';
+            for (let y = 0; y < h; y += 4) {
+                ctx.fillRect(0, y, w, 2);
+            }
+
+            // Luminous neon side boundaries
+            ctx.fillStyle = trackEdgeRgb;
+            ctx.fillRect(0, 0, 8, h);
+            ctx.fillRect(w - 8, 0, 8, h);
+
+            // Center lane energy channel
+            ctx.fillStyle = '#06101d';
+            ctx.fillRect(w * 0.5 - 18, 0, 36, h);
+
+            // Glowing directional chevrons (forward motion indicator)
+            ctx.strokeStyle = trackEmissiveRgb;
+            ctx.lineWidth = 5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            const numChevrons = 4;
+            const spacing = h / numChevrons;
+            for (let c = 0; c < numChevrons; c++) {
+                const cy = c * spacing + spacing * 0.5;
+                ctx.beginPath();
+                ctx.moveTo(w * 0.5 - 14, cy - 10);
+                ctx.lineTo(w * 0.5, cy + 6);
+                ctx.lineTo(w * 0.5 + 14, cy - 10);
+                ctx.stroke();
+            }
+
+            // High-intensity core glow
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            for (let c = 0; c < numChevrons; c++) {
+                const cy = c * spacing + spacing * 0.5;
+                ctx.beginPath();
+                ctx.moveTo(w * 0.5 - 12, cy - 9);
+                ctx.lineTo(w * 0.5, cy + 5);
+                ctx.lineTo(w * 0.5 + 12, cy - 9);
+                ctx.stroke();
+            }
+        });
+
+        if (this.trackTexture) {
+            this.trackTexture.repeat.set(1, 1);
+        }
+
+        this.trackMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffffff,
+            map: this.trackTexture,
+            roughness: 0.35,
+            metalness: 0.65,
             side: THREE.DoubleSide
         });
 
-        const trackMesh = new THREE.Mesh(ribbonGeo, ribbonMat);
+        const trackMesh = new THREE.Mesh(ribbonGeo, this.trackMaterial);
         trackMesh.receiveShadow = this.tier.shadows;
         this.scene.add(trackMesh);
+        this.trackMesh = trackMesh;
 
         // Neon track borders
-        const lineMat = new THREE.LineBasicMaterial({ color: 0x0E7C7B, linewidth: 2 });
+        const lineMat = new THREE.LineBasicMaterial({ color: trackEdgeHex, linewidth: 2 });
         const edgePtsL = [];
         const edgePtsR = [];
         for (let i = 0; i <= segments; i++) {
             const t = i / segments;
             const pt = this.spline.getPointAt(t);
             const tangent = this.spline.getTangentAt(t).normalize();
-            _normal.crossVectors(tangent, _up).normalize();
+            
+            const nextT = Math.min(1.0, t + 0.005);
+            const nextTangent = this.spline.getTangentAt(nextT).normalize();
+            const turnRate = (nextTangent.x * tangent.z - nextTangent.z * tangent.x) / 0.005;
+            const bankAngle = Math.max(-0.55, Math.min(0.55, turnRate * 0.4));
+            
+            const localUp = _up.clone().applyAxisAngle(tangent, bankAngle);
+            _normal.crossVectors(tangent, localUp).normalize();
+            
             edgePtsL.push(pt.clone().addScaledVector(_normal, -width / 2));
             edgePtsR.push(pt.clone().addScaledVector(_normal, width / 2));
         }
@@ -204,11 +530,77 @@ export class TrackBuilder {
         const boxGeo = new THREE.BoxGeometry(1, 1, 1);
         boxGeo.translate(0, 0.5, 0);
 
-        // Vibrant PBR building material with support for per-instance colors
+        // Procedural skyscraper facade texture with glowing office windows and neon trim
+        const windowGlowHex = (this.sector.windowGlow !== undefined) ? this.sector.windowGlow : 0xfff3b0;
+        const windowGlowRgb = '#' + windowGlowHex.toString(16).padStart(6, '0');
+        const trimHex = (this.sector.trimColor !== undefined) ? this.sector.trimColor : 0x00ffff;
+        const trimRgb = '#' + trimHex.toString(16).padStart(6, '0');
+
+        this.buildingTexture = createProceduralTexture(256, 256, (ctx, w, h) => {
+            // Dark metallic structural facade
+            ctx.fillStyle = '#151c28';
+            ctx.fillRect(0, 0, w, h);
+
+            // Vertical structural columns/mullions
+            ctx.fillStyle = '#0b1018';
+            const colWidth = 16;
+            for (let x = 0; x < w; x += colWidth) {
+                ctx.fillRect(x + colWidth - 2, 0, 2, h);
+            }
+
+            // High-density illuminated futuristic windows
+            const cols = 16;
+            const rows = 32;
+            const cellW = w / cols;
+            const cellH = h / rows;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const wx = c * cellW + 2;
+                    const wy = r * cellH + 2;
+                    const ww = cellW - 4;
+                    const wh = cellH - 3;
+
+                    // Pseudo-random deterministic window illumination
+                    const hash = (r * 17 + c * 31 + (r % 3) * 7) % 100;
+                    if (hash < 34) {
+                        // Soft warm office amber/gold
+                        ctx.fillStyle = windowGlowRgb;
+                        ctx.globalAlpha = 0.9;
+                        ctx.fillRect(wx, wy, ww, wh);
+                    } else if (hash < 50) {
+                        // Sci-fi cyan / cool data center glow
+                        ctx.fillStyle = trimRgb;
+                        ctx.globalAlpha = 0.8;
+                        ctx.fillRect(wx, wy, ww, wh);
+                    } else {
+                        // Unlit dark glass with faint structural tint
+                        ctx.fillStyle = '#080d16';
+                        ctx.globalAlpha = 0.95;
+                        ctx.fillRect(wx, wy, ww, wh);
+                    }
+                }
+            }
+
+            // Horizontal neon floor dividing bands
+            ctx.globalAlpha = 0.95;
+            ctx.fillStyle = trimRgb;
+            for (let r = 0; r < rows; r += 8) {
+                ctx.fillRect(0, r * cellH, w, 2);
+            }
+            ctx.globalAlpha = 1.0;
+        });
+
+        if (this.buildingTexture) {
+            this.buildingTexture.repeat.set(2, 6);
+        }
+
+        // Vibrant PBR building material with support for per-instance colors and facade texture
         const buildingMat = new THREE.MeshStandardMaterial({
             color: 0xffffff,
-            roughness: 0.55,
-            metalness: 0.35
+            map: this.buildingTexture,
+            roughness: 0.45,
+            metalness: 0.55
         });
 
         const instancedCity = new THREE.InstancedMesh(boxGeo, buildingMat, count);
@@ -602,7 +994,74 @@ export class TrackBuilder {
         return collided;
     }
 
+    update(speedKmh = 0, dt = 0.016) {
+        // Animate glowing track chevrons proportional to forward velocity
+        if (this.trackTexture && this.trackTexture.offset) {
+            const flowRate = Math.max(0.4, speedKmh / 90.0);
+            this.trackTexture.offset.y -= flowRate * dt * 2.2;
+        }
+
+        // Slow atmospheric sky dome celestial rotation
+        if (this.skyDome) {
+            this.skyDome.rotation.y += dt * 0.005;
+        }
+    }
+
+    createAtmosphericTurbulencePockets() {
+        if (!this.spline) return;
+        this.turbulenceZones = [];
+
+        // Seed 4 strategic atmospheric turbulence pockets along circuit
+        const samplePoints = [0.18, 0.42, 0.68, 0.88];
+        samplePoints.forEach(t => {
+            const center = this.spline.getPointAt(t);
+            this.turbulenceZones.push({
+                position: center.clone().add(new THREE.Vector3(0, (Math.random() - 0.5) * 6, 0)),
+                radius: 22.0,
+                radiusSq: 484.0 // 22 * 22
+            });
+        });
+    }
+
+    checkTurbulence(position) {
+        if (!this.turbulenceZones || this.turbulenceZones.length === 0) return false;
+        for (let i = 0; i < this.turbulenceZones.length; i++) {
+            const z = this.turbulenceZones[i];
+            if (position.distanceToSquared(z.position) < z.radiusSq) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     dispose() {
+        if (this.skyDome) {
+            this.scene.remove(this.skyDome);
+            if (this.skyDome.geometry) this.skyDome.geometry.dispose();
+            if (this.skyDome.material) this.skyDome.material.dispose();
+            this.skyDome = null;
+        }
+
+        if (this.canyonFloor) {
+            this.scene.remove(this.canyonFloor);
+            if (this.canyonFloor.geometry) this.canyonFloor.geometry.dispose();
+            if (this.canyonFloor.material) {
+                if (this.canyonFloor.material.map) this.canyonFloor.material.map.dispose();
+                this.canyonFloor.material.dispose();
+            }
+            this.canyonFloor = null;
+        }
+
+        if (this.trackTexture) {
+            this.trackTexture.dispose();
+            this.trackTexture = null;
+        }
+
+        if (this.buildingTexture) {
+            this.buildingTexture.dispose();
+            this.buildingTexture = null;
+        }
+
         if (this.launchPad) {
             this.scene.remove(this.launchPad);
             this.launchPad.traverse(c => {
@@ -645,6 +1104,28 @@ export class TrackBuilder {
             });
         });
         this.skyBridges = [];
+
+        if (this.silhouetteGroup) {
+            this.scene.remove(this.silhouetteGroup);
+            this.silhouetteGroup.traverse(c => {
+                if (c.geometry) c.geometry.dispose();
+                if (c.material) {
+                    if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+                    else c.material.dispose();
+                }
+            });
+            this.silhouetteGroup = null;
+        }
+
+        this.tunnels.forEach(t => {
+            this.scene.remove(t);
+            if (t.geometry) t.geometry.dispose();
+            if (t.material) {
+                if (Array.isArray(t.material)) t.material.forEach(m => m.dispose());
+                else t.material.dispose();
+            }
+        });
+        this.tunnels = [];
 
         this.trackObjects.forEach(to => {
             this.scene.remove(to);

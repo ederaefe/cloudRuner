@@ -226,6 +226,22 @@ export class ParticleSystem {
             this.emit(cameraPosition, color, _tempVector, size, lifetime, PARTICLE_TYPES.SPEED_STREAK);
         }
     }
+
+    emitWingtipVortices(position, quaternion, speed) {
+        if (speed < 120) return;
+        const wingSpan = 3.6;
+        const vortexColor = new THREE.Color(speed > 220 ? 0x00ffff : 0xaaccff);
+
+        // Left wingtip vortex ribbon
+        _tempVector.set(-wingSpan, 0, -0.4).applyQuaternion(quaternion).add(position);
+        const trailVelL = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion).multiplyScalar(speed * 0.06);
+        this.emit(_tempVector, vortexColor, trailVelL, 1.4, 0.45, PARTICLE_TYPES.SPEED_STREAK);
+
+        // Right wingtip vortex ribbon
+        _tempVector.set(wingSpan, 0, -0.4).applyQuaternion(quaternion).add(position);
+        const trailVelR = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion).multiplyScalar(speed * 0.06);
+        this.emit(_tempVector, vortexColor, trailVelR, 1.4, 0.45, PARTICLE_TYPES.SPEED_STREAK);
+    }
     
     emitStuntEffect(position, type) {
         const count = 8;

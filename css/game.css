@@ -55,6 +55,42 @@ body, html {
     transition: opacity 0.25s ease-out;
 }
 
+/* Tactical Peripheral Pitch/Roll Ladder (Task 7) */
+.horizon-ladder-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 240px;
+    height: 160px;
+    pointer-events: none;
+    z-index: 8;
+    opacity: 0.38;
+    transition: opacity 0.3s ease;
+}
+
+.horizon-pitch-bar {
+    position: absolute;
+    top: 50%;
+    left: 10%;
+    right: 10%;
+    height: 1.5px;
+    background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.8), rgba(0, 255, 255, 0.8), transparent);
+    transform-origin: center center;
+    box-shadow: 0 0 6px rgba(0, 255, 255, 0.6);
+}
+
+.horizon-crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 12px;
+    height: 12px;
+    border: 1px solid rgba(0, 255, 255, 0.45);
+    border-radius: 50%;
+}
+
 /* Top Tactical Telemetry Bar */
 #top-hud {
     position: absolute;
@@ -1263,5 +1299,102 @@ body, html {
     font-size: 12px;
     color: #cbd5e1;
     line-height: 1.4;
+}
+
+/* ==========================================================================
+   Task 50: Minimalist Top-Edge Compass Ribbon Canvas
+   ========================================================================== */
+.compass-canvas {
+    width: 260px;
+    height: 28px;
+    border-radius: 4px;
+    background: rgba(7, 17, 31, 0.75);
+    border: 1px solid rgba(0, 255, 255, 0.35);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    align-self: center;
+}
+
+@media (max-width: 768px) {
+    .compass-canvas {
+        width: 180px;
+        height: 24px;
+    }
+}
+
+/* ==========================================================================
+   Task 35: Contextual Non-Blocking Notification Toast System
+   ========================================================================== */
+.toast-stack-container {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 72px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    z-index: 950;
+    pointer-events: none;
+    width: 90%;
+    max-width: 420px;
+}
+
+.toast-msg {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+    transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1), transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    background: rgba(7, 17, 31, 0.88);
+    border: 1px solid rgba(0, 255, 255, 0.4);
+    border-left: 4px solid var(--primary-teal);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #e2e8f0;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.toast-msg.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.toast-msg.toast-bonus {
+    border-left-color: var(--nitro-amber);
+    color: #fef08a;
+}
+
+.toast-msg.toast-warning {
+    border-left-color: #ef4444;
+    color: #fca5a5;
+}
+
+/* ==========================================================================
+   Task 36: Mobile-First Sliding Bottom-Sheet Modal Presentation
+   ========================================================================== */
+@media (max-width: 768px) {
+    .overlay-screen {
+        align-items: flex-end !important;
+        padding: 0 !important;
+    }
+
+    .glass-modal {
+        width: 100% !important;
+        max-width: 100% !important;
+        border-radius: 20px 20px 0 0 !important;
+        max-height: 82vh !important;
+        overflow-y: auto !important;
+        padding: 20px 16px 28px 16px !important;
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8) !important;
+        animation: slideUpSheet 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes slideUpSheet {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+    }
 }
 

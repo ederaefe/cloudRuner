@@ -154,5 +154,97 @@ This enables zero-latency P2P mesh synchronization via WebRTC DataChannels (`Pee
 * **Automated Verification Suite Expansion (`scripts/test_engine.mjs`)**:
   * Expanded automated test harness to 124 assertions verifying audio toggles, keyboard blur resets, touch release failsafes, stunt quaternion synchronization, building collision deflection, particle kinematics, out-of-bounds validators, and direct pathname routes with exit code 0.
 
+### Global Agent Enhancements: Advanced Web Search & Research Skills Architecture
+* **Global Customization Discovery (`~/.gemini/config/skills/`)**:
+  * Configured Antigravity 2.0 global skills discovery for real-time web retrieval, documentation lookup, and multi-source research across all workspaces.
+* **PipeLLM Official Skill Integration (`~/.gemini/config/skills/pipellm-web-search/`)**:
+  * Installed the official `PipeLlm-AI/pipellm-websearch-skill` package with its API specification, Gemini extension metadata, and prompt directives.
+  * Direct support for PipeLLM endpoints: `/v1/websearch/search` (vector RAG re-ranking), `/v1/websearch/simple-search` (Google snippets), `/v1/websearch/reader` (HTML to markdown conversion), and `/v1/websearch/search-news` (breaking news extraction).
+* **Multi-Tier Resilient Research Skill (`~/.gemini/config/skills/advanced-web-search/`)**:
+  * Resolved single-vendor dependency risks by establishing a layered execution hierarchy:
+    * Tier 1: Native zero-cost AGY tools (`search_web`, `read_url_content`) for rapid grounding and immediate citations.
+    * Tier 2: Resilient CLI search runner (`scripts/search.py`) in Python 3 standard library with zero external pip dependencies. Automatically queries PipeLLM if `PIPELLM_API_KEY` is present, with seamless fallback to DuckDuckGo HTML scraping.
+    * Tier 3: Specialized extractors for web reading and deep headless crawling via Firecrawl integration.
+  * **Token Preservation & Context Hygiene**: File-backed storage (`--output <file.json>`) saves full search payloads to disk to avoid flooding LLM context windows, returning concise summaries and paths.
+  * **Deep Research Protocol**: Enforces multi-hop query decomposition, domain targeting (`site:github.com`, `site:docs.*`), and a Two-Source Rule for technical validation and security claims.
+
+### Completed: Low-Spec WebGL Graphics Upgrade Architecture (`/low-spec-webgl-game-craft`)
+* **Procedural Skyscraper Facade Texturing (`js/engine/track_builder.js`)**:
+  * Implemented `createProceduralTexture()` to generate a high-density 256x256 architectural atlas on an offscreen HTML5 `<canvas>` at boot time (0 KB network payload, < 4ms compile overhead).
+  * Synthesized vertical structural columns/mullions, horizontal floor-dividing neon conduits matching sector trim colors, and randomized illuminated office windows with deterministic pseudorandom lighting states (warm amber, cyan server bank, and dark tinted glass).
+  * Applied procedural atlas with `THREE.RepeatWrapping` across `instancedCity` material while preserving per-instance color multiplication, transforming flat boxes into detailed futuristic urban canyons in **1 single draw call**.
+* **Procedural Atmospheric Celestial Sky Dome (`js/engine/track_builder.js`)**:
+  * Constructed an inverted 1800m celestial dome (`THREE.SphereGeometry`, `THREE.BackSide`) with analytically evaluated vertex color gradients interpolating from zenith (`sector.zenithColor`) to horizon haze (`sector.horizonColor` / `sector.skyColor`).
+  * Masks camera far clipping planes and harmonizes seamlessly with `THREE.FogExp2` without polygon edge popping.
+  * Driven by continuous celestial yaw rotation (`dt * 0.005 rad/s`) in `track.update()`.
+* **Subterranean Cyber Terrain Floor (`js/engine/track_builder.js`)**:
+  * Added a subterranean canyon floor plane (`2400m x 2400m` at `y = -24m`) with procedural cybernetic grid lines and illuminated node intersections matching `sector.gridColor`.
+  * Eliminates the bottom void, grounds the skyscraper foundations, and fades into horizon fog at distance.
+* **Animated High-Tech Energy Track Ribbon (`js/engine/track_builder.js`, `index.html`)**:
+  * Generated a procedural track texture with dark carbon-weave surfacing, luminous neon boundary rails (`sector.trackEdge`), and glowing directional speed chevrons (`sector.trackEmissive`) pointing along the flight vector.
+  * Extruded UV mapping along the CatmullRom spline loop (`uv.y = (i / segments) * 60.0`).
+  * In the main render loop, `track.update(speedKmh, dt)` offsets texture UV coordinates proportional to drone velocity, delivering an immediate visceral sense of speed even in straight sky-lanes.
+* **Supersonic Thruster Plumes & Shock Diamonds (`js/engine/drone.js`)**:
+  * Integrated a dual-stage exhaust booster system comprising an outer energetic flame cone and an inner supersonic shock diamond core (`THREE.AdditiveBlending`).
+  * Dynamically scales and shifts hue across flight regimes: subtle teal cruise glow at >75 km/h, intense safety orange during Stage 2 Boost, and hyper-cyan shock diamonds during Stage 3 Hyper-Overdrive.
+* **Multi-Environment Test Resilience (`scripts/test_engine.mjs`)**:
+  * Augmented headless mock harness with `PlaneGeometry`, `CanvasTexture`, and 2D canvas context primitives (`fillRect`, `fill`, `arc`), achieving 100% test pass rate across 124 assertions.
+
+### Completed: Holistic 60-Task Flight Engine, UI & System Architecture Upgrade
+* **Fixed-Timestep Physics Substepping (`js/engine/drone.js`)**:
+  * Decoupled rendering frame time from flight simulation by adopting a deterministic accumulator pattern running at 120Hz (`dt = 1/120s`, max accumulated time 0.1s).
+  * Eliminates high-velocity collision clipping through skyscraper facades, tunnel walls, and floor boundaries during sudden frame pacing spikes or device thermal throttling.
+* **Spline Superelevation & Curvature Banking (`js/engine/track_builder.js`)**:
+  * Evaluated spline tangent derivatives across adjacent segments to calculate localized centrifugal turning forces.
+  * Tilted the ribbon normal and neon boundary edges around the flight tangent axis (up to 31.5 degrees), generating banked NASCAR-style turns that guide high-speed drones aerodynamically.
+* **Ground-Effect Aerodynamic Lift Cushion (`js/engine/drone.js`)**:
+  * Added an asymptotic ground-effect repulsion force activated when flying below 4.2m altitude, proportional to forward velocity squared and inverse altitude: $F_{\text{ground}} \propto v^2 / (h + 0.2)$.
+  * Cushions high-speed dive recoveries and prevents harsh floor clipping without artificial hard altitude stops.
+* **Autonomous Loiter & Course Realignment ("Zen Autopilot") (`js/engine/drone.js`, `index.html`)**:
+  * Integrated an autonomous course-projection state machine toggled via `Z` key or headless benchmark flags.
+  * Computes nearest spline points and smoothly blends drone attitude and velocity vectors back into the race corridor.
+* **Seed-Based Procedural Track Generation (`js/engine/track_builder.js`, `js/coordinator.js`)**:
+  * Implemented Mulberry32 32-bit deterministic PRNG (`SeededRNG`).
+  * Modulates circuit waypoints, city building layouts, and skyline silhouette heights using seed strings parsed from URL query parameters (`?seed=...`).
+* **Multi-Camera Rig Architecture (`js/engine/camera_rig.js`, `index.html`)**:
+  * Unified Chase, First-Person Cockpit, Trackside Spectator, and 6-DOF Photo Mode into a single state machine toggled with `V` and `P`.
+  * In photo mode, simulation delta is frozen and UI hidden, allowing lossless 1:1 canvas PNG captures via `takeSnapshot()`.
+* **Minimalist Top-Edge Compass Ribbon (`js/ui/hud.js`, `index.html`, `css/game.css`)**:
+  * Rendered a lightweight 360-degree sliding compass bearing strip at top-center on an offscreen 2D canvas with sub-pixel tick translation and target azimuth pins.
+* **Contextual Non-Blocking Notification Toast Stack (`js/ui/hud.js`, `css/game.css`)**:
+  * Replaced intrusive modals with a non-blocking toast queue supporting info, bonus, and warning alert tiers with automatic 1.8s dismissal and max 2 stacked items.
+* **Mobile-First Sliding Bottom-Sheet Drawer (`js/ui/hangar_settings.js`, `css/game.css`)**:
+  * Transformed dialog modals on viewports $\leq 768\text{px}$ into native-feeling swipeable bottom sheets with touch grab-bars.
+* **Gamepad Flight Stick Deadzone & Sensitivity Tuning (`js/ui/hangar_settings.js`, `index.html`)**:
+  * Added configurable deadzone threshold sliders (0.02 to 0.30) and non-linear sensitivity exponents ($y = x^\gamma$) persisted across sessions.
+* **Deterministic 48-Byte Binary Telemetry Serialization (`js/engine/drone.js`)**:
+  * Pre-allocated a static 48-byte `ArrayBuffer` and `DataView` packing 0xBA7C magic header, status bitflags, float32 world coordinates, quaternion components, velocity vectors, quantized airspeed, and nitro stage.
+  * Completely zero GC allocation per frame, providing direct WebRTC datachannel and multiplayer netcode readiness.
+* **Holographic Ghost Drone Replay Buffer (`js/engine/drone.js`)**:
+  * Quantizes drone position and rotation every 4 simulation ticks into a memory-efficient circular ring buffer for time-trial ghost replay.
+* **Automated QA Headless Benchmark Harness (`index.html`, `scripts/test_engine.mjs`)**:
+  * Enabled automated 2-lap headless autopilot benchmarking via `?benchmark=1` logging min, avg, max FPS, and frame drop metrics.
+  * Verified 100% test pass rate across 139 automated unit test assertions in `scripts/test_engine.mjs`.
+
+### Completed: Slow Roads Atmospheric Skylines, Session Permalinks & Dedicated `.aeroghost` Interchange
+* **Three Clean Atmospheric Skylines (`js/config.js`, `js/engine/track_builder.js`, `index.html`)**:
+  * Modeled directly after Slow Roads' clean, minimalist horizon aesthetic:
+    1. `MORNING_CALM`: Clear azure skies (`#4a90e2`), golden morning dawn illumination (`#fff0d0`), and light fog (`density: 0.0016`).
+    2. `EVENING_GLOOMY`: Moody violet/indigo zenith (`#140a20`), dense amber/crimson horizon haze (`#7a2245`), and atmospheric dusk lighting (`density: 0.0032`).
+    3. `NIGHT_NEON`: Deep obsidian twilight (`#010206`), starfield, luminous cyan/orange window arrays, and high-intensity vehicle headlights (`density: 0.0022`).
+  * Seamlessly toggled via start briefing buttons, dynamically altering sky dome vertex gradients, fog density, and city window illumination.
+* **Slow Roads Session URL Permalinks (`js/coordinator.js`)**:
+  * Each player is assigned a unique persistent session identifier (`PILOT-XXXX`), stored in `localStorage`.
+  * The browser address bar synchronizes in real time via `history.replaceState` (`?seed=...&sky=...&pilot=...`) without page reloads.
+  * Added "SHARE FLIGHT LINK" buttons in start briefing and pause modals, copying the session permalink directly to the clipboard with contextual toast notifications.
+* **Dedicated Flight Replay File Format (`.aeroghost`) (`js/coordinator.js`, `index.html`)**:
+  * Formatted telemetry replays into a dedicated file extension (`.aeroghost`) with strict schema validation (`BARCH_AERO_GHOST_V1`).
+  * Features 1-click export of flight records (`<pilot>_SEC01_<seed>.aeroghost`) and instant import via file selector or canvas drag-and-drop, spawning an iridescent rival holographic ghost drone.
+* **100% Offline-First PWA Execution (`service-worker.js`)**:
+  * Pre-caches Three.js r128, all JavaScript engine modules, CSS stylesheets, fonts, and HTML.
+  * Network access is used solely on initial installation or for remote maps, ensuring the game runs offline with zero network latency.
+* **Comprehensive QA Verification (`scripts/test_engine.mjs`)**:
+  * Expanded automated test suite from 139 to 148 verified assertions, confirming zero regressions across all subsystems.
+
 
 

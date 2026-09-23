@@ -20,6 +20,12 @@ export class SoundEngine {
         this.windNode = null;
         this.windFilter = null;
         this.windGain = null;
+
+        // Ambient Synthwave Radio Station (Task 41)
+        this.synthOsc1 = null;
+        this.synthOsc2 = null;
+        this.synthFilter = null;
+        this.synthGain = null;
     }
 
     init() {
@@ -35,10 +41,59 @@ export class SoundEngine {
 
             this.setupTurbine();
             this.setupWindBuffer();
+            this.setupAmbientRadio();
+            this.setupMediaSession();
             this.enabled = true;
         } catch (e) {
             console.warn('Web Audio synthesis initialization failed:', e);
         }
+    }
+
+    setupMediaSession() {
+        // Task 42: Native OS Media Session API
+        if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
+            try {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: 'Aero-Canyon Circuit',
+                    artist: 'BARCH VTOL Synthesizer',
+                    album: 'Aero-Canyon Racing Soundtrack'
+                });
+                navigator.mediaSession.setActionHandler('play', () => this.resume());
+                navigator.mediaSession.setActionHandler('pause', () => {
+                    if (this.ctx && this.ctx.state === 'running') this.ctx.suspend();
+                });
+            } catch (e) {}
+        }
+    }
+
+    setupAmbientRadio() {
+        if (!this.ctx) return;
+        try {
+            // Task 41: Ambient Synthwave Radio Station
+            this.synthOsc1 = this.ctx.createOscillator();
+            this.synthOsc2 = this.ctx.createOscillator();
+            this.synthFilter = this.ctx.createBiquadFilter();
+            this.synthGain = this.ctx.createGain();
+
+            this.synthOsc1.type = 'sawtooth';
+            this.synthOsc2.type = 'sawtooth';
+            this.synthOsc1.frequency.setValueAtTime(55.0, this.ctx.currentTime); // A1 note
+            this.synthOsc2.frequency.setValueAtTime(55.35, this.ctx.currentTime); // Chorus detune
+
+            this.synthFilter.type = 'lowpass';
+            this.synthFilter.frequency.setValueAtTime(320, this.ctx.currentTime);
+            this.synthFilter.Q.setValueAtTime(3.5, this.ctx.currentTime);
+
+            this.synthGain.gain.setValueAtTime(0.09, this.ctx.currentTime);
+
+            this.synthOsc1.connect(this.synthFilter);
+            this.synthOsc2.connect(this.synthFilter);
+            this.synthFilter.connect(this.synthGain);
+            this.synthGain.connect(this.masterGain);
+
+            this.synthOsc1.start();
+            this.synthOsc2.start();
+        } catch (e) {}
     }
 
     resume() {
@@ -191,6 +246,12 @@ export class SoundEngine {
         // Turbine gain boost
         const targetEngineGain = isStage3 ? 0.18 : (isNitroActive ? 0.14 : 0.08);
         this.engineGain.gain.setTargetAtTime(targetEngineGain, now, 0.08);
+
+        // Modulate ambient synthwave radio station cutoff with speed
+        if (this.synthFilter) {
+            const synthCutoff = 280 + (speedKmh / 320) * 1250;
+            this.synthFilter.frequency.setTargetAtTime(synthCutoff, now, 0.12);
+        }
     }
 
     playGateChime() {

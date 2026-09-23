@@ -220,5 +220,48 @@ export class TouchControls {
                 this.vibrate([25, 30, 25]);
             });
         }
+
+        // Tactical Flight Assist Touch Buttons
+        const btnTouchStop = document.getElementById('btn-touch-stop');
+        const btnTouchAuto = document.getElementById('btn-touch-auto');
+        const btnTouchAlt = document.getElementById('btn-touch-alt');
+        const btnTouchAssist = document.getElementById('btn-touch-assist');
+
+        if (btnTouchStop) {
+            btnTouchStop.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                const state = this.input.toggleHoverStop();
+                this.vibrate([30, 40]);
+                if (window._showAssistAlert) window._showAssistAlert('VTOL HOVER STOP', state ? 'FULL STOP AIRBRAKE' : 'HOVER BRAKE RELEASED');
+            });
+        }
+
+        if (btnTouchAuto) {
+            btnTouchAuto.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                const state = this.input.toggleAutopilot();
+                this.vibrate([20, 20]);
+                if (window._showAssistAlert) window._showAssistAlert('AUTOPILOT HAND-OFF', state ? 'CO-PILOT ENGAGED' : 'MANUAL RESTORED');
+            });
+        }
+
+        if (btnTouchAlt) {
+            btnTouchAlt.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                const currentY = window._playerDrone ? window._playerDrone.position.y : null;
+                const state = this.input.toggleAltitudeHold(currentY);
+                this.vibrate([15, 25]);
+                if (window._showAssistAlert) window._showAssistAlert('ALTITUDE HOLD', state ? `LOCKED: ${this.input.state.targetAltitude}M` : 'DISENGAGED');
+            });
+        }
+
+        if (btnTouchAssist) {
+            btnTouchAssist.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                const state = this.input.toggleFlyAssist();
+                this.vibrate(15);
+                if (window._showAssistAlert) window._showAssistAlert('FLY ASSIST', state ? 'STABILIZATION ON' : 'ASSIST OFF');
+            });
+        }
     }
 }

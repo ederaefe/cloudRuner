@@ -21,6 +21,117 @@ export class RacingHUD {
         this.stuntTitle = document.getElementById('stunt-title-txt');
         this.stuntBonus = document.getElementById('stunt-bonus-txt');
         this.stuntTimeout = null;
+
+        // Task 7: Peripheral Horizon Pitch/Roll Ladder
+        this.horizonBar = document.getElementById('horizon-pitch-bar');
+
+        // Task 50: Minimalist Top-Edge Compass Ribbon Canvas
+        this.compassCanvas = document.getElementById('compass-ribbon-canvas');
+        this.compassCtx = (this.compassCanvas && typeof this.compassCanvas.getContext === 'function') 
+            ? this.compassCanvas.getContext('2d') 
+            : null;
+
+        // Task 35: Contextual Non-Blocking Notification Toast Stack
+        this.toastStack = document.getElementById('hud-toast-stack');
+        this.activeToasts = [];
+    }
+
+    showToast(message, type = 'info', duration = 2200) {
+        if (!this.toastStack) return;
+        const toast = document.createElement('div');
+        toast.className = `toast-msg toast-${type}`;
+        toast.textContent = message;
+        this.toastStack.appendChild(toast);
+        this.activeToasts.push(toast);
+
+        while (this.activeToasts.length > 2) {
+            const old = this.activeToasts.shift();
+            if (old && old.parentNode) old.parentNode.removeChild(old);
+        }
+
+        if (typeof requestAnimationFrame !== 'undefined') {
+            requestAnimationFrame(() => toast.classList.add('visible'));
+        } else {
+            toast.classList.add('visible');
+        }
+
+        setTimeout(() => {
+            toast.classList.remove('visible');
+            setTimeout(() => {
+                if (toast.parentNode) toast.parentNode.removeChild(toast);
+                const idx = this.activeToasts.indexOf(toast);
+                if (idx !== -1) this.activeToasts.splice(idx, 1);
+            }, 300);
+        }, duration);
+    }
+
+    updateCompass(drone, targets = []) {
+        if (!this.compassCtx || !drone || !drone.group) return;
+        const ctx = this.compassCtx;
+        const w = this.compassCanvas.width || 260;
+        const h = this.compassCanvas.height || 28;
+
+        ctx.clearRect(0, 0, w, h);
+
+        ctx.fillStyle = 'rgba(7, 17, 31, 0.75)';
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.35)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+
+        const yawRad = drone.group.rotation.y || 0;
+        let headingDeg = ((-yawRad * 180 / Math.PI) % 360 + 360) % 360;
+
+        const pixelsPerDeg = 1.4;
+        const centerX = w / 2;
+
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        for (let relDeg = -80; relDeg <= 80; relDeg += 10) {
+            const absDeg = ((Math.round(headingDeg + relDeg) % 360) + 360) % 360;
+            const x = centerX + relDeg * pixelsPerDeg;
+
+            if (absDeg % 90 === 0) {
+                const cardinal = absDeg === 0 ? 'N' : absDeg === 90 ? 'E' : absDeg === 180 ? 'S' : 'W';
+                ctx.fillStyle = '#00ffff';
+                ctx.fillText(cardinal, x, h / 2 - 2);
+                ctx.fillStyle = 'rgba(0, 255, 255, 0.8)';
+                ctx.fillRect(x - 0.5, h - 6, 1, 6);
+            } else if (absDeg % 30 === 0) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                ctx.fillText(`${absDeg.toString().padStart(3, '0')}`, x, h / 2 - 2);
+                ctx.fillRect(x - 0.5, h - 5, 1, 5);
+            } else {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                ctx.fillRect(x - 0.5, h - 3, 1, 3);
+            }
+        }
+
+        ctx.strokeStyle = '#F4A426';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(centerX, 0);
+        ctx.lineTo(centerX, h);
+        ctx.stroke();
+
+        if (Array.isArray(targets)) {
+            targets.forEach(tgt => {
+                if (!tgt || !tgt.position) return;
+                const dx = tgt.position.x - drone.position.x;
+                const dz = tgt.position.z - drone.position.z;
+                const targetAngle = (Math.atan2(dx, dz) * 180 / Math.PI + 360) % 360;
+                let diff = (targetAngle - headingDeg + 540) % 360 - 180;
+                if (Math.abs(diff) <= 80) {
+                    const pinX = centerX + diff * pixelsPerDeg;
+                    ctx.fillStyle = tgt.color || '#E8580A';
+                    ctx.beginPath();
+                    ctx.arc(pinX, h - 4, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+        }
     }
 
     showStuntAlert(title, bonus) {
@@ -85,6 +196,17 @@ export class RacingHUD {
             }
         }
 
-        // Speed lines are now handled by 3D particle system
+        // Task 7: Peripheral Horizon Ladder Update
+        if (this.horizonBar && drone && drone.group) {
+            const pitch = drone.group.rotation.x || 0;
+            const roll = drone.group.rotation.z || 0;
+            const pitchOffset = Math.max(-45, Math.min(45, pitch * 50));
+            this.horizonBar.style.transform = `translateY(${pitchOffset}px) rotate(${-roll}rad)`;
+        }
+
+        // Task 50: Minimalist Top-Edge Compass Ribbon Update
+        if (this.compassCanvas) {
+            this.updateCompass(drone);
+        }
     }
 }

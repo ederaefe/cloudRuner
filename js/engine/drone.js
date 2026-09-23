@@ -12,6 +12,16 @@ import { ParticleSystem } from './particle_system.js';
 const _fwdVector = new THREE.Vector3();
 const _exhaustDir = new THREE.Vector3();
 const _exhaustPos = new THREE.Vector3();
+const _downVector = new THREE.Vector3(0, -1, 0);
+const _rayOrigin = new THREE.Vector3();
+const _tangentScratch = new THREE.Vector3();
+const _crossScratch = new THREE.Vector3();
+const _quatScratch = new THREE.Quaternion();
+const _eulerScratch = new THREE.Euler(0, 0, 0, 'YXZ');
+
+// Fixed-timestep simulation sub-stepping constants (Task 1)
+const FIXED_DT = 1 / 120;
+const MAX_ACCUMULATED_TIME = 0.1;
 
 export class Drone {
     constructor(scene, isAi = false, aiColor = null, tier = null) {
@@ -47,6 +57,16 @@ export class Drone {
         this.targetNacelleAngle = 0;
         this.landingGearExtended = true;
         this.rotorBlurIntensity = 0;
+
+        // Slow Roads Enhancement: Advanced flight & simulation state
+        this.physicsAccumulator = 0;
+        this.groundEffectLift = 0;
+        this.isAutopilot = false;
+        this.autopilotBlend = 0;
+        this.isTurbulenceActive = false;
+        this.realignmentCooldown = 0;
+        this.trackSpline = null;
+        this.spotlights = [];
 
         this.buildMesh(aiColor);
     }
@@ -180,8 +200,41 @@ export class Drone {
         this.exhaustMesh.visible = false;
         this.group.add(this.exhaustMesh);
 
+        // Supersonic Shock Diamond Core
+        const coreGeo = new THREE.ConeGeometry(0.18, 1.6, 8);
+        coreGeo.rotateX(-Math.PI / 2);
+        coreGeo.translate(0, 0, -0.8);
+        const coreMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending
+        });
+        this.exhaustCore = new THREE.Mesh(coreGeo, coreMat);
+        this.exhaustCore.visible = false;
+        this.group.add(this.exhaustCore);
+
         // 6. Landing Gear (animated based on speed)
         this.createLandingGear();
+
+        // 7. Dual Retractable High-Intensity Forward Spotlights (Task 25)
+        const spotMatTargetL = new THREE.Object3D();
+        spotMatTargetL.position.set(-0.8, -0.2, 35);
+        this.group.add(spotMatTargetL);
+        const spotL = new THREE.SpotLight(0xaaccff, 2.2, 140, Math.PI / 7, 0.45, 1.2);
+        spotL.position.set(-0.7, 0.1, 1.5);
+        spotL.target = spotMatTargetL;
+        this.group.add(spotL);
+
+        const spotMatTargetR = new THREE.Object3D();
+        spotMatTargetR.position.set(0.8, -0.2, 35);
+        this.group.add(spotMatTargetR);
+        const spotR = new THREE.SpotLight(0xaaccff, 2.2, 140, Math.PI / 7, 0.45, 1.2);
+        spotR.position.set(0.7, 0.1, 1.5);
+        spotR.target = spotMatTargetR;
+        this.group.add(spotR);
+
+        this.spotlights = [spotL, spotR];
     }
 
     createLandingGear() {
@@ -253,11 +306,67 @@ export class Drone {
         if (stats.nitroMax) this.nitroMaxCapacity = stats.nitroMax;
     }
 
-    updatePhysics(inputState, stuntFsm, dt) {
+    setTrackSpline(spline) {
+        this.trackSpline = spline;
+    }
+
+    toggleAutopilot() {
+        this.isAutopilot = !this.isAutopilot;
+        this.autopilotBlend = this.isAutopilot ? 1.0 : 0.0;
+        return this.isAutopilot;
+    }
+
+    toggleSpotlights(forceState = null) {
+        const nextState = forceState !== null ? forceState : !this.spotlights[0]?.visible;
+        this.spotlights.forEach(spot => {
+            if (spot) spot.visible = nextState;
+        });
+        return nextState;
+    }
+
+    updatePhysics(inputState, stuntFsm, frameDt, trackBuilder = null) {
+        if (!frameDt || Number.isNaN(frameDt)) return;
+        const safeDt = Math.min(frameDt, MAX_ACCUMULATED_TIME);
+        this.physicsAccumulator += safeDt;
+
+        // Substep physics loop (Task 1: Fixed-Timestep Accumulator at 120 Hz)
+        while (this.physicsAccumulator >= FIXED_DT) {
+            this.stepPhysics(inputState, stuntFsm, FIXED_DT, trackBuilder);
+            this.physicsAccumulator -= FIXED_DT;
+        }
+
+        // Post-substep visual animations using actual frame delta
+        this.updateVisualEffects(frameDt);
+    }
+
+    stepPhysics(inputState, stuntFsm, dt, trackBuilder = null) {
         const flightCfg = CONFIG.FLIGHT;
         const nitroCfg = CONFIG.NITRO;
         const maxNitro = this.nitroMaxCapacity || nitroCfg.MAX_CAPACITY;
         const maxCruiseSpeed = this.maxSpeedKmh || flightCfg.MAX_CRUISE_SPEED;
+
+        // Task 9: Autopilot ("Zen Flight") Input Integration
+        const hasManualSteering = Math.abs(inputState.turn || 0) > 0.08 ||
+                                  Math.abs(inputState.pitch || 0) > 0.08 ||
+                                  Math.abs(inputState.roll || 0) > 0.08;
+
+        if (hasManualSteering && this.isAutopilot) {
+            // Disengage autopilot on player intervention with smooth handoff
+            this.isAutopilot = false;
+        }
+
+        if (this.isAutopilot && this.trackSpline) {
+            this.autopilotBlend = Math.min(1.0, this.autopilotBlend + dt * 2.5);
+            // Autonomous spline following
+            const approxU = ((this.splineProgress || 0) + 0.018) % 1.0;
+            const targetPoint = this.trackSpline.getPointAt(approxU);
+            _tangentScratch.subVectors(targetPoint, this.position).normalize();
+            
+            _quatScratch.setFromUnitVectors(new THREE.Vector3(0, 0, 1), _tangentScratch);
+            this.quaternion.slerp(_quatScratch, dt * 3.5 * this.autopilotBlend);
+        } else {
+            this.autopilotBlend = Math.max(0.0, this.autopilotBlend - dt * 3.0);
+        }
 
         // Nitro management & Hyper-Overdrive latching (/boost)
         if (inputState.isNitroHeld && this.nitroAmount > 0) {
@@ -283,6 +392,11 @@ export class Drone {
         else if (inputState.forward > 0) targetSpeedKmh = maxCruiseSpeed;
         else if (inputState.forward < 0) targetSpeedKmh = flightCfg.BASE_SPEED * 0.5;
 
+        // Turbulence drag modifier (Task 6)
+        if (this.isTurbulenceActive) {
+            targetSpeedKmh *= 0.78;
+        }
+
         // Let Stunt FSM modulate speed and orientation
         stuntFsm.update(this, inputState, dt);
 
@@ -305,11 +419,95 @@ export class Drone {
             this.velocity.copy(_fwdVector).multiplyScalar(newSpeedMs);
         }
 
+        // Task 2: Ground-Effect Aerodynamic Repulsion Engine
+        this.applyGroundEffect(dt, trackBuilder);
+
+        // Task 4: Dynamic 4-Point Hover Raycast Cushioning & Wall Deflection
+        this.applyHoverDeflection(dt, trackBuilder);
+
         // Apply position delta
         this.position.addScaledVector(this.velocity, dt);
         this.speedKmh = this.velocity.length() * 3.6;
 
-        // Rotor animation and tilt-nacelle transition (0 rad in cruise, PI/2 in hover)
+        // Task 10: Smooth Course Realignment & Spline Projection Guard
+        this.checkCourseRealignment(dt, trackBuilder);
+    }
+
+    applyGroundEffect(dt, trackBuilder) {
+        const floorY = (trackBuilder?.canyonFloor?.position.y !== undefined) ? trackBuilder.canyonFloor.position.y : -24.0;
+        const groundClearance = this.position.y - floorY;
+        const groundEffectThreshold = 4.2; // meters
+
+        if (groundClearance < groundEffectThreshold && groundClearance > 0) {
+            const normalizedHeight = (groundEffectThreshold - groundClearance) / groundEffectThreshold;
+            this.groundEffectLift = Math.pow(normalizedHeight, 2) * 16.0;
+            this.position.y += this.groundEffectLift * dt;
+            if (this.velocity.y < 0) {
+                this.velocity.y *= Math.max(0.0, 1.0 - normalizedHeight * 0.8);
+            }
+        } else {
+            this.groundEffectLift = 0;
+        }
+    }
+
+    applyHoverDeflection(dt, trackBuilder) {
+        if (!trackBuilder || !trackBuilder.buildingAABBs || trackBuilder.buildingAABBs.length === 0) return;
+        
+        const pos = this.position;
+        const margin = 2.4; // Safety cushion radius
+
+        for (let i = 0; i < trackBuilder.buildingAABBs.length; i++) {
+            const box = trackBuilder.buildingAABBs[i];
+            if (pos.x > box.min.x - margin && pos.x < box.max.x + margin &&
+                pos.z > box.min.z - margin && pos.z < box.max.z + margin &&
+                pos.y > box.min.y && pos.y < box.max.y) {
+                
+                const dxMin = Math.abs(pos.x - (box.min.x - margin));
+                const dxMax = Math.abs(pos.x - (box.max.x + margin));
+                const dzMin = Math.abs(pos.z - (box.min.z - margin));
+                const dzMax = Math.abs(pos.z - (box.max.z + margin));
+                const minDist = Math.min(dxMin, dxMax, dzMin, dzMax);
+
+                const deflectSpeed = Math.max(12.0, this.speedKmh * 0.12);
+                if (minDist === dxMin) pos.x -= deflectSpeed * dt;
+                else if (minDist === dxMax) pos.x += deflectSpeed * dt;
+                else if (minDist === dzMin) pos.z -= deflectSpeed * dt;
+                else if (minDist === dzMax) pos.z += deflectSpeed * dt;
+                break;
+            }
+        }
+    }
+
+    checkCourseRealignment(dt, trackBuilder) {
+        if (this.realignmentCooldown > 0) {
+            this.realignmentCooldown -= dt;
+            return;
+        }
+
+        const spline = this.trackSpline || trackBuilder?.spline;
+        if (!spline) return;
+
+        const approxT = (this.splineProgress || 0) % 1.0;
+        const splinePt = spline.getPointAt(approxT);
+        const distSq = this.position.distanceToSquared(splinePt);
+
+        if (distSq > 2304) { // 48m threshold squared
+            const tangent = spline.getTangentAt(approxT).normalize();
+            this.position.copy(splinePt).addScaledVector(new THREE.Vector3(0, 1, 0), 3.0);
+            
+            _quatScratch.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+            this.quaternion.copy(_quatScratch);
+            
+            const preserveSpeed = Math.max(28.0, this.velocity.length());
+            this.velocity.copy(tangent).multiplyScalar(preserveSpeed);
+
+            this.realignmentCooldown = 3.5;
+            this.emitStuntParticles('REALIGN');
+        }
+    }
+
+    updateVisualEffects(dt) {
+        const flightCfg = CONFIG.FLIGHT;
         const cruiseRatio = Math.min(1.0, this.speedKmh / flightCfg.BASE_SPEED);
         this.targetNacelleAngle = THREE.MathUtils.lerp(Math.PI / 2.5, 0.0, cruiseRatio);
         
@@ -348,29 +546,58 @@ export class Drone {
         });
 
         // Thruster glow intensity & booster flame VFX (/boost)
+        const rndFlicker = Math.random() * 0.2;
         if (this.nitroStage === 3) {
             this.thrustGlow.color.setHex(0x00ffff);
             this.thrustGlow.intensity = 3.8;
             if (this.exhaustMesh) {
                 this.exhaustMesh.visible = true;
                 this.exhaustMesh.material.color.setHex(0x00ffff);
-                this.exhaustMesh.material.opacity = 0.85 + Math.random() * 0.15;
-                this.exhaustMesh.scale.set(1.4, 1.4, 1.8 + Math.random() * 0.4);
+                this.exhaustMesh.material.opacity = 0.85 + rndFlicker;
+                this.exhaustMesh.scale.set(1.5, 1.5, 2.0 + rndFlicker * 2);
+            }
+            if (this.exhaustCore) {
+                this.exhaustCore.visible = true;
+                this.exhaustCore.material.color.setHex(0xffffff);
+                this.exhaustCore.material.opacity = 0.95;
+                this.exhaustCore.scale.set(1.2, 1.2, 1.6 + rndFlicker);
             }
         } else if (this.nitroStage === 2) {
             this.thrustGlow.color.setHex(0xE8580A);
-            this.thrustGlow.intensity = 2.6;
+            this.thrustGlow.intensity = 2.8;
             if (this.exhaustMesh) {
                 this.exhaustMesh.visible = true;
                 this.exhaustMesh.material.color.setHex(0xE8580A);
-                this.exhaustMesh.material.opacity = 0.75 + Math.random() * 0.15;
-                this.exhaustMesh.scale.set(1.0, 1.0, 1.2 + Math.random() * 0.3);
+                this.exhaustMesh.material.opacity = 0.78 + rndFlicker;
+                this.exhaustMesh.scale.set(1.1, 1.1, 1.3 + rndFlicker * 1.5);
+            }
+            if (this.exhaustCore) {
+                this.exhaustCore.visible = true;
+                this.exhaustCore.material.color.setHex(0xffe066);
+                this.exhaustCore.material.opacity = 0.8;
+                this.exhaustCore.scale.set(0.9, 0.9, 1.1);
+            }
+        } else if (this.speedKmh > 75) {
+            const speedRatio = Math.min(1.0, (this.speedKmh - 75) / 120);
+            this.thrustGlow.color.setHex(0x0E7C7B);
+            this.thrustGlow.intensity = 0.8 + speedRatio * 0.8;
+            if (this.exhaustMesh) {
+                this.exhaustMesh.visible = true;
+                this.exhaustMesh.material.color.setHex(0x0E7C7B);
+                this.exhaustMesh.material.opacity = 0.45 * speedRatio + rndFlicker * 0.15;
+                this.exhaustMesh.scale.set(0.6 * speedRatio, 0.6 * speedRatio, (0.7 + rndFlicker) * speedRatio);
+            }
+            if (this.exhaustCore) {
+                this.exhaustCore.visible = false;
             }
         } else {
             this.thrustGlow.color.setHex(0x0E7C7B);
-            this.thrustGlow.intensity = 1.0;
+            this.thrustGlow.intensity = 0.5;
             if (this.exhaustMesh) {
                 this.exhaustMesh.visible = false;
+            }
+            if (this.exhaustCore) {
+                this.exhaustCore.visible = false;
             }
         }
 
@@ -382,6 +609,14 @@ export class Drone {
             // Emit from rear of drone without GC allocation
             _exhaustPos.copy(this.position).addScaledVector(_fwdVector, -2.0);
             this.particleSystem.emitExhaust(_exhaustPos, _exhaustDir, this.speedKmh);
+        }
+
+        // Task 5: Emit wingtip vortices during high-G banked turns or knife-edge flight
+        if (this.particleSystem && this.speedKmh > 130) {
+            const bankAngle = Math.abs(this.group.rotation.z);
+            if ((bankAngle > 0.4 || this.nitroStage >= 2) && typeof this.particleSystem.emitWingtipVortices === 'function') {
+                this.particleSystem.emitWingtipVortices(this.position, this.quaternion, this.speedKmh);
+            }
         }
     }
 
@@ -401,6 +636,93 @@ export class Drone {
         if (this.particleSystem) {
             this.particleSystem.update(dt);
         }
+    }
+
+    // Task 60: Fixed 48-byte Binary Telemetry Snapshot Pipeline (Zero-Allocation)
+    static TELEMETRY_BYTE_LENGTH = 48;
+    static _telemetryBuffer = new ArrayBuffer(48);
+    static _telemetryDataView = new DataView(Drone._telemetryBuffer);
+
+    encodeTelemetrySnapshot(targetDataView = null) {
+        const dv = targetDataView || Drone._telemetryDataView;
+        // Offset 0 (Uint16): Magic Identifier 0xBA7C ('BARCH')
+        dv.setUint16(0, 0xBA7C, true);
+        // Offset 2 (Uint16): Status Bitflags
+        let flags = 0;
+        if (this.isAutopilot) flags |= (1 << 0);
+        if (this.spotlightsOn) flags |= (1 << 1);
+        if (this.isNitroLatched) flags |= (1 << 2);
+        dv.setUint16(2, flags, true);
+        // Offset 4..15 (Float32 x 3): World Position (X, Y, Z)
+        dv.setFloat32(4, this.position.x, true);
+        dv.setFloat32(8, this.position.y, true);
+        dv.setFloat32(12, this.position.z, true);
+        // Offset 16..31 (Float32 x 4): Orientation Quaternion (X, Y, Z, W)
+        dv.setFloat32(16, this.quaternion._x || 0, true);
+        dv.setFloat32(20, this.quaternion._y || 0, true);
+        dv.setFloat32(24, this.quaternion._z || 0, true);
+        dv.setFloat32(28, this.quaternion._w !== undefined ? this.quaternion._w : 1, true);
+        // Offset 32..43 (Float32 x 3): Linear Velocity Vector
+        dv.setFloat32(32, this.velocity.x, true);
+        dv.setFloat32(36, this.velocity.y, true);
+        dv.setFloat32(40, this.velocity.z, true);
+        // Offset 44 (Uint16): Airspeed in KM/H (quantized)
+        dv.setUint16(44, Math.min(65535, Math.max(0, Math.round(this.speedKmh * 10))), true);
+        // Offset 46 (Uint8): Nitro Stage (1, 2, 3)
+        dv.setUint8(46, this.nitroStage || 1);
+        // Offset 47 (Uint8): Reserved / Padding
+        dv.setUint8(47, 0);
+
+        return dv;
+    }
+
+    static decodeTelemetrySnapshot(dataView) {
+        const magic = dataView.getUint16(0, true);
+        if (magic !== 0xBA7C) return null;
+        const flags = dataView.getUint16(2, true);
+        return {
+            isAutopilot: (flags & (1 << 0)) !== 0,
+            spotlightsOn: (flags & (1 << 1)) !== 0,
+            isNitroLatched: (flags & (1 << 2)) !== 0,
+            position: {
+                x: dataView.getFloat32(4, true),
+                y: dataView.getFloat32(8, true),
+                z: dataView.getFloat32(12, true)
+            },
+            quaternion: {
+                x: dataView.getFloat32(16, true),
+                y: dataView.getFloat32(20, true),
+                z: dataView.getFloat32(24, true),
+                w: dataView.getFloat32(28, true)
+            },
+            velocity: {
+                x: dataView.getFloat32(32, true),
+                y: dataView.getFloat32(36, true),
+                z: dataView.getFloat32(40, true)
+            },
+            speedKmh: dataView.getUint16(44, true) / 10,
+            nitroStage: dataView.getUint8(46)
+        };
+    }
+
+    // Task 57: Holographic Ghost Replay Buffer (Quantized 16-bit ring)
+    recordGhostSnapshot() {
+        if (!this.ghostBuffer) this.ghostBuffer = [];
+        if (this.ghostBuffer.length > 3000) this.ghostBuffer.shift(); // Max ~50 seconds at 60Hz/4
+        this.ghostBuffer.push({
+            px: Math.round(this.position.x * 10) / 10,
+            py: Math.round(this.position.y * 10) / 10,
+            pz: Math.round(this.position.z * 10) / 10,
+            qx: Math.round((this.quaternion._x || 0) * 1000) / 1000,
+            qy: Math.round((this.quaternion._y || 0) * 1000) / 1000,
+            qz: Math.round((this.quaternion._z || 0) * 1000) / 1000,
+            qw: Math.round((this.quaternion._w !== undefined ? this.quaternion._w : 1) * 1000) / 1000,
+            sp: Math.round(this.speedKmh)
+        });
+    }
+
+    getGhostReplay() {
+        return this.ghostBuffer || [];
     }
 
     dispose() {

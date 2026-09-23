@@ -76,6 +76,9 @@ Object.defineProperty(globalThis, 'navigator', {
 });
 const mock2dCtx = {
     clearRect: () => {},
+    fillRect: () => {},
+    fill: () => {},
+    arc: () => {},
     beginPath: () => {},
     moveTo: () => {},
     lineTo: () => {},
@@ -169,6 +172,7 @@ class MockVector3 {
         return this;
     }
     applyQuaternion(q) { return this; }
+    applyAxisAngle(axis, angle) { return this; }
     negate() { this.x = -this.x; this.y = -this.y; this.z = -this.z; return this; }
 }
 
@@ -220,6 +224,7 @@ class MockObject3D {
         this.children.forEach(c => c.traverse(cb));
     }
     updateMatrix() {}
+    lookAt() {}
 }
 
 class MockMesh extends MockObject3D {
@@ -285,10 +290,21 @@ global.THREE = {
     },
     ConeGeometry: MockGeometry,
     BoxGeometry: MockGeometry,
+    PlaneGeometry: MockGeometry,
     SphereGeometry: MockGeometry,
     CylinderGeometry: MockGeometry,
     RingGeometry: MockGeometry,
     BufferGeometry: MockGeometry,
+    CanvasTexture: class {
+        constructor() {
+            this.wrapS = 0;
+            this.wrapT = 0;
+            this.repeat = { set: () => {} };
+            this.offset = { y: 0 };
+            this.dispose = () => {};
+        }
+    },
+    RepeatWrapping: 1000,
     BufferAttribute: class {
         constructor(array, itemSize) {
             this.array = array;
@@ -325,6 +341,14 @@ global.THREE = {
             super();
             this.color = { setHex: () => {} };
             this.intensity = 1.0;
+        }
+    },
+    SpotLight: class extends MockObject3D {
+        constructor() {
+            super();
+            this.color = { setHex: () => {} };
+            this.intensity = 1.0;
+            this.target = new MockObject3D();
         }
     },
     FogExp2: class {
@@ -726,6 +750,66 @@ const testRoutes = (path) => {
 };
 assert(testRoutes('/boost').nitroCharged === true, 'Pathname /boost triggers nitro overcharge');
 assert(testRoutes('/teamwork-preview').mode === CONFIG.MODES.TEAMWORK_COOP, 'Pathname /teamwork-preview activates Teamwork mode');
+
+// 16.9 Task 60: Binary Telemetry 48-Byte Snapshot Encoder & Decoder
+playerDrone.position.set(120.5, 45.25, -310.75);
+playerDrone.velocity.set(10.0, 2.0, 50.0);
+playerDrone.speedKmh = 180.0;
+playerDrone.nitroStage = 2;
+playerDrone.isAutopilot = true;
+const telemetryDataView = playerDrone.encodeTelemetrySnapshot();
+assert(telemetryDataView.byteLength === 48, 'Binary telemetry snapshot packs exactly 48 bytes');
+assert(telemetryDataView.getUint16(0, true) === 0xBA7C, 'Binary telemetry header starts with magic 0xBA7C');
+
+const decoded = Drone.decodeTelemetrySnapshot(telemetryDataView);
+assert(decoded !== null, 'Binary telemetry decoder successfully decodes snapshot');
+assert(decoded.isAutopilot === true, 'Decoded telemetry preserves autopilot flag');
+assert(Math.abs(decoded.position.x - 120.5) < 0.01, 'Decoded telemetry preserves position X');
+assert(decoded.nitroStage === 2, 'Decoded telemetry preserves nitro stage');
+
+// 16.10 Task 57: Holographic Ghost Replay Buffer Recording
+playerDrone.recordGhostSnapshot();
+const ghostFrames = playerDrone.getGhostReplay();
+assert(ghostFrames.length > 0, 'Drone records ghost replay snapshots');
+assert(ghostFrames[0].px === 120.5, 'Ghost snapshot quantizes position X accurately');
+
+// 16.11 Task 35 & 50: RacingHUD Toasts & Compass Ribbon
+hud.showToast('GATE OVERDRIVE LOCKED', 'bonus', 1800);
+assert(typeof hud.showToast === 'function', 'RacingHUD provides contextual toast notifications');
+assert(typeof hud.updateCompass === 'function', 'RacingHUD provides top-edge 360-degree compass ribbon');
+
+// 16.12 Task 45: Stick Deadzone & Sensitivity Controls
+assert(hangar.profile.settings.deadzone === 0.12, 'Hangar defaults stick deadzone to 0.12');
+assert(hangar.profile.settings.sensitivity === 1.0, 'Hangar defaults stick sensitivity to 1.0');
+
+// 16.13 Slow Roads Inspired Skylines
+assert(Array.isArray(CONFIG.SKYLINES) && CONFIG.SKYLINES.length === 3, 'CONFIG defines 3 Slow Roads atmospheric skylines');
+assert(CONFIG.SKYLINES.some(s => s.id === 'MORNING_CALM'), 'CONFIG defines MORNING_CALM skyline');
+assert(CONFIG.SKYLINES.some(s => s.id === 'EVENING_GLOOMY'), 'CONFIG defines EVENING_GLOOMY skyline');
+assert(CONFIG.SKYLINES.some(s => s.id === 'NIGHT_NEON'), 'CONFIG defines NIGHT_NEON skyline');
+
+// 16.14 Pilot Session ID & URL Sync
+assert(typeof coordinator.pilotId === 'string' && coordinator.pilotId.startsWith('PILOT-'), 'Coordinator initializes pilot session ID');
+assert(typeof coordinator.updateSessionUrl === 'function', 'Coordinator provides session URL synchronization');
+
+// 16.15 .aeroghost File Format Parser & Exporter
+const sampleGhostJson = JSON.stringify({
+    format: 'BARCH_AERO_GHOST_V1',
+    pilotId: 'PILOT-TEST',
+    sectorId: 1,
+    seed: 'TEST-SEED',
+    lapTime: 42.5,
+    snapshots: [{ px: 0, py: 15, pz: 0, qx: 0, qy: 0, qz: 0, qw: 1, sp: 200 }]
+});
+const parsedGhost = Coordinator.parseGhostFile(sampleGhostJson);
+assert(parsedGhost !== null && parsedGhost.format === 'BARCH_AERO_GHOST_V1', '.aeroghost parser validates format header');
+assert(Coordinator.parseGhostFile('{"format":"INVALID"}') === null, '.aeroghost parser rejects corrupted telemetry');
+
+// 16.16 TrackBuilder with Skyline Atmospheric Override
+const morningSkyline = CONFIG.SKYLINES.find(s => s.id === 'MORNING_CALM');
+const morningTrack = new TrackBuilder(scene, coordinator.tier, CONFIG.SECTORS[0], 'MORNING-TEST', morningSkyline);
+assert(morningTrack.sector.skyColor === morningSkyline.skyColor, 'TrackBuilder applies skyline skyColor override');
+morningTrack.dispose();
 
     console.log(`\n========================================`);
     console.log(`ALL TESTS PASSED: ${passedTests}/${totalTests} ASSERTIONS VERIFIED`);

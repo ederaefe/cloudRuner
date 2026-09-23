@@ -21,6 +21,33 @@ export class DesktopControls {
             if (key === 'q') this.input.state.stuntRollLeft = true;
             if (key === 'e') this.input.state.stuntRollRight = true;
             if (key === 'x') this.input.state.isCobraTriggered = true;
+
+            // Flight Assist, Altitude Hold, Autopilot & Hover Stop toggles
+            if (key === 'j') {
+                const state = this.input.toggleFlyAssist();
+                if (window._showAssistAlert) window._showAssistAlert('FLY ASSIST', state ? 'STABILIZATION ON' : 'ASSIST OFF');
+            }
+            if (key === 'h') {
+                const currentY = window._playerDrone ? window._playerDrone.position.y : null;
+                const state = this.input.toggleAltitudeHold(currentY);
+                if (window._showAssistAlert) window._showAssistAlert('ALTITUDE HOLD', state ? `LOCKED: ${this.input.state.targetAltitude}M` : 'ALT HOLD DISENGAGED');
+            }
+            if (key === 't' || key === '[') {
+                const target = this.input.adjustTargetAltitude(5);
+                if (window._showAssistAlert) window._showAssistAlert('TARGET ALTITUDE', `${target} METERS (+5M)`);
+            }
+            if (key === 'g' || key === ']') {
+                const target = this.input.adjustTargetAltitude(-5);
+                if (window._showAssistAlert) window._showAssistAlert('TARGET ALTITUDE', `${target} METERS (-5M)`);
+            }
+            if (key === 'o' || key === 'u') {
+                const state = this.input.toggleAutopilot();
+                if (window._showAssistAlert) window._showAssistAlert('AUTOPILOT HAND-OFF', state ? 'CO-PILOT ENGAGED' : 'MANUAL CONTROL RESTORED');
+            }
+            if (key === 'b') {
+                const state = this.input.toggleHoverStop();
+                if (window._showAssistAlert) window._showAssistAlert('VTOL HOVER STOP', state ? 'FULL STOP AIRBRAKE ENGAGED' : 'HOVER BRAKE RELEASED');
+            }
         });
 
         window.addEventListener('keyup', (e) => {
@@ -71,6 +98,12 @@ export class DesktopControls {
         }
         if (this.keys['shift']) {
             fwd += 0.6;
+        }
+
+        // Auto-release Hover Stop if pilot commands forward thrust
+        if (fwd > 0.1 && this.input.state.hoverStopActive) {
+            this.input.state.hoverStopActive = false;
+            if (window._showAssistAlert) window._showAssistAlert('VTOL HOVER STOP', 'THROTTLE RESUMED');
         }
 
         if (this.keys['a'] || this.keys['arrowleft']) { yaw -= 1.0; roll -= 1.0; }
@@ -131,5 +164,22 @@ export class DesktopControls {
         this.input.state.steerYaw = yaw;
         this.input.state.roll = roll;
         this.input.state.pitch = pitch;
+    }
+
+    // Task 44: Gamepad Dual-Motor Haptic Vibration
+    playHapticRumble(duration = 180, strong = 0.5, weak = 0.3) {
+        if (this.gamepadIndex !== null && navigator.getGamepads) {
+            const gp = navigator.getGamepads()[this.gamepadIndex];
+            if (gp && gp.vibrationActuator && typeof gp.vibrationActuator.playEffect === 'function') {
+                try {
+                    gp.vibrationActuator.playEffect('dual-rumble', {
+                        startDelay: 0,
+                        duration: duration,
+                        weakMagnitude: weak,
+                        strongMagnitude: strong
+                    });
+                } catch (e) {}
+            }
+        }
     }
 }

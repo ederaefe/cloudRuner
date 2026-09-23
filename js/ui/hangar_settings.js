@@ -45,7 +45,9 @@ export class HangarSettingsManager {
                 masterVolume: 0.8,
                 engineVolume: 0.8,
                 hapticEnabled: true,
-                invertPitch: false
+                invertPitch: false,
+                deadzone: 0.12,
+                sensitivity: 1.0
             }
         };
 
@@ -146,6 +148,38 @@ export class HangarSettingsManager {
         if (selectTier) {
             selectTier.addEventListener('change', (e) => {
                 this.profile.settings.tierOverride = e.target.value;
+            });
+        }
+
+        const sliderDeadzone = document.getElementById('slider-deadzone');
+        const txtValDeadzone = document.getElementById('txt-val-deadzone');
+        const sliderSensitivity = document.getElementById('slider-sensitivity');
+        const txtValSensitivity = document.getElementById('txt-val-sensitivity');
+
+        window._stickDeadzone = this.profile.settings?.deadzone !== undefined ? this.profile.settings.deadzone : 0.12;
+        window._stickSensitivity = this.profile.settings?.sensitivity !== undefined ? this.profile.settings.sensitivity : 1.0;
+
+        if (sliderDeadzone) {
+            sliderDeadzone.value = window._stickDeadzone;
+            if (txtValDeadzone) txtValDeadzone.textContent = Number(window._stickDeadzone).toFixed(2);
+            sliderDeadzone.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                this.profile.settings.deadzone = val;
+                window._stickDeadzone = val;
+                if (txtValDeadzone) txtValDeadzone.textContent = val.toFixed(2);
+                this.saveProfile();
+            });
+        }
+
+        if (sliderSensitivity) {
+            sliderSensitivity.value = window._stickSensitivity;
+            if (txtValSensitivity) txtValSensitivity.textContent = `${Number(window._stickSensitivity).toFixed(1)}x`;
+            sliderSensitivity.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                this.profile.settings.sensitivity = val;
+                window._stickSensitivity = val;
+                if (txtValSensitivity) txtValSensitivity.textContent = `${val.toFixed(1)}x`;
+                this.saveProfile();
             });
         }
 

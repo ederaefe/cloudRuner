@@ -53,6 +53,8 @@
         </div>
     </div>
 
+    <canvas id="compass-ribbon-canvas" class="compass-canvas" width="260" height="28"></canvas>
+
     <div class="hud-panel">
         <div class="telemetry-item" id="pos-or-cargo-item">
             <span id="pos-or-cargo-label" class="telemetry-label">POSITION</span>
@@ -66,6 +68,15 @@
         <button id="btn-pause-game" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:6px 12px; font-weight:800; font-family:inherit; cursor:pointer;">PAUSE</button>
         <button id="btn-audio-toggle" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:6px 10px; font-weight:800; font-family:inherit; cursor:pointer;">AUDIO: OFF</button>
     </div>
+</div>
+
+<!-- Non-Blocking Contextual Notification Toast Stack (Task 35) -->
+<div id="hud-toast-stack" class="toast-stack-container"></div>
+
+<!-- Tactical Peripheral Pitch/Roll Ladder (Task 7) -->
+<div id="peripheral-horizon-ladder" class="horizon-ladder-container">
+    <div id="horizon-pitch-bar" class="horizon-pitch-bar"></div>
+    <div class="horizon-crosshair"></div>
 </div>
 
 <!-- Center Bottom Nitro Energy Gauge -->
@@ -125,10 +136,26 @@
             <!-- Dynamically populated from CONFIG.SECTORS by HangarSettingsManager -->
         </div>
 
+        <!-- Slow Roads Inspired Atmospheric Skyline Presets -->
+        <div style="font-size:11px; font-weight:800; color:rgba(255,255,255,0.6); text-align:left; margin-top:8px;">ATMOSPHERIC SKYLINE</div>
+        <div class="skyline-row" id="skyline-selection-list" style="display:flex; gap:6px; margin: 4px 0 10px 0;">
+            <button class="mode-select-btn" data-sky="MORNING_CALM" style="font-size:10px; padding:6px 8px;">MORNING BRIGHT</button>
+            <button class="mode-select-btn active" data-sky="EVENING_GLOOMY" style="font-size:10px; padding:6px 8px;">EVENING GLOOMY</button>
+            <button class="mode-select-btn" data-sky="NIGHT_NEON" style="font-size:10px; padding:6px 8px;">NIGHT NEON</button>
+        </div>
+
         <div style="display:flex; gap:8px; margin: 14px 0 10px 0;">
             <button id="btn-open-sidebar-menu" class="cta-button" style="background:rgba(0,255,255,0.18); border:1px solid #00ffff; color:#00ffff; flex:1;">CUSTOMIZE [TAB]</button>
             <button id="btn-open-help" class="cta-button" style="background:rgba(255,255,255,0.12); flex:1;">CONTROLS</button>
             <button id="btn-open-settings" class="cta-button" style="background:rgba(255,255,255,0.12); flex:1;">SETTINGS</button>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <button id="btn-copy-flight-link" class="cta-button" style="background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.25); font-size:12px; flex:1;">SHARE FLIGHT LINK</button>
+            <label class="cta-button" style="background:rgba(0,255,255,0.12); border:1px solid rgba(0,255,255,0.4); font-size:12px; flex:1; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                LOAD .AEROGHOST
+                <input type="file" id="input-ghost-file" accept=".aeroghost,.json" style="display:none;">
+            </label>
         </div>
 
         <button id="btn-launch-race" class="cta-button" style="background:linear-gradient(135deg, var(--primary-teal), #075251); font-size:17px;">LAUNCH MISSION</button>
@@ -181,6 +208,14 @@
                 <span>INVERT PITCH</span>
                 <input type="checkbox" id="chk-invert-pitch" style="accent-color:var(--primary-teal); width:18px; height:18px;">
             </div>
+            <div class="settings-row">
+                <span>STICK DEADZONE (<span id="txt-val-deadzone">0.12</span>)</span>
+                <input type="range" min="0.02" max="0.30" step="0.01" value="0.12" class="settings-slider" id="slider-deadzone">
+            </div>
+            <div class="settings-row">
+                <span>STICK SENSITIVITY (<span id="txt-val-sensitivity">1.0x</span>)</span>
+                <input type="range" min="0.6" max="2.4" step="0.1" value="1.0" class="settings-slider" id="slider-sensitivity">
+            </div>
         </div>
 
         <div class="instruction-grid" style="font-size:11px; margin-top:10px;">
@@ -202,6 +237,7 @@
         <h1 style="color:#F4A426;">MISSION PAUSED</h1>
         <div style="display:flex; flex-direction:column; gap:12px; margin:20px 0;">
             <button id="btn-resume-game" class="cta-button">RESUME FLIGHT</button>
+            <button id="btn-copy-flight-link-pause" class="cta-button" style="background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.25);">SHARE FLIGHT LINK</button>
             <button id="btn-help-from-pause" class="cta-button" style="background:rgba(255,255,255,0.12);">FLIGHT ACADEMY</button>
             <button id="btn-restart-from-pause" class="cta-button" style="background:rgba(255,255,255,0.12);">RESTART MISSION</button>
             <button id="btn-menu-from-pause" class="cta-button" style="background:rgba(255,255,255,0.12);">MAIN MENU</button>
@@ -258,9 +294,12 @@
         <div id="end-unlock-notice" style="font-size:13px; font-weight:800; color:#00ffaa; margin-bottom:8px;"></div>
         <div id="end-rewards-txt" style="font-size: 14px; font-weight: 800; color: #F4A426; margin-bottom: 14px;"></div>
         
-        <div style="display:flex; gap:10px;">
-            <button id="btn-equip-trophy" class="cta-button hidden" style="background:linear-gradient(135deg, #ffc400, #b28500); color:#000; font-weight:900; flex:1;">EQUIP APEX SOVEREIGN</button>
-            <button id="btn-restart-race" class="cta-button" style="flex:1;">CONTINUE</button>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+            <button id="btn-export-ghost" class="cta-button" style="background:rgba(0,255,255,0.18); border:1px solid #00ffff; color:#00ffff; font-size:13px;">EXPORT GHOST (.aeroghost)</button>
+            <div style="display:flex; gap:10px;">
+                <button id="btn-equip-trophy" class="cta-button hidden" style="background:linear-gradient(135deg, #ffc400, #b28500); color:#000; font-weight:900; flex:1;">EQUIP APEX SOVEREIGN</button>
+                <button id="btn-restart-race" class="cta-button" style="flex:1;">CONTINUE</button>
+            </div>
         </div>
     </div>
 </div>
@@ -589,14 +628,19 @@ window.addEventListener('load', () => {
     let nextGateIndex = 1;
     let raceTotalTime = 0;
 
+    let selectedSkylineId = coordinator.skyline || 'EVENING_GLOOMY';
+
     function setupSectorAndMode(sectorId, mode) {
         const sector = CONFIG.SECTORS.find(s => s.id === sectorId) || CONFIG.SECTORS[0];
+        const currentSkyline = (CONFIG.SKYLINES && CONFIG.SKYLINES.find(s => s.id === selectedSkylineId)) || (CONFIG.SKYLINES && CONFIG.SKYLINES[0]);
+        const sky = currentSkyline || sector;
 
-        // Apply sector atmosphere
-        scene.fog.density = sector.fogDensity;
-        scene.fog.color.setHex(sector.skyColor);
-        renderer.setClearColor(sector.skyColor);
-        sun.color.setHex(sector.sunColor);
+        // Apply sector & skyline atmosphere
+        scene.fog.density = sky.fogDensity !== undefined ? sky.fogDensity : sector.fogDensity;
+        scene.fog.color.setHex(sky.skyColor !== undefined ? sky.skyColor : sector.skyColor);
+        renderer.setClearColor(sky.skyColor !== undefined ? sky.skyColor : sector.skyColor);
+        sun.color.setHex(sky.sunColor !== undefined ? sky.sunColor : sector.sunColor);
+        if (sky.lightIntensity) sun.intensity = sky.lightIntensity;
 
         // Clean previous systems
         if (track) track.dispose();
@@ -607,14 +651,18 @@ window.addEventListener('load', () => {
         });
         aiRacers = [];
 
-        // Build Track & City
-        track = new TrackBuilder(scene, tier, sector);
+        // Build Track & City with chosen skyline atmospheric preset
+        track = new TrackBuilder(scene, tier, sector, coordinator.seed, currentSkyline);
+
+        // Synchronize browser URL bar with user session permalink
+        coordinator.updateSessionUrl(coordinator.seed, selectedSkylineId, mode);
 
         // Position player at origin or start gate
         const startPos = track.spline.getPointAt(0);
         const startTangent = track.spline.getTangentAt(0).normalize();
         playerDrone.position.copy(startPos);
         playerDrone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), startTangent);
+        playerDrone.setTrackSpline(track.spline);
         stuntFsm.syncWithQuaternion(playerDrone.quaternion);
 
         // Mode specific setup
@@ -838,11 +886,128 @@ window.addEventListener('load', () => {
         window._gameState = gameState;
     });
 
+    // Slow Roads Inspired Skyline Atmospheric Switching
+    document.querySelectorAll('#skyline-selection-list button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#skyline-selection-list button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            selectedSkylineId = btn.dataset.sky;
+            coordinator.skyline = selectedSkylineId;
+            setupSectorAndMode(hangarManager.selectedSectorId, hangarManager.selectedMode);
+            const skyName = btn.textContent.trim();
+            hud.showToast(`ATMOSPHERE: ${skyName}`, 'info');
+        });
+    });
+
+    // Copy Flight Session Link Handlers (Start & Pause Modals)
+    const copyFlightLinkHandler = async () => {
+        coordinator.updateSessionUrl(coordinator.seed, selectedSkylineId, hangarManager.selectedMode);
+        const copied = await coordinator.copySessionUrl();
+        if (copied) {
+            hud.showToast('FLIGHT PERMALINK COPIED TO CLIPBOARD', 'info');
+        } else {
+            prompt('Copy flight session permalink:', window.location.href);
+        }
+    };
+    const btnCopyFlightLink = document.getElementById('btn-copy-flight-link');
+    const btnCopyFlightLinkPause = document.getElementById('btn-copy-flight-link-pause');
+    if (btnCopyFlightLink) btnCopyFlightLink.addEventListener('click', copyFlightLinkHandler);
+    if (btnCopyFlightLinkPause) btnCopyFlightLinkPause.addEventListener('click', copyFlightLinkHandler);
+
+    // Export .aeroghost file handler
+    const btnExportGhost = document.getElementById('btn-export-ghost');
+    if (btnExportGhost) {
+        btnExportGhost.addEventListener('click', () => {
+            const fileName = coordinator.exportGhostFile(playerDrone.getGhostReplay(), hangarManager.selectedSectorId, raceTotalTime);
+            if (fileName) {
+                hud.showToast(`GHOST EXPORTED: ${fileName}`, 'bonus');
+            }
+        });
+    }
+
+    // Import .aeroghost file handlers (File Picker & Canvas Drag-and-Drop)
+    let rivalGhostData = null;
+    let rivalGhostDrone = null;
+    let rivalGhostPlaybackIndex = 0;
+
+    const loadGhostTelemetry = (text) => {
+        const parsed = Coordinator.parseGhostFile(text);
+        if (parsed && Array.isArray(parsed.snapshots) && parsed.snapshots.length > 0) {
+            rivalGhostData = parsed;
+            rivalGhostPlaybackIndex = 0;
+            if (!rivalGhostDrone) {
+                rivalGhostDrone = new Drone(scene, {
+                    id: 'RIVAL_GHOST',
+                    bodyColor: 0x00f0ff,
+                    glowColor: 0x00ffff
+                });
+                rivalGhostDrone.group.traverse(c => {
+                    if (c.isMesh && c.material) {
+                        c.material.transparent = true;
+                        c.material.opacity = 0.55;
+                    }
+                });
+            }
+            hud.showToast(`RIVAL GHOST LOADED: ${parsed.pilotId}`, 'bonus');
+        } else {
+            hud.showToast('INVALID .AEROGHOST TELEMETRY FILE', 'warning');
+        }
+    };
+
+    const inputGhostFile = document.getElementById('input-ghost-file');
+    if (inputGhostFile) {
+        inputGhostFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (evt) => loadGhostTelemetry(evt.target.result);
+                reader.readAsText(file);
+            }
+        });
+    }
+
+    window.addEventListener('dragover', (e) => e.preventDefault());
+    window.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const file = e.dataTransfer.files[0];
+            const reader = new FileReader();
+            reader.onload = (evt) => loadGhostTelemetry(evt.target.result);
+            reader.readAsText(file);
+        }
+    });
+
     // 11. Resize Handler
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Hotkeys: Z for Zen Autopilot, L for Spotlights, V for Camera Mode, P for Photo Mode
+    window.addEventListener('keydown', (e) => {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
+        if (e.key === 'z' || e.key === 'Z') {
+            const isAuto = playerDrone.toggleAutopilot();
+            hud.showStuntAlert(isAuto ? 'AUTOPILOT ENGAGED' : 'MANUAL FLIGHT', isAuto ? 'ZEN LOITER MODE' : 'MANUAL OVERRIDE');
+            if (isAuto) soundEngine.playGateChime(1);
+        } else if (e.key === 'l' || e.key === 'L') {
+            const spotsOn = playerDrone.toggleSpotlights();
+            hud.showStuntAlert(spotsOn ? 'SPOTLIGHTS ON' : 'SPOTLIGHTS OFF', 'FORWARD TACTICAL BEAMS');
+        } else if (e.key === 'v' || e.key === 'V') {
+            const newMode = cameraRig.cycleCameraMode();
+            hud.showStuntAlert('CAMERA MODE', newMode);
+        } else if (e.key === 'p' || e.key === 'P') {
+            const isPhoto = cameraRig.togglePhotoMode();
+            if (isPhoto) {
+                hud.showStuntAlert('PHOTO STUDIO', 'PRESS SPACE TO EXPORT SNAPSHOT');
+            } else {
+                hud.showStuntAlert('PHOTO STUDIO', 'RESUMED FLIGHT');
+            }
+        } else if (cameraRig.isPhotoMode && e.key === ' ') {
+            cameraRig.takeSnapshot(renderer.domElement, `barch-snapshot-${Date.now()}.png`);
+            hud.showStuntAlert('SNAPSHOT CAPTURED', 'SAVED TO DOWNLOADS');
+        }
     });
 
     // 12. Simulation Loop (Zero-Allocation & Paced)
@@ -865,9 +1030,41 @@ window.addEventListener('load', () => {
             maxSpeedInRace = Math.max(maxSpeedInRace, playerDrone.speedKmh);
             checkDRS(dt * 1000);
 
-            // Update Player Physics
+            // Update Player Physics with Fixed-Timestep Accumulator and Track context
             const inputState = inputManager.getState();
-            playerDrone.updatePhysics(inputState, stuntFsm, dt);
+            playerDrone.updatePhysics(inputState, stuntFsm, dt, track);
+
+            // Atmospheric turbulence check (Task 6)
+            if (track && typeof track.checkTurbulence === 'function') {
+                const inTurbulence = track.checkTurbulence(playerDrone.position);
+                if (inTurbulence !== playerDrone.isTurbulenceActive) {
+                    playerDrone.isTurbulenceActive = inTurbulence;
+                    if (inTurbulence) {
+                        hud.showStuntAlert('TURBULENCE', 'ATMOSPHERIC RESISTANCE DETECTED');
+                    }
+                }
+            }
+
+            // Task 57: Record telemetry snapshot every 4 ticks for ghost racing
+            if (!window._ghostFrameCount) window._ghostFrameCount = 0;
+            window._ghostFrameCount++;
+            if (window._ghostFrameCount % 4 === 0) {
+                playerDrone.recordGhostSnapshot();
+            }
+
+            // Task 57: Advance rival holographic ghost drone loaded from .aeroghost
+            if (rivalGhostData && rivalGhostDrone && rivalGhostData.snapshots && rivalGhostData.snapshots.length > 0) {
+                const snap = rivalGhostData.snapshots[rivalGhostPlaybackIndex];
+                if (snap) {
+                    rivalGhostDrone.position.set(snap.px, snap.py, snap.pz);
+                    rivalGhostDrone.quaternion.set(snap.qx, snap.qy, snap.qz, snap.qw);
+                    rivalGhostDrone.speedKmh = snap.sp || 150;
+                    rivalGhostDrone.updateVisualEffects(dt);
+                }
+                if (window._ghostFrameCount % 4 === 0) {
+                    rivalGhostPlaybackIndex = (rivalGhostPlaybackIndex + 1) % rivalGhostData.snapshots.length;
+                }
+            }
 
             // Nitro Boost audio trigger on stage transitions (/boost)
             if (playerDrone.nitroStage !== previousNitroStage) {
@@ -993,6 +1190,12 @@ window.addEventListener('load', () => {
 
             // Cleanly consume one-shot stunt triggers
             inputManager.resetStuntFlags();
+        }
+
+        // Update track energy chevron flow and atmospheric dome rotation
+        if (track && typeof track.update === 'function') {
+            const activeSpeed = (window._gameState === 'RACING') ? playerDrone.speedKmh : 24.0;
+            track.update(activeSpeed, dt);
         }
 
         // Camera Tracking & Scene Rendering (guarded against WebGL context loss)

@@ -18,6 +18,13 @@ const _shakeOffset = new THREE.Vector3();
 const _acceleration = new THREE.Vector3();
 const _previousVelocity = new THREE.Vector3();
 
+export const CAMERA_MODES = {
+    CHASE: 'CHASE',
+    COCKPIT: 'COCKPIT',
+    SPECTATOR: 'SPECTATOR',
+    PHOTO: 'PHOTO'
+};
+
 export class CameraRig {
     constructor(camera) {
         this.camera = camera;
@@ -31,10 +38,59 @@ export class CameraRig {
         this.isEpilogue = false;
         this.epilogueAngle = 0;
         
+        // Camera modes & Slow Roads features
+        this.mode = CAMERA_MODES.CHASE;
+        this.spectatorAnchor = new THREE.Vector3();
+        this.spectatorDwellTimer = 0;
+        this.isPhotoMode = false;
+        this.photoCamYaw = 0;
+        this.photoCamPitch = 0;
+        this.photoCamDistance = 12.0;
+
         // Enhanced camera behavior
         this.forwardLean = 0.0;
         this.verticalBob = 0.0;
         this.bobPhase = 0.0;
+    }
+
+    cycleCameraMode() {
+        if (this.mode === CAMERA_MODES.CHASE) {
+            this.mode = CAMERA_MODES.COCKPIT;
+        } else if (this.mode === CAMERA_MODES.COCKPIT) {
+            this.mode = CAMERA_MODES.SPECTATOR;
+            this.spectatorDwellTimer = 0;
+        } else {
+            this.mode = CAMERA_MODES.CHASE;
+        }
+        return this.mode;
+    }
+
+    togglePhotoMode() {
+        this.isPhotoMode = !this.isPhotoMode;
+        if (this.isPhotoMode) {
+            this.mode = CAMERA_MODES.PHOTO;
+            this.photoCamYaw = 0;
+            this.photoCamPitch = 0.2;
+            this.photoCamDistance = 10.0;
+        } else {
+            this.mode = CAMERA_MODES.CHASE;
+        }
+        return this.isPhotoMode;
+    }
+
+    takeSnapshot(canvas, filename = 'barch-aero-snapshot.png') {
+        if (!canvas || typeof canvas.toBlob !== 'function') return;
+        canvas.toBlob((blob) => {
+            if (!blob) return;
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }, 'image/png');
     }
 
     setEpilogueMode(active) {
@@ -103,6 +159,45 @@ export class CameraRig {
             this.camera.lookAt(this.currentLookAt);
             this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, 52.0, dt * 3.0);
             this.camera.updateProjectionMatrix();
+            return;
+        }
+
+        // Task 48: First-Person Cockpit View Mode
+        if (this.mode === CAMERA_MODES.COCKPIT) {
+            _idealOffset.set(0, 0.42, 0.7).applyQuaternion(drone.quaternion);
+            this.currentPos.copy(drone.position).add(_idealOffset);
+            _forwardLook.set(0, 0.25, 25.0).applyQuaternion(drone.quaternion);
+            this.currentLookAt.copy(drone.position).add(_forwardLook);
+            this.camera.position.copy(this.currentPos);
+            this.camera.lookAt(this.currentLookAt);
+            this.camera.fov = 76.0;
+            this.camera.updateProjectionMatrix();
+            return;
+        }
+
+        // Task 49: Trackside Broadcast Spectator Mode
+        if (this.mode === CAMERA_MODES.SPECTATOR) {
+            this.spectatorDwellTimer -= dt;
+            const distToDrone = this.spectatorAnchor.distanceTo(drone.position);
+            if (this.spectatorDwellTimer <= 0 || distToDrone > 95 || distToDrone < 2) {
+                _forwardLook.set((Math.random() - 0.5) * 20, 8, 45).applyQuaternion(drone.quaternion);
+                this.spectatorAnchor.copy(drone.position).add(_forwardLook);
+                this.spectatorDwellTimer = 3.5;
+            }
+            this.camera.position.lerp(this.spectatorAnchor, dt * 4.0);
+            this.camera.lookAt(drone.position);
+            this.camera.fov = 42.0;
+            this.camera.updateProjectionMatrix();
+            return;
+        }
+
+        // Task 46: Dedicated Photo Mode
+        if (this.mode === CAMERA_MODES.PHOTO) {
+            const px = drone.position.x + Math.sin(this.photoCamYaw) * Math.cos(this.photoCamPitch) * this.photoCamDistance;
+            const py = drone.position.y + Math.sin(this.photoCamPitch) * this.photoCamDistance;
+            const pz = drone.position.z + Math.cos(this.photoCamYaw) * Math.cos(this.photoCamPitch) * this.photoCamDistance;
+            this.camera.position.set(px, py, pz);
+            this.camera.lookAt(drone.position);
             return;
         }
 

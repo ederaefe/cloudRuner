@@ -20,7 +20,14 @@ export class InputManager {
             stuntRollLeft: false,
             stuntRollRight: false,
             isKnifeEdgeHeld: false,
-            isCobraTriggered: false
+            isCobraTriggered: false,
+
+            // Flight Assist, Altitude Hold, Autopilot & Hover Stop
+            flyAssistEnabled: true,
+            altitudeHoldEnabled: false,
+            targetAltitude: 35.0,
+            autopilotEnabled: false,
+            hoverStopActive: false
         };
     }
 
@@ -28,6 +35,40 @@ export class InputManager {
         this.state.stuntRollLeft = false;
         this.state.stuntRollRight = false;
         this.state.isCobraTriggered = false;
+    }
+
+    toggleFlyAssist() {
+        this.state.flyAssistEnabled = !this.state.flyAssistEnabled;
+        return this.state.flyAssistEnabled;
+    }
+
+    toggleAltitudeHold(currentAlt = null) {
+        this.state.altitudeHoldEnabled = !this.state.altitudeHoldEnabled;
+        if (this.state.altitudeHoldEnabled && Number.isFinite(currentAlt)) {
+            this.state.targetAltitude = Math.round(currentAlt);
+        }
+        return this.state.altitudeHoldEnabled;
+    }
+
+    adjustTargetAltitude(delta) {
+        this.state.targetAltitude = Math.max(8, Math.min(280, Math.round(this.state.targetAltitude + delta)));
+        return this.state.targetAltitude;
+    }
+
+    toggleAutopilot() {
+        this.state.autopilotEnabled = !this.state.autopilotEnabled;
+        if (this.state.autopilotEnabled) {
+            this.state.hoverStopActive = false; // Disengage stop if autopilot turned on
+        }
+        return this.state.autopilotEnabled;
+    }
+
+    toggleHoverStop() {
+        this.state.hoverStopActive = !this.state.hoverStopActive;
+        if (this.state.hoverStopActive) {
+            this.state.autopilotEnabled = false; // Disengage autopilot if stop engaged
+        }
+        return this.state.hoverStopActive;
     }
 
     getState() {
