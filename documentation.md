@@ -60,3 +60,11 @@ This enables zero-latency P2P mesh synchronization via WebRTC DataChannels (`Pee
 * **Extraction Engine (`js/engine/extraction_engine.js`)**: Manages base helipads, glowing orange drop zones, rooftop payload crates, magnetic winch latching, and extraction drop sequences.
 * **Hangar & Settings Manager (`js/ui/hangar_settings.js`)**: Persistent `localStorage` profile managing player credits, 4 airframe skins (Search & Rescue, Arctic Ghost, Stealth Carbon, Cyber Neon), upgrade trees (Turbine Velocity, Winch Latch Radius, Hull Armor, Nitro Cell Capacity), audio sliders, and graphics tier overrides.
 * **Comprehensive Documentation & SEO README (`README.md`)**: Full architectural reference, control mappings, performance tiers, and deployment guides.
+
+### Completed: Low-End Mobile Stability, DRS & Zero-Allocation Engine
+* **Zero-Allocation Render Loop**: Replaced all per-frame `new THREE.Vector3()`, `clone()`, and `new THREE.Euler()` allocations in `drone.js`, `camera_rig.js`, `stunt_fsm.js`, and `ai_racer.js` with module-level pre-allocated scratch objects, eliminating V8 Garbage Collection micro-stutters on budget mobile devices.
+* **Dynamic Resolution Scaling (DRS)**: Automated frame-pacing monitor that dynamically reduces `renderer.setPixelRatio` down to 0.70x if average frametimes exceed 24ms, scaling back to native when frame rates stabilize.
+* **Screen Wake Lock API (`navigator.wakeLock`)**: Automatically acquires screen wake lock on mission start to prevent mobile devices from sleeping during races, releasing on pause or finish.
+* **Background Tab Lifecycle Handling**: Listens to `visibilitychange` to automatically pause flight physics and suspend the Web Audio context when the tab is backgrounded.
+* **WebGL Context Loss & Recovery**: Registered event handlers on canvas for `webglcontextlost` and `webglcontextrestored`.
+* **Off-Course Safety Realignment**: Bounding altitude and distance envelope that detects crashes or drift and cleanly repositions the craft onto the nearest checkpoint gate.

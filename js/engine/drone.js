@@ -7,6 +7,9 @@ Articulated tilt-rotors, carbon/orange search-and-rescue livery, and vector phys
 
 import { CONFIG } from '../config.js';
 
+// Pre-allocated scratch objects to prevent garbage collection spikes
+const _fwdVector = new THREE.Vector3();
+
 export class Drone {
     constructor(scene, isAi = false, aiColor = null) {
         this.scene = scene;
@@ -19,8 +22,8 @@ export class Drone {
         this.quaternion = this.group.quaternion;
         this.velocity = new THREE.Vector3(0, 0, 0);
         this.speedKmh = 0;
-        this.nitroAmount = 40.0; // Starting Nitro
-        this.nitroStage = 1;     // 1: Cruise, 2: Afterburner, 3: Hyper-Overdrive
+        this.nitroAmount = 40.0;
+        this.nitroStage = 1;
 
         // Articulated components
         this.tiltNacelles = [];
@@ -196,9 +199,9 @@ export class Drone {
             const accelRate = (targetSpeedMs > currentSpeedMs) ? flightCfg.ACCELERATION : flightCfg.BRAKING_DECEL;
             const newSpeedMs = THREE.MathUtils.lerp(currentSpeedMs, targetSpeedMs, Math.min(1.0, accelRate * dt / Math.max(1, currentSpeedMs)));
 
-            // Forward direction vector in world space
-            const fwdVector = new THREE.Vector3(0, 0, 1).applyQuaternion(this.quaternion);
-            this.velocity.copy(fwdVector).multiplyScalar(newSpeedMs);
+            // Forward direction vector in world space (zero-allocation)
+            _fwdVector.set(0, 0, 1).applyQuaternion(this.quaternion);
+            this.velocity.copy(_fwdVector).multiplyScalar(newSpeedMs);
         }
 
         // Apply position delta

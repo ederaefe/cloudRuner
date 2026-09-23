@@ -8,6 +8,15 @@ AI navigation along 3D track spline, lane variation, collision, and drafting
 import { Drone } from './drone.js';
 import { CONFIG } from '../config.js';
 
+// Pre-allocated static scratch objects for zero-allocation AI loop
+const _up = new THREE.Vector3(0, 1, 0);
+const _dirFwd = new THREE.Vector3(0, 0, 1);
+const _normal = new THREE.Vector3();
+const _targetPos = new THREE.Vector3();
+const _pushDir = new THREE.Vector3();
+const _toPlayer = new THREE.Vector3();
+const _forwardVec = new THREE.Vector3();
+
 export class AiRacer {
     constructor(scene, spline, index, totalRacers) {
         this.scene = scene;
@@ -42,21 +51,21 @@ export class AiRacer {
             this.currentLap++;
         }
 
-        // Evaluate spline position and forward tangent
+        // Evaluate spline position and forward tangent (zero-allocation)
         const centerPos = this.spline.getPointAt(this.trackProgress % 1.0);
         const tangent = this.spline.getTangentAt(this.trackProgress % 1.0).normalize();
-        const normal = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0)).normalize();
+        _normal.crossVectors(tangent, _up).normalize();
 
         // Calculate lane wobble
         this.wobblePhase += dt * CONFIG.AI.LANE_WOBBLE_FREQ;
         const currentLateralOffset = this.laneOffset + Math.sin(this.wobblePhase) * CONFIG.AI.LANE_WOBBLE_AMP;
 
         // Position drone with lateral lane offset
-        const targetPos = centerPos.clone().addScaledVector(normal, currentLateralOffset);
-        this.drone.position.copy(targetPos);
+        _targetPos.copy(centerPos).addScaledVector(_normal, currentLateralOffset);
+        this.drone.position.copy(_targetPos);
 
         // Orient drone along track tangent with banking
-        this.drone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+        this.drone.quaternion.setFromUnitVectors(_dirFwd, tangent);
 
         // Rotor spinning animation
         this.drone.rotorDiscs.forEach(r => {
@@ -69,9 +78,9 @@ export class AiRacer {
         const collisionRadius = 2.8;
 
         if (dist < collisionRadius) {
-            // Elastic collision push
-            const pushDir = playerDrone.position.clone().sub(this.drone.position).normalize();
-            playerDrone.position.addScaledVector(pushDir, 0.6);
+            // Elastic collision push (zero-allocation)
+            _pushDir.copy(playerDrone.position).sub(this.drone.position).normalize();
+            playerDrone.position.addScaledVector(_pushDir, 0.6);
             cameraRig.triggerShake(0.3);
             return true;
         }
@@ -79,13 +88,14 @@ export class AiRacer {
     }
 
     isPlayerDrafting(playerDrone) {
-        // Check if player is directly behind AI within slipstream cone
-        const toPlayer = playerDrone.position.clone().sub(this.drone.position);
-        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(this.drone.quaternion);
+        // Check if player is directly behind AI within slipstream cone (zero-allocation)
+        _toPlayer.copy(playerDrone.position).sub(this.drone.position);
+        _forwardVec.copy(_dirFwd).applyQuaternion(this.drone.quaternion);
 
-        const distance = toPlayer.length();
+        const distance = _toPlayer.length();
         if (distance > 0.5 && distance < CONFIG.FLIGHT.DRAFTING_DISTANCE) {
-            const alignment = toPlayer.clone().normalize().dot(forward.clone().negate());
+            _toPlayer.normalize();
+            const alignment = _toPlayer.dot(_forwardVec.negate());
             if (alignment > 0.82) { // Within 35-degree rear wake cone
                 return true;
             }

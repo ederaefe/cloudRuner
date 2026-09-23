@@ -12,6 +12,10 @@
 
 ## Key Features & Highlights
 
+* **Zero-Allocation Render Loop**: Eliminates garbage collection (GC) micro-stutters by utilizing pre-allocated static scratch vectors and Euler angles across all flight, stunt, camera, and AI loops.
+* **Dynamic Resolution Scaling (DRS)**: Frame-pacing monitor dynamically throttles `renderer.setPixelRatio` on the fly if frametime exceeds 24ms, guaranteeing smooth performance on budget Mali/Adreno mobile chipsets.
+* **Screen Wake Lock & Lifecycle Management**: Automatically acquires `navigator.wakeLock` to prevent mobile displays from sleeping mid-race, and pauses simulation/audio when the tab is backgrounded.
+* **Course Realignment Recovery**: Automatically detects off-course boundary deviations and safely realigns the drone onto the track without game restarts.
 * **Zero Build Steps & Lightweight Footprint**: Entire game code is under 90 KB. Loads instantly via public CDNs with zero npm packages or complex bundler pipelines.
 * **Hardware-Adaptive Coordinator**: A client-side hardware profiler dynamically benchmarks GPU capabilities, CPU concurrency, memory, and pointer types, applying Tier 1 (Mobile Low), Tier 2 (Mobile Mid), or Tier 3 (Desktop High) to optimize draw calls, resolution scale (DPR), and shadow maps.
 * **Offline-First PWA Architecture**: Native Service Worker with Cache-First strategy (`Cache API`) caches all scripts, assets, and shaders for 0ms subsequent loads and full offline capability.

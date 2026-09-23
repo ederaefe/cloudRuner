@@ -401,7 +401,75 @@ window.addEventListener('load', () => {
         }
     }
 
-    // 8. Modal Buttons
+    // 8. Dynamic Resolution Scaling (DRS) & Wake Lock
+    let currentDpr = tier.dpr;
+    const frameHistory = [];
+    let lastDrsCheck = performance.now();
+
+    function checkDRS(frameTimeMs) {
+        frameHistory.push(frameTimeMs);
+        if (frameHistory.length > 25) frameHistory.shift();
+        const now = performance.now();
+        if (now - lastDrsCheck > 1200) {
+            lastDrsCheck = now;
+            const avg = frameHistory.reduce((a, b) => a + b, 0) / frameHistory.length;
+            if (avg > 24 && currentDpr > 0.70) {
+                currentDpr = Math.max(0.70, currentDpr - 0.15);
+                renderer.setPixelRatio(currentDpr);
+            } else if (avg < 17 && currentDpr < tier.dpr) {
+                currentDpr = Math.min(tier.dpr, currentDpr + 0.1);
+                renderer.setPixelRatio(currentDpr);
+            }
+        }
+    }
+
+    let wakeLock = null;
+    async function requestWakeLock() {
+        if ('wakeLock' in navigator) {
+            try { wakeLock = await navigator.wakeLock.request('screen'); }
+            catch (e) { /* ignore silently on unsupported platforms */ }
+        }
+    }
+
+    function releaseWakeLock() {
+        if (wakeLock) {
+            wakeLock.release().then(() => { wakeLock = null; }).catch(() => {});
+        }
+    }
+
+    // 9. Lifecycle & Context Recovery
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            if (window._gameState === 'RACING') {
+                hangarManager.openPause();
+            }
+            if (soundEngine.ctx && soundEngine.ctx.state === 'running') {
+                soundEngine.ctx.suspend();
+            }
+            releaseWakeLock();
+        } else {
+            if (soundEngine.ctx && soundEngine.ctx.state === 'suspended' && window._gameState === 'RACING') {
+                soundEngine.ctx.resume();
+            }
+            if (window._gameState === 'RACING') {
+                requestWakeLock();
+            }
+        }
+    });
+
+    canvas.addEventListener('webglcontextlost', (e) => {
+        e.preventDefault();
+        console.warn('WebGL context lost - suspending flight loop');
+        window._gameState = 'PAUSED';
+    });
+
+    canvas.addEventListener('webglcontextrestored', () => {
+        console.info('WebGL context restored - recovering scene');
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        window._gameState = 'RACING';
+    });
+
+    // 10. Modal Buttons & Race Lifecycle
     const startModal = document.getElementById('start-modal');
     const endModal = document.getElementById('end-modal');
     const btnLaunch = document.getElementById('btn-launch-race');
@@ -412,6 +480,7 @@ window.addEventListener('load', () => {
     const beginRace = () => {
         soundEngine.init();
         soundEngine.resume();
+        requestWakeLock();
         startModal.classList.add('hidden');
 
         // Apply updated loadout
@@ -438,21 +507,23 @@ window.addEventListener('load', () => {
     });
 
     if (btnMenuPause) btnMenuPause.addEventListener('click', () => {
+        releaseWakeLock();
         document.getElementById('pause-modal').classList.add('hidden');
         startModal.classList.remove('hidden');
         gameState = 'START';
         window._gameState = gameState;
     });
 
-    // 9. Resize Handler
+    // 11. Resize Handler
     window.addEventListener('resize', () => {
         camera.aspect = window.innerWidth / window.innerHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // 10. Simulation Loop
+    // 12. Simulation Loop (Zero-Allocation & Paced)
     const clock = new THREE.Clock();
+    const _alignDir = new THREE.Vector3(0, 0, 1);
 
     function animate() {
         requestAnimationFrame(animate);
@@ -464,10 +535,21 @@ window.addEventListener('load', () => {
 
         if (window._gameState === 'RACING') {
             raceTotalTime += dt;
+            checkDRS(dt * 1000);
 
             // Update Player Physics
             const inputState = inputManager.getState();
             playerDrone.updatePhysics(inputState, stuntFsm, dt);
+
+            // Out-of-bounds safety check & realign
+            if (playerDrone.position.y < -65 || (track && playerDrone.position.length() > 650)) {
+                hud.showStuntAlert('COURSE REALIGNMENT', 'RETURNING TO TRACK');
+                soundEngine.playNearMiss();
+                const safeGate = track.gates[Math.max(0, nextGateIndex - 1) % track.gates.length];
+                playerDrone.position.copy(safeGate.position);
+                playerDrone.quaternion.setFromUnitVectors(_alignDir, safeGate.normal);
+                playerDrone.velocity.set(0, 0, 0);
+            }
 
             if (hangarManager.selectedMode === CONFIG.MODES.CIRCUIT_RACE) {
                 // Circuit Mode Logic: Gates & Laps
@@ -519,7 +601,6 @@ window.addEventListener('load', () => {
                 const isVersus = hangarManager.selectedMode === CONFIG.MODES.EXTRACTION_VERSUS;
                 extractionEngine.update(playerDrone, stats.winchRadius, aiRacers, isVersus, dt);
 
-                // Update AI Racers if in versus mode
                 if (isVersus) {
                     aiRacers.forEach((ai) => {
                         ai.update(dt);
@@ -549,6 +630,7 @@ window.addEventListener('load', () => {
 
     function finishRace(isExtraction) {
         window._gameState = 'FINISHED';
+        releaseWakeLock();
         endModal.classList.remove('hidden');
 
         const rewardCredits = isExtraction ? 350 : 250;

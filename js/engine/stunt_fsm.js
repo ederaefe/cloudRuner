@@ -15,6 +15,8 @@ export const STUNT_STATES = {
     COBRA_AIRBRAKE: 'COBRA_AIRBRAKE'
 };
 
+const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
+
 export class StuntFSM {
     constructor(soundEngine = null, onStuntTriggered = null) {
         this.sound = soundEngine;
@@ -140,14 +142,14 @@ export class StuntFSM {
             }
         }
 
-        // Apply Euler orientation to drone quaternion
-        const euler = new THREE.Euler(
+        // Apply Euler orientation to drone quaternion (zero-allocation)
+        _euler.set(
             this.currentPitch,
             this.currentYaw,
             this.currentRoll + this.stuntRollProgress,
             'YXZ'
         );
-        drone.quaternion.setFromEuler(euler);
+        drone.quaternion.setFromEuler(_euler);
 
         // Reset one-shot input triggers
         inputState.stuntRollLeft = false;
