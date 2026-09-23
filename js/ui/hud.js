@@ -224,7 +224,7 @@ export class RacingHUD {
         }
 
         // Flight Assist HUD & Touch Sync
-        const st = inputState || (window._inputManager ? window._inputManager.state : null);
+        const st = (typeof window !== 'undefined' && window._inputManager) ? window._inputManager.state : null;
         if (st) {
             if (this.btnHudAuto) {
                 this.btnHudAuto.classList.toggle('active', !!st.autopilotEnabled);
