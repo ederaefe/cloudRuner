@@ -345,6 +345,65 @@ This enables zero-latency P2P mesh synchronization via WebRTC DataChannels (`Pee
   * Sits directly underneath the floating circular gates to provide essential visual continuity and speed reference, preventing the craft from appearing detached from the racing circuit.
   * Framed by glowing neon edge boundary lines (`opacity: 0.48`, linewidth 2) defining the flight corridor with minimalist elegance.
 
+---
+
+### Completed: Visual Bug Remediation & Rendering Pipeline Stabilization
+
+* **Frustum & Atmospheric Projection Restoration (`index.html`, `js/engine/track_builder.js`)**:
+  * Expanded camera frustum far clip plane from 2200m to 6500m (`new THREE.PerspectiveCamera(..., 0.1, 6500)`), ensuring the 5000m radius Sky Dome and 4000m distant skyline silhouette rings are fully enclosed within the render volume without depth culling.
+  * Updated `createSkyDome` vertex color gradient normalization from `(posAttr.getY(i) + 400) / 2200` to `(posAttr.getY(i) + 500) / 5200` to deliver a continuous, smooth horizon-to-zenith color gradient across the entire dome.
+  * Adjusted launch pad platform geometry height (`position.y = startPoint.y - 1.98`, ring at `-1.16`, decal at `-1.15`), seating the launch structure flush beneath the holographic track ribbon to eliminate geometric intersection and Z-fighting.
+
+* **PBR Surface Normals & Kinematic Hierarchy Integrity (`js/engine/drone.js`)**:
+  * Inverted index winding order and computed true vertex normals (`mirrorGeometryWithCorrectNormals`) for left-wing and left-canard mirrored geometries, resolving inward-pointing normal artifacts, dark face shading, and broken shadow occlusion.
+  * Re-parented wingtip tilt-rotor nacelles under the main wings (`wingR.add(nacGroupR)`, `wingL.add(nacGroupL)`) so nacelles stay physically locked to the airframe tips during dynamic variable-geometry wing flexing.
+  * Mirrored roll and yaw signs for the left wing and canard (`wingL.rotation.z = morph * 0.11`, `canardL.rotation.z = morph * 0.12`), establishing realistic aerodynamic dihedral symmetry during turns.
+
+* **Cockpit Camera & Particle Frustum Alignment (`js/engine/camera_rig.js`, `js/engine/particle_system.js`)**:
+  * Relocated first-person Cockpit camera forward of the canopy structure (`(0, 0.45, 1.85)`) and toggled canopy mesh visibility (`canopy.visible = false` in cockpit mode, `true` otherwise), preventing near-plane clipping through opaque cockpit geometry.
+  * Redesigned `emitSpeedStreak` particle emission to spawn particles ahead of the camera inside the active view frustum (`cameraPosition + forward * (18..42m)`) with inward relative velocity (`-speed * 0.45`), producing forward-streaming atmospheric streaks across the screen.
+
+* **HUD Telemetry Orientation & Responsive UI Layout (`js/ui/hud.js`, `css/game.css`, `index.html`)**:
+  * Synchronized the 2D compass ribbon and peripheral horizon ladder by extracting yaw, pitch, and roll from `drone.group.quaternion` using `THREE.Euler(..., 'YXZ')`, resolving permanently static 0-degree telemetry readouts.
+  * Added dynamic canvas buffer resizing (`width = 180, height = 24` on `<= 768px`) to match responsive CSS styling, eliminating GPU bilinear stretching and blurry tick marks on mobile.
+  * Relocated `.toast-stack-container` to `calc(env(safe-area-inset-top, 14px) + 104px)`, preventing notification toasts from obscuring the tactical flight assist control bar.
+  * Removed duplicate obsolete 4-tab sidebar from `index.html` and renamed start-modal ticker IDs to prevent DOM ID collisions.
+
+---
+
+### Completed: Full Redesign — Stratosphere Sky-Dive & Ascension Racing Circuit (Sessions 1–4)
+
+* **Session 1: Sound Nuking, Stratosphere Staging Grid & Attack Drone Airframe**:
+  * **Complete Audio Neutralization (`js/audio/sound_engine.js`)**: All Web Audio gain nodes and synthesizing routines permanently clamped to 0.0 volume and bypassed to provide pristine silence per user directive, while preserving all method signatures to maintain 100% test suite compatibility.
+  * **Stratosphere Staging Grid (`js/engine/track_builder.js`, `js/config.js`)**: Elevated starting grid to the stratosphere ($y = 750\text{m}$). Built 4 floating hexagonal cantilever launch slabs spaced side-by-side (`[-24, -8, 8, 24]` meters offset) with color-coded portal rings (Amber, Cyan, Magenta, Emerald) and glowing runway boundary rings.
+  * **Aggressive Attack Combat Drone (`js/engine/drone.js`)**: Replaced standard hovercraft hull with a razor-sharp supersonic combat airframe featuring a needle nose cone, forward-swept delta wings, articulated canards, and dual glowing plasma exhaust ports. Preserved VTOL Search-and-Rescue mode as an alternate loiter roleplay airframe.
+  * **Stationary Staging Hover & Revving (`js/engine/drone.js`, `js/engine/ai_racer.js`)**: Drones sit stationary on their respective platforms prior to race start. Added subtle sine bobbing ($0.16\text{m}$) and interactive pitch tilt / revving tachometer readout when pilot presses forward throttle (`W` / `Up Arrow`) before launch.
+
+* **Session 2: Asphalt-Style 360° Cinematic Sequence & Assisted Deep Dive Funnel**:
+  * **Asphalt Orbital Intro Camera Sequence (`js/engine/camera_rig.js`)**: Constructed a 4-phase choreographed intro camera sequence during the 3.5s countdown:
+    1. *Low-Angle Hero Orbit*: Dramatic low sweep showcasing the player's combat drone.
+    2. *Platform Pan*: Lateral camera sweep across rival staging slabs and color-coded portals.
+    3. *Plunge Crane Reveal*: Overhead crane tilt peering down the 720m sheer drop to the city.
+    4. *Rear Cockpit Lock*: Rapid transition behind the drone aligning directly with the dive funnel.
+  * **Assisted Deep Dive Kinematics (`js/engine/drone.js`)**: 7–10s assisted dive funnel descending from $y = 750\text{m} \to y = 28\text{m}$. Passive gravity falls under natural acceleration ($24\text{m/s}^2$, top speed ~180 km/h), while forward throttle engages active thruster acceleration ($44\text{m/s}^2 - 64\text{m/s}^2$, top speed 320+ km/h).
+  * **Dynamic FOV Dive Flare & Screen Shake (`js/engine/camera_rig.js`)**: FOV expands smoothly from $65^\circ$ up to $105^\circ$ proportional to dive velocity, paired with Mach speed screenshake and free lateral look/pan ($\pm 45^\circ$) allowing pilots to glance sideways at diving rivals.
+  * **Vertical Speed Streaks (`js/engine/particle_system.js`)**: High-speed particle field streaming upward ("reverse rain") during dive descent and streaming downward during vertical climb.
+  * **Progressive Altitude Fog Clearing (`index.html`)**: Fog density dissolves smoothly as craft passes below 250m altitude, unveiling the daylight urban canyon circuit.
+
+* **Session 3: AI Rival Dive Kinematics, Post-Dive Straightaway & Building Clearance Envelopes**:
+  * **Synchronized Rival AI Dive (`js/engine/ai_racer.js`)**: AI racers staged on platforms 0, 2, and 3 launch simultaneously into the funnel with individualized acceleration curves ($38\text{m/s}^2 - 52\text{m/s}^2$), visibly pulling away from the player if throttle is released.
+  * **450m Post-Dive Calibration Straightaway (`js/engine/track_builder.js`)**: Parabolic pullout curve at $y \approx 28\text{m}$ seamlessly transitions into a 450-meter wide, unobstructed straightaway giving pilots immediate orientation before entering chicane turns.
+  * **Strict 3D Radial Building Clearance Envelopes (`js/engine/track_builder.js`)**: Completely eliminated building-path collisions by enforcing 3D clearance testing against all spline samples with altitude-adjusted setbacks ($160\text{m}+$ along high drops) and outer perimeter fallback placement (`spread * 0.75 + 400`).
+  * **Matte Pastel Daylight Aesthetics (`js/engine/track_builder.js`, `js/config.js`)**: Transformed building shaders into solid matte terracotta, soft sage, muted cobalt, and warm clay materials (`roughness: 0.82, metalness: 0.12`), reflecting the clean daylight aesthetic of *Slow Roads*.
+
+* **Session 4: Vertical Sky-Ramp Ascension Sprint & Minimalist Zen UI**:
+  * **90° Vertical Sky-Ramp Ascension Sprint (`js/engine/track_builder.js`, `js/engine/drone.js`)**: At spline terminus ($t \ge 0.83$), the circuit curves vertically upward from $y = 28\text{m} \to y = 750\text{m}$. Drone engages full-afterburner rocket climb, burning accumulated nitro reserves to reach Mach velocities (>300 km/h) up into the stratosphere.
+  * **Grand Champion Stratosphere Finish Portal (`js/engine/track_builder.js`, `index.html`)**: Massive 14-meter gold torus portal constructed at $y \approx 750\text{m}$, serving as the ultimate finish threshold triggering the epilogue victory sequence upon summit arrival.
+  * **Slow Roads Minimalist Frosted UI (`css/game.css`, `js/ui/hud.js`, `index.html`)**: Replaced sci-fi frames with translucent rounded frosted pill containers (`background: rgba(15,23,42,0.65)`, `backdrop-filter: blur(14px)`, `border-radius: 9999px`).
+  * **Minimalist Countdown Pill Overlay (`index.html`, `js/ui/hud.js`)**: Frosted countdown overlay displaying `3... 2... 1... DIVE!` with pulse animations and cyan portal flare, avoiding all screen clutter.
+  * **Out-of-Bounds Elevation Re-calibration (`index.html`)**: Expanded ceiling boundary from 380m to 900m and radial bounds to 4500m, accommodating stratosphere staging and vertical climb without false-positive resets.
+
+
 
 
 

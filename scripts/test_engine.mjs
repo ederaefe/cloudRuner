@@ -181,8 +181,11 @@ class MockVector3 {
 class MockQuaternion {
     constructor() { this._x = 0; this._y = 0; this._z = 0; this._w = 1; }
     setFromUnitVectors(a, b) { return this; }
+    setFromAxisAngle(axis, angle) { return this; }
     setFromEuler(e) { return this; }
     slerp(q, t) { return this; }
+    multiply(q) { return this; }
+    identity() { return this; }
     copy(q) { return this; }
     invert() { return this; }
     clone() { return new MockQuaternion(); }
@@ -298,6 +301,8 @@ global.THREE = {
     SphereGeometry: MockGeometry,
     CylinderGeometry: MockGeometry,
     RingGeometry: MockGeometry,
+    CircleGeometry: MockGeometry,
+    TorusGeometry: MockGeometry,
     BufferGeometry: MockGeometry,
     CanvasTexture: class {
         constructor() {
@@ -905,6 +910,121 @@ sidebar.switchTab('sectors');
 assert(sidebar.activeTab === 'sectors', 'CustomizationSidebar switches to sectors tab');
 sidebar.switchTab('modes');
 assert(sidebar.activeTab === 'modes', 'CustomizationSidebar switches to modes tab');
+
+// 19. Stratosphere Launch Staging, Deep Dive Funnel & Ascension Sprint (Sessions 1-4)
+assert(CONFIG.STAGING !== undefined, 'CONFIG defines STAGING block');
+assert(CONFIG.STAGING.ALTITUDE === 750.0, 'CONFIG defines staging altitude at 750m');
+assert(CONFIG.STAGING.COUNTDOWN_SECONDS === 3.5, 'CONFIG defines 3.5s launch countdown');
+assert(CONFIG.STAGING.PLATFORM_COUNT === 4, 'CONFIG defines 4 staging platforms');
+
+// Test TrackBuilder staging grid and finish portal
+const stagingTrack = new TrackBuilder(scene, coordinator.tier, CONFIG.SECTORS[0]);
+assert(stagingTrack.stagingPositions.length === 4, 'TrackBuilder creates 4 staging positions');
+assert(stagingTrack.stagingPlatforms.length === 4, 'TrackBuilder creates 4 floating launch platforms');
+assert(stagingTrack.portals.length === 4, 'TrackBuilder creates 4 color-coded portal gates');
+assert(stagingTrack.finishPortal !== null, 'TrackBuilder creates Grand Champion finish portal');
+assert(stagingTrack.stagingPositions[0].y === stagingTrack.spline.getPointAt(0).y, 'Staging pads align with spline start altitude');
+
+// Test Drone Staging and Stationary Revving
+const testCombatDrone = new Drone(scene, false);
+testCombatDrone.setStaging(true, stagingTrack.stagingPositions[1]);
+assert(testCombatDrone.isStaging === true, 'Drone enters staging mode');
+assert(testCombatDrone.speedKmh === 0, 'Drone is stationary during staging');
+
+// Stationary idle hover with revving
+testCombatDrone.updateStagingHover(1.0, { forward: 0.8 }, 0.016);
+assert(testCombatDrone.speedKmh > 0, 'Drone revving tachometer responds to forward throttle on pad');
+assert(testCombatDrone.position.y !== stagingTrack.stagingPositions[1].y, 'Drone gently bobs in hover on launch slab');
+
+// Test 7-10s Deep Dive Gravity vs Boosted Thrust Kinematics
+testCombatDrone.setTrackSpline(stagingTrack.spline);
+testCombatDrone.startDive();
+assert(testCombatDrone.isDiving === true, 'Drone initiates sky dive');
+assert(testCombatDrone.isStaging === false, 'Drone clears staging flag on dive launch');
+
+// Passive gravity dive (no throttle)
+const passiveDrone = new Drone(scene, false);
+passiveDrone.setTrackSpline(stagingTrack.spline);
+passiveDrone.setStaging(true, stagingTrack.stagingPositions[0]);
+passiveDrone.startDive();
+passiveDrone.updateDivePhysics({ forward: 0 }, 0.1, stagingTrack);
+const passiveSpeed = passiveDrone.speedKmh;
+
+// Boosted thrust dive (with throttle)
+testCombatDrone.updateDivePhysics({ forward: 1.0 }, 0.1, stagingTrack);
+const boostedSpeed = testCombatDrone.speedKmh;
+assert(boostedSpeed > passiveSpeed, 'Boosted throttle dive accelerates significantly faster than passive gravity');
+
+// Lateral lane steering within the dive funnel
+const preLaneX = testCombatDrone.position.x;
+testCombatDrone.updateDivePhysics({ forward: 1.0, turn: 1.0 }, 0.1, stagingTrack);
+assert(testCombatDrone.diveLaneOffset !== 0, 'Dive physics supports lateral lane shifting within funnel');
+
+// Ascension Sprint up 90-degree sky ramp
+testCombatDrone.startAscension();
+assert(testCombatDrone.isAscending === true, 'Drone initiates vertical sky ascension sprint');
+testCombatDrone.nitroAmount = 80;
+for (let t = 0; t < 10; t++) {
+    testCombatDrone.updateAscensionPhysics({ isNitroHeld: true }, 0.05, stagingTrack);
+}
+assert(testCombatDrone.speedKmh > 200, 'Ascension sprint reaches extreme Mach climb velocity');
+assert(testCombatDrone.nitroAmount < 80, 'Vertical ascension consumes nitro fuel cell');
+
+// AI Racer Staging and Dive Acceleration
+const testAiRacer = new AiRacer(scene, stagingTrack.spline, 0, 3, false, coordinator.tier);
+testAiRacer.setStaging(stagingTrack.stagingPositions[2]);
+assert(testAiRacer.isStaging === true, 'AiRacer enters staging mode');
+testAiRacer.update(0.016, null);
+assert(testAiRacer.speedKmh === 0, 'AiRacer remains stationary during staging hover');
+
+testAiRacer.startDive();
+assert(testAiRacer.isDiving === true, 'AiRacer launches into dive');
+testAiRacer.update(0.1, null);
+assert(testAiRacer.speedKmh > 50, 'AiRacer accelerates dynamically down dive funnel');
+
+// CameraRig Asphalt 360 Intro Sequence and Dynamic FOV Dive
+cameraRig.introPhase = 0;
+cameraRig.updateIntroSequence(testCombatDrone, stagingTrack.stagingPlatforms, 0.15, 0.016);
+assert(cameraRig.camera.fov > 50, 'CameraRig updates intro sequence phase 1 orbit');
+cameraRig.updateIntroSequence(testCombatDrone, stagingTrack.stagingPlatforms, 0.50, 0.016);
+assert(cameraRig.targetFov === 74.0, 'CameraRig updates intro sequence phase 2 platform sweep');
+cameraRig.updateIntroSequence(testCombatDrone, stagingTrack.stagingPlatforms, 0.80, 0.016);
+assert(cameraRig.targetFov === 82.0, 'CameraRig updates intro sequence phase 3 plunge reveal');
+
+// CameraRig Dive Flare (FOV expands up to 105 deg)
+testCombatDrone.speedKmh = 320;
+cameraRig.updateDive(testCombatDrone, { turn: 0.5 }, 0.016);
+assert(cameraRig.targetFov >= 100, 'CameraRig dynamic FOV dive flare expands toward 105 degrees at high speed');
+assert(cameraRig.divePanYaw !== 0, 'CameraRig supports lateral look/pan to view diving rivals');
+
+// ParticleSystem Vertical Speed Streaks (reverse rain)
+const testPs = new ParticleSystem(scene, coordinator.tier);
+testPs.emitVerticalSpeedStreaks(new THREE.Vector3(0, 500, 0), new THREE.Vector3(0, 0, -1), -150, 0.016);
+testPs.update(0.016);
+assert(testPs.activeCount > 0, 'ParticleSystem emits vertical speed streak particles');
+testPs.dispose();
+
+// RacingHUD Minimalist Frosted Countdown Overlay
+const hudCountdownMock = {
+    textContent: '',
+    className: '',
+    classList: {
+        add: function(c) { this._classes = this._classes || new Set(); this._classes.add(c); },
+        remove: function(c) { if (this._classes) this._classes.delete(c); },
+        toggle: function(c, v) { if (v) this.add(c); else this.remove(c); },
+        contains: function(c) { return this._classes ? this._classes.has(c) : false; }
+    }
+};
+hud.countdownEl = hudCountdownMock;
+hud.showCountdown('3');
+assert(hudCountdownMock.textContent === '3', 'RacingHUD displays countdown digit 3');
+hud.showCountdown('DIVE!', true);
+assert(hudCountdownMock.textContent === 'DIVE!', 'RacingHUD displays DIVE! prompt');
+assert(hudCountdownMock.classList.contains('dive-go'), 'RacingHUD marks countdown with dive-go style');
+hud.hideCountdown();
+assert(hudCountdownMock.classList.contains('hidden'), 'RacingHUD hides countdown overlay');
+
+stagingTrack.dispose();
 
     console.log(`\n========================================`);
     console.log(`ALL TESTS PASSED: ${passedTests}/${totalTests} ASSERTIONS VERIFIED`);

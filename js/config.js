@@ -25,16 +25,16 @@ export const CONFIG = {
             payloads: 4,
             requiredSectorId: null,
             fogDensity: 0.0008,
-            sunColor: 0xfff0dd,
-            skyColor: 0x07111f,
-            zenithColor: 0x040814,
-            horizonColor: 0x0c2238,
-            gridColor: 0x00e5ff,
-            trackEmissive: 0x00f0ff,
-            trackEdge: 0x0E7C7B,
+            sunColor: 0xfff5ea,
+            skyColor: 0x7ec8e3,
+            zenithColor: 0x3a7bd5,
+            horizonColor: 0xd8e8f8,
+            gridColor: 0x5fa8d3,
+            trackEmissive: 0x00e5ff,
+            trackEdge: 0x1b4965,
             buildingSpread: 2200,
             buildingHeightMax: 65,
-            buildingColors: [0x0F8B8D, 0x1E3D59, 0xEC9A29, 0x17B978, 0x2B4162, 0xFF6E40, 0x38A3A5, 0x57CC99],
+            buildingColors: [0xD97757, 0x8EA89D, 0x5A7D9A, 0xD4A373, 0xE0C39E, 0xC98B8B, 0xA3B18A, 0x778DA9],
             beaconColors: [0x00ffff, 0xff0055, 0xffaa00],
             trimColor: 0x00ffff,
             windowGlow: 0xfff3b0
@@ -428,6 +428,20 @@ export const CONFIG = {
         GATE_RADIUS: 8.5,
         CHECKPOINT_RADIUS: 9.0,
         LAPS_TO_WIN: 2
+    },
+
+    // Stratosphere Launch Staging & Deep Dive Specifications
+    STAGING: {
+        ALTITUDE: 750.0,
+        DIVE_BOTTOM_ALTITUDE: 28.0,
+        FINISH_ALTITUDE: 750.0,
+        PLATFORM_COUNT: 4,
+        PLATFORM_SPACING: 16.0,
+        COUNTDOWN_SECONDS: 3.5,
+        DIVE_DURATION_ESTIMATE: 8.5,
+        PASSIVE_GRAVITY: 24.0,
+        BOOST_DIVE_ACCELERATION: 65.0,
+        MAX_DIVE_SPEED: 340.0
     },
 
     // Device Hardware Profiles

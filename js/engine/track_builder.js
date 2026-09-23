@@ -113,40 +113,59 @@ export class TrackBuilder {
     }
 
     buildTrackSpline() {
-        // Wide open circuit — scaled 3x on XZ so the drone feels small in a vast world
+        // Master 3D Aerial Circuit:
+        // Stratosphere Staging (750m) -> 7-10s Deep Dive Funnel -> 450m Calibration Straightaway ->
+        // Canyon Chicane & Obstacle Run -> 90° Vertical Sky-Ramp Ascension Sprint -> Finish Portal (750m)
         const basePoints = [
-            [0,    18,   0],
-            [180,  28,   360],
-            [420,  55,   660],
-            [240,  85,   1080],
-            [-180, 48,   1350],
-            [-540, 22,   1140],
-            [-720, 65,   720],
-            [-600, 100,  300],
-            [-240, 75,   -120],
-            [120,  32,   -360],
-            [480,  12,   -240],
-            [300,  14,   -60]
+            [0,    750,  0],     // Point 0: Stratosphere Launch Grid (Stratosphere Staging)
+            [0,    680,  80],    // Point 1: Funnel lip & plunge initiation
+            [20,   500,  220],   // Point 2: Supersonic vertical plunge through clouds
+            [30,   280,  440],   // Point 3: Stratosphere fog boundary crossing
+            [15,   110,  700],   // Point 4: Approaching city canopy
+            [5,    42,   920],   // Point 5: Parabolic recovery curve pullout
+            [0,    28,   1080],  // Point 6: Pullout complete, wide 450m straightaway entry (y=28m)
+            [0,    28,   1530],  // Point 7: End of 450m calibration straightaway (1080 -> 1530 = 450m)
+            [180,  34,   1850],  // Point 8: Canyon entry turn
+            [450,  46,   2200],  // Point 9: Banked outer sweeping arc
+            [280,  54,   2600],  // Point 10: Chicane crest
+            [-160, 44,   2700],  // Point 11: Tight canyon S-bend
+            [-520, 32,   2300],  // Point 12: Low-altitude river run
+            [-680, 36,   1700],  // Point 13: Skyline sweeping curve
+            [-480, 32,   1050],  // Point 14: Industrial return corridor
+            [-240, 28,   500],   // Point 15: Run-up straight to ascension ramp
+            [-60,  28,   140],   // Point 16: Foot of 90° vertical sky-ramp
+            [-30,  48,   40],    // Point 17: Ramp entry curve
+            [-10,  150,  -20],   // Point 18: Steep vertical ascension climb
+            [0,    360,  -50],   // Point 19: Vertical rocket burn through clouds
+            [0,    600,  -40],   // Point 20: High stratosphere sprint
+            [0,    750,  -15]    // Point 21: Summit finish portal, closing loop into Point 0
         ];
 
-        // Seed-based deterministic waypoint modulation (small jitter relative to new scale)
-        const seedScale = 0.22;
-        const rawPoints = basePoints.map((bp) => {
-            const rx = (this.rng.random() - 0.5) * 80 * seedScale;
-            const ry = (this.rng.random() - 0.5) * 30 * seedScale;
-            const rz = (this.rng.random() - 0.5) * 80 * seedScale;
-            return new THREE.Vector3(bp[0] + rx, Math.max(14, bp[1] + ry), bp[2] + rz);
+        // Seed-based deterministic waypoint modulation (preserves vertical launch/dive geometry)
+        const seedScale = 0.18;
+        const rawPoints = basePoints.map((bp, idx) => {
+            // Keep launch platforms, deep dive entry, and finish summit unjittered for precise alignment
+            const isCriticalPoint = (idx === 0 || idx === 1 || idx === 6 || idx === 7 || idx >= 20);
+            const rx = isCriticalPoint ? 0 : (this.rng.random() - 0.5) * 60 * seedScale;
+            const ry = isCriticalPoint ? 0 : (this.rng.random() - 0.5) * 20 * seedScale;
+            const rz = isCriticalPoint ? 0 : (this.rng.random() - 0.5) * 60 * seedScale;
+            return new THREE.Vector3(bp[0] + rx, Math.max(22, bp[1] + ry), bp[2] + rz);
         });
 
-        // Gaussian altitude smoothing kernel across cyclic waypoints
+        // Altitude smoothing across non-critical waypoints
         const n = rawPoints.length;
         const smoothedPoints = [];
         for (let i = 0; i < n; i++) {
-            const prev = rawPoints[(i - 1 + n) % n];
-            const curr = rawPoints[i];
-            const next = rawPoints[(i + 1) % n];
-            const smoothY = prev.y * 0.22 + curr.y * 0.56 + next.y * 0.22;
-            smoothedPoints.push(new THREE.Vector3(curr.x, smoothY, curr.z));
+            const isCriticalPoint = (i <= 2 || i === 6 || i === 7 || i >= 18);
+            if (isCriticalPoint) {
+                smoothedPoints.push(rawPoints[i].clone());
+            } else {
+                const prev = rawPoints[(i - 1 + n) % n];
+                const curr = rawPoints[i];
+                const next = rawPoints[(i + 1) % n];
+                const smoothY = prev.y * 0.22 + curr.y * 0.56 + next.y * 0.22;
+                smoothedPoints.push(new THREE.Vector3(curr.x, smoothY, curr.z));
+            }
         }
 
         this.spline = new THREE.CatmullRomCurve3(smoothedPoints, true, 'centripetal', 0.5);
@@ -162,7 +181,7 @@ export class TrackBuilder {
             const tempCol = new THREE.Color();
 
             for (let i = 0; i < posAttr.count; i++) {
-                const ny = Math.max(0, Math.min(1.0, (posAttr.getY(i) + 400) / 2200));
+                const ny = Math.max(0, Math.min(1.0, (posAttr.getY(i) + 500) / 5200));
                 tempCol.copy(horizon).lerp(zenith, Math.pow(ny, 0.75));
                 colorAttr[i * 3] = tempCol.r;
                 colorAttr[i * 3 + 1] = tempCol.g;
@@ -433,40 +452,103 @@ export class TrackBuilder {
     createLaunchPad() {
         const padGroup = new THREE.Group();
         const startPoint = this.spline.getPointAt(0);
+        this.stagingPositions = [];
+        this.stagingPlatforms = [];
+        this.portals = [];
 
-        // Heavy hexagonal launch platform
-        const platformGeo = new THREE.CylinderGeometry(14, 16, 1.6, 6);
+        // 4 individual floating launch slabs spaced side-by-side in the stratosphere (y ~ 750m)
+        const laneOffsets = [-24, -8, 8, 24]; // Lane 1 (x=-8) is Player; Lanes 0, 2, 3 are AI Rivals
+        const laneColors = [0xff9900, 0x00f0ff, 0xff00aa, 0x00ff88]; // Color-coded portal rings
+
+        // Hexagonal floating cantilever platform geometry
+        const platformGeo = new THREE.CylinderGeometry(6.8, 7.8, 1.4, 6);
         const platformMat = new THREE.MeshStandardMaterial({
-            color: 0x111c2b,
-            roughness: 0.6,
-            metalness: 0.4
+            color: 0x16202e,
+            roughness: 0.65,
+            metalness: 0.45
         });
-        const platform = new THREE.Mesh(platformGeo, platformMat);
-        platform.position.set(startPoint.x, startPoint.y - 1.2, startPoint.z);
-        platform.receiveShadow = this.tier.shadows;
-        padGroup.add(platform);
 
-        // Glowing border ring
-        const ringGeo = new THREE.RingGeometry(11.5, 13.5, 6);
-        const ringMat = new THREE.MeshBasicMaterial({
-            color: 0x0E7C7B,
-            side: THREE.DoubleSide
-        });
-        const ring = new THREE.Mesh(ringGeo, ringMat);
-        ring.rotation.x = -Math.PI / 2;
-        ring.position.set(startPoint.x, startPoint.y - 0.38, startPoint.z);
-        padGroup.add(ring);
+        // Platform glowing border ring
+        const ringGeo = new THREE.RingGeometry(5.8, 6.7, 6);
+        const decalGeo = new THREE.RingGeometry(1.6, 2.6, 24);
 
-        // Center amber chevron / target decal
-        const decalGeo = new THREE.RingGeometry(2.5, 4.5, 32);
-        const decalMat = new THREE.MeshBasicMaterial({
-            color: 0xE8580A,
-            side: THREE.DoubleSide
+        // Futuristic Portal Ring Geometry (with headless environment fallbacks)
+        const portalRingGeo = (THREE.TorusGeometry) 
+            ? new THREE.TorusGeometry(4.8, 0.35, 12, 32) 
+            : new THREE.RingGeometry(4.4, 5.2, 24);
+        const portalFieldGeo = (THREE.CircleGeometry) 
+            ? new THREE.CircleGeometry(4.6, 24) 
+            : new THREE.RingGeometry(0.1, 4.6, 24);
+
+        laneOffsets.forEach((offsetX, idx) => {
+            const laneCol = laneColors[idx];
+            const px = startPoint.x + offsetX;
+            const py = startPoint.y;
+            const pz = startPoint.z;
+
+            // Staging hover position for drone
+            this.stagingPositions.push(new THREE.Vector3(px, py, pz));
+
+            const slabGroup = new THREE.Group();
+            slabGroup.position.set(px, py - 1.8, pz);
+
+            // 1. Floating Hex Slab
+            const slab = new THREE.Mesh(platformGeo, platformMat);
+            slab.receiveShadow = this.tier.shadows;
+            slabGroup.add(slab);
+
+            // 2. Glowing platform border
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: laneCol,
+                side: THREE.DoubleSide
+            });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.y = 0.72;
+            slabGroup.add(ring);
+
+            // 3. Staging Target Chevron
+            const decalMat = new THREE.MeshBasicMaterial({
+                color: idx === 1 ? 0x00ffff : 0xffaa00,
+                side: THREE.DoubleSide
+            });
+            const decal = new THREE.Mesh(decalGeo, decalMat);
+            decal.rotation.x = -Math.PI / 2;
+            decal.position.y = 0.73;
+            slabGroup.add(decal);
+
+            // 4. Color-Coded Portal Gate behind each platform (z = -12)
+            const portalGroup = new THREE.Group();
+            portalGroup.position.set(px, py + 2.5, pz - 12.0);
+
+            const portalRingMat = new THREE.MeshBasicMaterial({ color: laneCol });
+            const portalRing = new THREE.Mesh(portalRingGeo, portalRingMat);
+            portalGroup.add(portalRing);
+
+            const portalFieldMat = new THREE.MeshBasicMaterial({
+                color: laneCol,
+                transparent: true,
+                opacity: 0.28,
+                side: THREE.DoubleSide
+            });
+            const portalField = new THREE.Mesh(portalFieldGeo, portalFieldMat);
+            portalGroup.add(portalField);
+
+            padGroup.add(slabGroup);
+            padGroup.add(portalGroup);
+            this.stagingPlatforms.push(slabGroup);
+            this.portals.push(portalGroup);
         });
-        const decal = new THREE.Mesh(decalGeo, decalMat);
-        decal.rotation.x = -Math.PI / 2;
-        decal.position.set(startPoint.x, startPoint.y - 0.36, startPoint.z);
-        padGroup.add(decal);
+
+        // 5. Grand Champion Finish Portal at Stratosphere Summit (y ~ 750m)
+        const finishPortalGeo = (THREE.TorusGeometry)
+            ? new THREE.TorusGeometry(14.0, 1.1, 16, 48)
+            : new THREE.RingGeometry(12.8, 15.2, 32);
+        const finishPortalMat = new THREE.MeshBasicMaterial({ color: 0xffd700 });
+        const finishPortal = new THREE.Mesh(finishPortalGeo, finishPortalMat);
+        finishPortal.position.set(startPoint.x, startPoint.y + 4.0, startPoint.z - 14.0);
+        padGroup.add(finishPortal);
+        this.finishPortal = finishPortal;
 
         this.scene.add(padGroup);
         this.launchPad = padGroup;
@@ -542,12 +624,12 @@ export class TrackBuilder {
             this.buildingTexture.repeat.set(2, 6);
         }
 
-        // Vibrant PBR building material with support for per-instance colors and facade texture
+        // Vibrant matte PBR building material for Slow Roads clean pastel aesthetic
         const buildingMat = new THREE.MeshStandardMaterial({
             color: 0xffffff,
             map: this.buildingTexture,
-            roughness: 0.45,
-            metalness: 0.55
+            roughness: 0.82,
+            metalness: 0.12
         });
 
         const instancedCity = new THREE.InstancedMesh(boxGeo, buildingMat, count);
@@ -559,7 +641,7 @@ export class TrackBuilder {
         const maxHeight = this.sector.buildingHeightMax || 140;
 
         // Sector-coordinated color palettes
-        const defaultPalette = [0x0F8B8D, 0x1E3D59, 0xEC9A29, 0x17B978, 0x2B4162, 0xFF6E40, 0x38A3A5, 0x57CC99];
+        const defaultPalette = [0xD97757, 0x8EA89D, 0x5A7D9A, 0xD4A373, 0xE0C39E, 0xC98B8B, 0xA3B18A, 0x778DA9];
         const palette = (this.sector.buildingColors && this.sector.buildingColors.length > 0)
             ? this.sector.buildingColors
             : defaultPalette;
@@ -581,21 +663,27 @@ export class TrackBuilder {
         const outerCount = count - canyonCount;
         const tempColor = new THREE.Color();
 
-        // 1. Canyon-Aligned Flankers (Architecturally Coordinated Along Spline)
+        // 1. Canyon-Aligned Flankers (Guaranteed Safety Envelope)
         for (let i = 0; i < canyonCount; i++) {
             const sampleIdx = Math.floor((i / canyonCount) * sampleCount) % sampleCount;
             const sp = splineSamples[sampleIdx];
             const norm = splineNormals[sampleIdx];
             const side = (i % 2 === 0) ? 1 : -1;
 
-            // Push buildings far from the flight corridor — open sky feel, not a canyon tunnel
-            const trackWidth = CONFIG.TRACK.RIBBON_WIDTH || 12;
-            const corridorSetback = (trackWidth * 0.5) + 80 + ((i * 7) % 40);
+            // Enforce open skyway setbacks: push buildings well clear of the flight corridor
+            const trackWidth = CONFIG.TRACK.RIBBON_WIDTH || 14;
+            // On high altitude dive and ascension sections, keep buildings extra far from vertical drop
+            const isHighAltitude = sp.y > 65;
+            const corridorSetback = isHighAltitude
+                ? (160 + ((i * 7) % 60))
+                : ((trackWidth * 0.5) + 65 + ((i * 7) % 35));
             const lateralJitter = ((i * 13) % 15) - 7.5;
 
             const bw = 22 + ((i * 11) % 26);
             const bd = 22 + ((i * 17) % 26);
-            const bh = 55 + ((i * 23) % Math.max(30, maxHeight - 30));
+            // Cap height so tops stay well below flight elevation
+            const maxAllowedHeight = isHighAltitude ? 45 : Math.max(30, maxHeight - 30);
+            const bh = 45 + ((i * 23) % maxAllowedHeight);
 
             const bx = sp.x + (norm.x * corridorSetback * side) + (norm.z * lateralJitter);
             const bz = sp.z + (norm.z * corridorSetback * side) - (norm.x * lateralJitter);
@@ -629,38 +717,43 @@ export class TrackBuilder {
             });
         }
 
-        // 2. Outer Urban Skyline Clusters (Horizon Monoliths)
+        // 2. Outer Urban Skyline Clusters (Strict 3D Radial Clearance)
         for (let i = 0; i < outerCount; i++) {
             const instIdx = canyonCount + i;
             let bx = 0, bz = 0, bw = 0, bd = 0, bh = 0;
             let valid = false;
             let attempts = 0;
 
-            while (!valid && attempts < 25) {
+            while (!valid && attempts < 35) {
                 attempts++;
-                const angle = (i / outerCount) * Math.PI * 2 + (attempts * 0.1);
+                const angle = (i / outerCount) * Math.PI * 2 + (attempts * 0.12);
                 const radius = 180 + Math.random() * (spread * 0.5);
                 bx = Math.cos(angle) * radius;
                 bz = Math.sin(angle) * radius;
                 bw = 26 + Math.random() * 34;
                 bd = 26 + Math.random() * 34;
-                bh = 70 + Math.random() * maxHeight;
+                bh = 65 + Math.random() * maxHeight;
 
                 let tooClose = false;
-                const minClearance = 36 + Math.max(bw, bd) * 0.5;
+                const minClearance = 44 + Math.max(bw, bd) * 0.5;
                 const minClearanceSq = minClearance * minClearance;
 
-                for (let s = 0; s < sampleCount; s += 2) {
+                // Test against all spline samples to eliminate any path encroachment
+                for (let s = 0; s < sampleCount; s++) {
                     const sp = splineSamples[s];
                     const dx = bx - sp.x;
                     const dz = bz - sp.z;
                     if (dx * dx + dz * dz < minClearanceSq) {
-                        tooClose = true;
-                        break;
+                        const buildingTop = -20 + bh;
+                        if (buildingTop > sp.y - 18.0) {
+                            tooClose = true;
+                            break;
+                        }
                     }
                 }
 
-                if (bx * bx + bz * bz < 45 * 45) {
+                // Staging drop clearance
+                if (Math.abs(bx) < 70 && Math.abs(bz) < 90) {
                     tooClose = true;
                 }
 
@@ -669,9 +762,11 @@ export class TrackBuilder {
                 }
             }
 
+            // Safe fallback perimeter placement if clearance search is exhausted
             if (!valid) {
-                bx += (bx >= 0 ? 80 : -80);
-                bz += (bz >= 0 ? 80 : -80);
+                const safeAngle = (i / outerCount) * Math.PI * 2;
+                bx = Math.cos(safeAngle) * (spread * 0.75 + 400);
+                bz = Math.sin(safeAngle) * (spread * 0.75 + 400);
             }
 
             const by = -20;

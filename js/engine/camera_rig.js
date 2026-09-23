@@ -51,6 +51,10 @@ export class CameraRig {
         this.forwardLean = 0.0;
         this.verticalBob = 0.0;
         this.bobPhase = 0.0;
+
+        // Asphalt Intro & Deep Dive State
+        this.divePanYaw = 0.0;
+        this.introPhase = 0.0;
     }
 
     cycleCameraMode() {
@@ -144,6 +148,95 @@ export class CameraRig {
         this.camera.updateProjectionMatrix();
     }
 
+    updateIntroSequence(drone, stagingPlatforms, progress, dt) {
+        if (!drone) return;
+        const p = THREE.MathUtils.clamp(progress, 0, 1);
+        const center = drone.stagingBasePos || drone.position;
+
+        if (p < 0.35) {
+            // Phase 1: Hero Attack Drone dramatic low-angle orbit
+            const angle = (p / 0.35) * Math.PI * 0.9 + 0.3;
+            const dist = 7.5;
+            this.currentPos.set(
+                center.x + Math.sin(angle) * dist,
+                center.y + 1.2,
+                center.z + Math.cos(angle) * dist
+            );
+            _targetPos.copy(center).add(new THREE.Vector3(0, 0.4, 0.5));
+            this.currentLookAt.lerp(_targetPos, dt * 8.0);
+            this.targetFov = 62.0;
+        } else if (p < 0.68) {
+            // Phase 2: Lateral pan across rival platforms and color-coded portals
+            const t = (p - 0.35) / 0.33;
+            const sweepX = THREE.MathUtils.lerp(-32.0, 32.0, t);
+            this.currentPos.set(sweepX, center.y + 3.8, center.z + 14.0);
+            _targetPos.set(sweepX * 0.6, center.y + 1.0, center.z - 4.0);
+            this.currentLookAt.lerp(_targetPos, dt * 6.0);
+            this.targetFov = 74.0;
+        } else if (p < 0.90) {
+            // Phase 3: Crane camera over platform edge revealing the 720m plunge to the city
+            const t = (p - 0.68) / 0.22;
+            this.currentPos.set(center.x, center.y + 6.0 + t * 4.0, center.z + 2.0);
+            _targetPos.set(center.x, center.y - 280.0, center.z + 240.0);
+            this.currentLookAt.lerp(_targetPos, dt * 7.0);
+            this.targetFov = 82.0;
+        } else {
+            // Phase 4: Swift lock behind player drone ready for dive
+            const targetCamPos = new THREE.Vector3(center.x, center.y + 3.2, center.z - 9.0);
+            this.currentPos.lerp(targetCamPos, dt * 10.0);
+            _targetPos.set(center.x, center.y + 0.4, center.z + 8.0);
+            this.currentLookAt.lerp(_targetPos, dt * 10.0);
+            this.targetFov = 65.0;
+        }
+
+        this.currentFov = THREE.MathUtils.lerp(this.currentFov, this.targetFov, dt * 5.0);
+        this.camera.fov = this.currentFov;
+        this.camera.position.copy(this.currentPos);
+        this.camera.lookAt(this.currentLookAt);
+        this.camera.updateProjectionMatrix();
+    }
+
+    updateDive(drone, inputState, dt) {
+        if (!drone) return;
+
+        // Dynamic FOV dive flare: expands smoothly from 65 up to 105 deg as Mach speed builds
+        const speedRatio = Math.min(1.0, Math.max(0, (drone.speedKmh - 100) / 220));
+        this.targetFov = THREE.MathUtils.lerp(65.0, 105.0, speedRatio);
+        this.currentFov = THREE.MathUtils.lerp(this.currentFov, this.targetFov, dt * 6.0);
+        this.camera.fov = this.currentFov;
+
+        // Lateral look / pan: player can look left & right to see rivals diving beside them
+        const lookInput = (inputState && (typeof inputState.panX === 'number' ? inputState.panX : inputState.turn)) || 0;
+        this.divePanYaw = THREE.MathUtils.lerp(this.divePanYaw, lookInput * 0.75, dt * 8.0);
+
+        _forwardLook.set(0, 0, 1).applyQuaternion(drone.quaternion);
+        _displacement.copy(_forwardLook).multiplyScalar(-8.5);
+        _displacement.y += 3.2; // sit above & behind diving drone
+
+        _targetPos.copy(drone.position).add(_displacement);
+        this.currentPos.lerp(_targetPos, dt * 12.0);
+
+        // Look at drone position plus lateral pan offset
+        const lateralLookOffset = new THREE.Vector3(Math.sin(this.divePanYaw) * 14.0, 0, 0).applyQuaternion(drone.quaternion);
+        _targetPos.copy(drone.position).addScaledVector(_forwardLook, 8.0).add(lateralLookOffset);
+        this.currentLookAt.lerp(_targetPos, dt * 12.0);
+
+        // Screenshake proportional to dive Mach speed
+        _shakeOffset.set(0, 0, 0);
+        const diveShake = speedRatio * 0.22;
+        if (diveShake > 0.01) {
+            _shakeOffset.set(
+                (Math.random() - 0.5) * diveShake,
+                (Math.random() - 0.5) * diveShake,
+                (Math.random() - 0.5) * diveShake
+            );
+        }
+
+        this.camera.position.copy(this.currentPos).add(_shakeOffset);
+        this.camera.lookAt(this.currentLookAt);
+        this.camera.updateProjectionMatrix();
+    }
+
     update(drone, dt) {
         if (!drone) return;
 
@@ -167,7 +260,8 @@ export class CameraRig {
 
         // Task 48: First-Person Cockpit View Mode
         if (this.mode === CAMERA_MODES.COCKPIT) {
-            _idealOffset.set(0, 0.42, 0.7).applyQuaternion(drone.quaternion);
+            if (drone.canopy) drone.canopy.visible = false;
+            _idealOffset.set(0, 0.45, 1.85).applyQuaternion(drone.quaternion);
             this.currentPos.copy(drone.position).add(_idealOffset);
             _forwardLook.set(0, 0.25, 25.0).applyQuaternion(drone.quaternion);
             this.currentLookAt.copy(drone.position).add(_forwardLook);
@@ -176,6 +270,8 @@ export class CameraRig {
             this.camera.fov = 76.0;
             this.camera.updateProjectionMatrix();
             return;
+        } else if (drone.canopy && !drone.canopy.visible) {
+            drone.canopy.visible = true;
         }
 
         // Task 49: Trackside Broadcast Spectator Mode

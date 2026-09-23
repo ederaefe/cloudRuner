@@ -36,7 +36,8 @@ export class SoundEngine {
             this.ctx = new AudioContextClass();
 
             this.masterGain = this.ctx.createGain();
-            this.masterGain.gain.setValueAtTime(0.8, this.ctx.currentTime);
+            this.masterGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
+            // Master gain muted permanently per user directive (silent mode)
             this.masterGain.connect(this.ctx.destination);
 
             this.setupTurbine();
@@ -50,7 +51,7 @@ export class SoundEngine {
     }
 
     setupMediaSession() {
-        // Task 42: Native OS Media Session API
+        // Native OS Media Session API
         if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
             try {
                 navigator.mediaSession.metadata = new MediaMetadata({
@@ -121,7 +122,7 @@ export class SoundEngine {
         this.enabled = !this.enabled;
         if (this.masterGain && this.ctx) {
             try {
-                this.masterGain.gain.setValueAtTime(this.enabled ? 0.8 : 0.0, this.ctx.currentTime);
+                this.masterGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
             } catch (e) {}
         }
         if (this.enabled) {
@@ -132,9 +133,8 @@ export class SoundEngine {
 
     setMasterVolume(val) {
         if (!this.ctx || !this.masterGain) return;
-        const clamped = Math.max(0, Math.min(1, Number(val) || 0));
         try {
-            this.masterGain.gain.setValueAtTime(clamped, this.ctx.currentTime);
+            this.masterGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
         } catch (e) {}
     }
 

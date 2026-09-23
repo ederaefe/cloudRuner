@@ -17,6 +17,8 @@ const _rayOrigin = new THREE.Vector3();
 const _tangentScratch = new THREE.Vector3();
 const _crossScratch = new THREE.Vector3();
 const _quatScratch = new THREE.Quaternion();
+const _rollQuatScratch = new THREE.Quaternion();
+const _dirFwdUnit = new THREE.Vector3(0, 0, 1);
 const _eulerScratch = new THREE.Euler(0, 0, 0, 'YXZ');
 
 // Fixed-timestep simulation sub-stepping constants (Task 1)
@@ -68,12 +70,22 @@ export class Drone {
         this.trackSpline = null;
         this.spotlights = [];
 
+        // Staging, Deep Dive & Ascension State
+        this.isStaging = false;
+        this.stagingBasePos = null;
+        this.stagingTimer = 0;
+        this.isDiving = false;
+        this.diveTime = 0;
+        this.diveProgress = 0;
+        this.diveLaneOffset = 0;
+        this.isAscending = false;
+
         this.buildMesh(aiColor);
     }
 
     buildMesh(customColor) {
         const bodyColor = customColor || 0x1a2130;
-        const accentColor = customColor ? 0xffffff : 0xE8580A; // Safety orange
+        const accentColor = customColor ? 0xffffff : 0x00f0ff; // High-tech combat cyan
 
         this.matBody = new THREE.MeshStandardMaterial({
             color: bodyColor,
@@ -99,20 +111,29 @@ export class Drone {
             opacity: 0.35
         });
 
-        // 1. Sleek aerodynamic fuselage
-        const bodyGeo = new THREE.ConeGeometry(0.8, 4.2, 8);
+        // 1. Futuristic Attack Combat Drone sharp needle fuselage
+        const bodyGeo = new THREE.ConeGeometry(0.75, 5.2, 6);
         bodyGeo.rotateX(Math.PI / 2);
         const fuselage = new THREE.Mesh(bodyGeo, this.matBody);
-        fuselage.scale.set(1.4, 0.65, 1.0);
+        fuselage.scale.set(1.25, 0.55, 1.0);
         fuselage.castShadow = true;
         this.group.add(fuselage);
         this.fuselage = fuselage;
 
-        // Cockpit canopy
-        const canopyGeo = new THREE.SphereGeometry(0.45, 12, 12);
-        canopyGeo.scale(0.8, 0.5, 1.8);
+        // Razor stealth nose needle spike
+        const noseSpikeGeo = new THREE.ConeGeometry(0.22, 2.0, 4);
+        noseSpikeGeo.rotateX(Math.PI / 2);
+        const noseSpike = new THREE.Mesh(noseSpikeGeo, this.matAccent);
+        noseSpike.position.set(0, 0, 2.6);
+        noseSpike.scale.set(0.6, 0.35, 1.0);
+        this.group.add(noseSpike);
+        this.noseSpike = noseSpike;
+
+        // Cockpit canopy - narrow stealth facet
+        const canopyGeo = new THREE.SphereGeometry(0.42, 8, 8);
+        canopyGeo.scale(0.7, 0.45, 1.8);
         const canopy = new THREE.Mesh(canopyGeo, matCanopy);
-        canopy.position.set(0, 0.28, 0.5);
+        canopy.position.set(0, 0.26, 0.5);
         this.group.add(canopy);
         this.canopy = canopy;
 
@@ -131,8 +152,23 @@ export class Drone {
         this.group.add(wingR);
         this.wingR = wingR;
 
-        const wingGeoL = wingGeoR.clone();
-        wingGeoL.scale(-1, 1, 1);
+        const mirrorGeometryWithCorrectNormals = (geo) => {
+            const mirrored = geo.clone();
+            mirrored.scale(-1, 1, 1);
+            if (mirrored.index) {
+                const idx = mirrored.index.array;
+                for (let i = 0; i < idx.length; i += 3) {
+                    const temp = idx[i];
+                    idx[i] = idx[i + 2];
+                    idx[i + 2] = temp;
+                }
+                mirrored.index.needsUpdate = true;
+            }
+            mirrored.computeVertexNormals();
+            return mirrored;
+        };
+
+        const wingGeoL = mirrorGeometryWithCorrectNormals(wingGeoR);
         const wingL = new THREE.Mesh(wingGeoL, this.matBody);
         wingL.castShadow = true;
         this.group.add(wingL);
@@ -159,19 +195,18 @@ export class Drone {
 
         const canardGroupL = new THREE.Group();
         canardGroupL.position.set(-0.65, 0.12, 0.85);
-        const canardGeoL = canardGeoR.clone();
-        canardGeoL.scale(-1, 1, 1);
+        const canardGeoL = mirrorGeometryWithCorrectNormals(canardGeoR);
         const canardMeshL = new THREE.Mesh(canardGeoL, this.matAccent);
         canardMeshL.castShadow = true;
         canardGroupL.add(canardMeshL);
         this.group.add(canardGroupL);
         this.canardL = canardGroupL;
 
-        // 3. Wingtip Articulated Tilt-Rotor Nacelles
+        // 3. Wingtip Articulated Tilt-Rotor Nacelles (parented to wings to maintain kinematic continuity)
         const nacelleGeo = new THREE.CylinderGeometry(0.22, 0.24, 1.1, 12);
         nacelleGeo.rotateX(Math.PI / 2);
 
-        const createNacelle = (xPos) => {
+        const createNacelle = (parentWing, xPos) => {
             const nacGroup = new THREE.Group();
             nacGroup.position.set(xPos, 0, -0.6);
 
@@ -187,12 +222,12 @@ export class Drone {
             this.rotorDiscs.push(rotorMesh);
             this.rotorMaterials.push(rotorMesh.material);
 
-            this.group.add(nacGroup);
+            parentWing.add(nacGroup);
             this.tiltNacelles.push(nacGroup);
         };
 
-        createNacelle(3.7);
-        createNacelle(-3.7);
+        createNacelle(wingR, 3.7);
+        createNacelle(wingL, -3.7);
 
         // 4. Twin Angled Tail Fins
         const finGeo = new THREE.BoxGeometry(0.08, 0.9, 0.8);
@@ -382,7 +417,171 @@ export class Drone {
         this.updateVisualEffects(frameDt);
     }
 
+    setStaging(active, basePos = null) {
+        this.isStaging = active;
+        if (basePos) {
+            this.stagingBasePos = basePos.clone();
+            this.position.copy(basePos);
+        }
+        this.velocity.set(0, 0, 0);
+        this.speedKmh = 0;
+        this.isDiving = false;
+        this.isAscending = false;
+        this.diveProgress = 0;
+        this.diveLaneOffset = 0;
+        this.stagingTimer = 0;
+    }
+
+    updateStagingHover(time, inputState, dt) {
+        if (!this.stagingBasePos) return;
+        const bob = Math.sin(time * 3.5) * 0.16;
+        this.position.set(this.stagingBasePos.x, this.stagingBasePos.y + bob, this.stagingBasePos.z);
+        const fwd = (inputState && typeof inputState.forward === 'number') ? inputState.forward : 0;
+        const targetPitch = fwd > 0.05 ? -0.09 * Math.min(1.0, fwd * 1.5) : 0.0;
+        _eulerScratch.set(targetPitch, 0, 0, 'YXZ');
+        this.quaternion.setFromEuler(_eulerScratch);
+        this.velocity.set(0, 0, 0);
+        this.speedKmh = fwd > 0.05 ? fwd * 45 : 0; // revving tachometer indicator
+
+        if (this.thrustGlow) {
+            this.thrustGlow.intensity = fwd > 0.05 ? 1.8 : 0.5;
+        }
+        if (this.exhaustMesh) {
+            this.exhaustMesh.visible = fwd > 0.05;
+            if (fwd > 0.05) {
+                this.exhaustMesh.scale.set(0.8, 0.8, 0.6 + Math.random() * 0.4);
+            }
+        }
+    }
+
+    startDive() {
+        this.isStaging = false;
+        this.isDiving = true;
+        this.diveTime = 0;
+        this.diveProgress = 0.001;
+        this.diveLaneOffset = (this.stagingBasePos ? (this.stagingBasePos.x - (this.trackSpline?.getPointAt(0).x || 0)) : 0);
+    }
+
+    updateDivePhysics(inputState, dt, trackBuilder) {
+        const spline = this.trackSpline || trackBuilder?.spline;
+        if (!spline) return;
+
+        this.diveTime = (this.diveTime || 0) + dt;
+        const rawForward = (inputState && typeof inputState.forward === 'number') ? inputState.forward : 0;
+        const isThrottling = rawForward > 0.05;
+
+        // Kinematics: Boosted thrust dive (7-8s) vs pure passive gravity (10-11s)
+        const gravityAcc = 24.0; // m/s^2
+        const thrustAcc = isThrottling ? (44.0 + rawForward * 20.0) : 0.0;
+        const totalAcc = gravityAcc + thrustAcc;
+
+        let currentSpeedMs = this.speedKmh / 3.6;
+        const maxDiveSpeedMs = isThrottling ? (320.0 / 3.6) : (180.0 / 3.6);
+        currentSpeedMs = Math.min(maxDiveSpeedMs, currentSpeedMs + totalAcc * dt);
+        this.speedKmh = currentSpeedMs * 3.6;
+
+        // Progress along dive funnel (spline t = 0 to pullout ~0.28)
+        const funnelLengthMeters = 860.0;
+        const deltaProgress = (currentSpeedMs * dt) / funnelLengthMeters * 0.28;
+        this.diveProgress = (this.diveProgress || 0) + deltaProgress;
+
+        const clampedT = Math.min(0.32, Math.max(0.001, this.diveProgress));
+        const currentPt = spline.getPointAt(clampedT);
+        const currentTan = spline.getTangentAt(clampedT).normalize();
+
+        // Lateral lane steering within the dive funnel (+- 16m)
+        const turnInput = (inputState && typeof inputState.turn === 'number') ? inputState.turn : 0;
+        this.diveLaneOffset = (this.diveLaneOffset || 0) + turnInput * dt * 26.0;
+        this.diveLaneOffset = THREE.MathUtils.clamp(this.diveLaneOffset, -16.0, 16.0);
+
+        _crossScratch.crossVectors(currentTan, new THREE.Vector3(0, 1, 0)).normalize();
+        this.position.copy(currentPt).addScaledVector(_crossScratch, this.diveLaneOffset);
+
+        // Orient along dive tangent with banking roll
+        _quatScratch.setFromUnitVectors(_dirFwdUnit, currentTan);
+        const bankAngle = -turnInput * 0.42;
+        if (typeof _rollQuatScratch.setFromAxisAngle === 'function') {
+            _rollQuatScratch.setFromAxisAngle(_dirFwdUnit, bankAngle);
+            if (typeof this.quaternion.multiply === 'function') {
+                this.quaternion.copy(_quatScratch).multiply(_rollQuatScratch);
+            } else {
+                this.quaternion.copy(_quatScratch);
+            }
+        } else {
+            this.quaternion.copy(_quatScratch);
+        }
+
+        this.velocity.copy(currentTan).multiplyScalar(currentSpeedMs);
+
+        // Transition from dive into flat straightaway when y <= 32m or t >= 0.27
+        if (currentPt.y <= 32.0 || this.diveProgress >= 0.27) {
+            this.isDiving = false;
+            this.splineProgress = 0.27; // enter straightaway
+        }
+    }
+
+    startAscension() {
+        this.isAscending = true;
+    }
+
+    updateAscensionPhysics(inputState, dt, trackBuilder) {
+        const spline = this.trackSpline || trackBuilder?.spline;
+        if (!spline) return;
+
+        // Rocket sprint up vertical sky-ramp: speed builds with nitro
+        const nitroRatio = Math.min(1.0, (this.nitroAmount || 0) / 60.0);
+        const boostHeld = inputState && inputState.isNitroHeld;
+        const maxClimbKmh = boostHeld ? 340.0 : (240.0 + nitroRatio * 60.0);
+        this.speedKmh = THREE.MathUtils.lerp(this.speedKmh, maxClimbKmh, dt * 3.5);
+
+        const currentSpeedMs = this.speedKmh / 3.6;
+        const climbDistMeters = 850.0;
+        const deltaT = (currentSpeedMs * dt) / climbDistMeters * 0.20;
+        this.splineProgress = ((this.splineProgress || 0.82) + deltaT) % 1.0;
+
+        const currentPt = spline.getPointAt(this.splineProgress);
+        const currentTan = spline.getTangentAt(this.splineProgress).normalize();
+
+        this.position.copy(currentPt);
+        _quatScratch.setFromUnitVectors(new THREE.Vector3(0, 0, 1), currentTan);
+        this.quaternion.copy(_quatScratch);
+        this.velocity.copy(currentTan).multiplyScalar(currentSpeedMs);
+
+        // Burn nitro during vertical ascension
+        if (this.nitroAmount > 0) {
+            this.nitroAmount = Math.max(0, this.nitroAmount - 12.0 * dt);
+            this.nitroStage = 3;
+        }
+
+        if (this.position.y >= 740.0) {
+            this.isAscending = false;
+        }
+    }
+
     stepPhysics(inputState, stuntFsm, dt, trackBuilder = null) {
+        if (this.isStaging) {
+            this.stagingTimer = (this.stagingTimer || 0) + dt;
+            this.updateStagingHover(this.stagingTimer, inputState, dt);
+            return;
+        }
+
+        if (this.isDiving) {
+            this.updateDivePhysics(inputState, dt, trackBuilder);
+            return;
+        }
+
+        if (this.isAscending) {
+            this.updateAscensionPhysics(inputState, dt, trackBuilder);
+            return;
+        }
+
+        // Automatic ascension ramp trigger near track terminus
+        if (this.splineProgress >= 0.83 && this.position.y >= 45.0) {
+            this.startAscension();
+            this.updateAscensionPhysics(inputState, dt, trackBuilder);
+            return;
+        }
+
         const flightCfg = CONFIG.FLIGHT;
         const nitroCfg = CONFIG.NITRO;
         const maxNitro = this.nitroMaxCapacity || nitroCfg.MAX_CAPACITY;
@@ -696,9 +895,9 @@ export class Drone {
             // Right wing flexes into turn geometry
             this.wingR.rotation.y = -morph * 0.14;
             this.wingR.rotation.z = -morph * 0.11;
-            // Left wing flexes sympathetically
-            this.wingL.rotation.y = -morph * 0.14;
-            this.wingL.rotation.z = -morph * 0.11;
+            // Left wing flexes symmetrically
+            this.wingL.rotation.y = morph * 0.14;
+            this.wingL.rotation.z = morph * 0.11;
         }
 
         // 3. Articulated Forward Aerodynamic Canards / Aero Flaps
@@ -707,7 +906,7 @@ export class Drone {
             this.canardR.rotation.x = -morph * 0.35;
             this.canardL.rotation.x = morph * 0.35;
             this.canardR.rotation.z = -morph * 0.12;
-            this.canardL.rotation.z = -morph * 0.12;
+            this.canardL.rotation.z = morph * 0.12;
         }
 
         // 4. Wingtip Nacelles Differential Thrust Vectoring
@@ -715,9 +914,9 @@ export class Drone {
             // Outer nacelle pitches down/vectors thrust, inner feathers back
             this.tiltNacelles[0].rotation.x = this.currentNacelleAngle - morph * 0.16;
             this.tiltNacelles[1].rotation.x = this.currentNacelleAngle + morph * 0.16;
-            // Wingtip roll cant
-            this.tiltNacelles[0].rotation.z = -morph * 0.18;
-            this.tiltNacelles[1].rotation.z = -morph * 0.18;
+            // Wingtip roll cant (parented to wings)
+            this.tiltNacelles[0].rotation.z = -morph * 0.08;
+            this.tiltNacelles[1].rotation.z = morph * 0.08;
         } else {
             this.tiltNacelles.forEach(n => {
                 n.rotation.x = this.currentNacelleAngle;

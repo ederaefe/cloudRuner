@@ -37,11 +37,73 @@ export class AiRacer {
         this.speedKmh = this.baseSpeedKmh;
 
         // Lane oscillation or Wingman escort offset
-        this.laneOffset = isWingman ? 5.5 : ((Math.random() - 0.5) * 6.0);
+        const laneSpacings = [-14.0, 14.0, -8.0, 8.0];
+        this.laneOffset = isWingman ? 5.5 : (laneSpacings[index % laneSpacings.length] || ((Math.random() - 0.5) * 8.0));
         this.wobblePhase = Math.random() * Math.PI * 2;
+
+        // Staging and Deep Dive State
+        this.isStaging = false;
+        this.stagingPos = null;
+        this.isDiving = false;
+        this.diveProgress = 0;
+        this.diveAcceleration = 38.0 + (index * 6.5); // AI rivals accelerate strongly down dive
+        this.diveMaxSpeedKmh = 275.0 + (index * 18.0); // 275 - 315 km/h
+    }
+
+    setStaging(stagingPos) {
+        this.isStaging = true;
+        this.stagingPos = stagingPos ? stagingPos.clone() : null;
+        if (stagingPos) {
+            this.drone.position.copy(stagingPos);
+        }
+        this.isDiving = false;
+        this.diveProgress = 0;
+        this.speedKmh = 0;
+    }
+
+    startDive() {
+        this.isStaging = false;
+        this.isDiving = true;
+        this.diveProgress = 0.001;
+        this.speedKmh = 50.0 + Math.random() * 30.0;
     }
 
     update(dt, playerDrone = null) {
+        if (this.isStaging && this.stagingPos) {
+            this.wobblePhase += dt * 3.5;
+            this.drone.position.set(
+                this.stagingPos.x,
+                this.stagingPos.y + Math.sin(this.wobblePhase) * 0.15,
+                this.stagingPos.z
+            );
+            const tan = this.spline.getTangentAt(0).normalize();
+            this.drone.quaternion.setFromUnitVectors(_dirFwd, tan);
+            this.speedKmh = 0;
+            return;
+        }
+
+        if (this.isDiving) {
+            this.speedKmh = Math.min(this.diveMaxSpeedKmh, this.speedKmh + this.diveAcceleration * dt * 3.6);
+            const speedMs = this.speedKmh / 3.6;
+            const deltaProgress = (speedMs * dt) / 860.0 * 0.28;
+            this.diveProgress += deltaProgress;
+
+            const clampedT = Math.min(0.32, Math.max(0.001, this.diveProgress));
+            const currentPt = this.spline.getPointAt(clampedT);
+            const currentTan = this.spline.getTangentAt(clampedT).normalize();
+
+            _normal.crossVectors(currentTan, _up).normalize();
+            _targetPos.copy(currentPt).addScaledVector(_normal, this.laneOffset);
+            this.drone.position.copy(_targetPos);
+            this.drone.quaternion.setFromUnitVectors(_dirFwd, currentTan);
+
+            if (currentPt.y <= 32.0 || this.diveProgress >= 0.27) {
+                this.isDiving = false;
+                this.trackProgress = 0.27; // merge onto 450m flat straightaway
+            }
+            return;
+        }
+
         if (this.isWingman && playerDrone) {
             // Teamwork Wingman: Formation escort flight
             const formationTargetSpeed = Math.max(CONFIG.FLIGHT.BASE_SPEED, playerDrone.speedKmh);

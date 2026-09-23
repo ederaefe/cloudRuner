@@ -102,6 +102,9 @@
 <!-- Non-Blocking Contextual Notification Toast Stack (Task 35) -->
 <div id="hud-toast-stack" class="toast-stack-container"></div>
 
+<!-- Slow Roads Style Minimalist Frosted Countdown Overlay (Task 28) -->
+<div id="hud-countdown" class="hud-countdown-pill hidden">3</div>
+
 <!-- Tactical Peripheral Pitch/Roll Ladder (Task 7) -->
 <div id="peripheral-horizon-ladder" class="horizon-ladder-container">
     <div id="horizon-pitch-bar" class="horizon-pitch-bar"></div>
@@ -222,11 +225,11 @@
         <!-- Calibration Progress Ticker -->
         <div class="calibration-ticker">
             <div class="calibration-bar-track">
-                <div id="preload-bar-fill" class="calibration-bar-fill"></div>
+                <div id="start-modal-bar-fill" class="calibration-bar-fill"></div>
             </div>
             <div style="display:flex; justify-content:space-between; font-size:10px; font-weight:800; color:var(--cyber-text-dim);">
-                <span id="preload-status-txt">CALIBRATING AVIONICS...</span>
-                <span id="preload-percent-txt" style="color:var(--cyber-cyan);">100%</span>
+                <span id="start-modal-status-txt">CALIBRATING AVIONICS...</span>
+                <span id="start-modal-percent-txt" style="color:var(--cyber-cyan);">100%</span>
             </div>
         </div>
 
@@ -385,48 +388,6 @@
     </div>
 </div>
 
-<!-- Customizations Sidebar Drawer -->
-<div id="sidebar-backdrop" class="sidebar-backdrop"></div>
-<aside id="customization-sidebar" class="sidebar-drawer">
-    <div class="sidebar-header">
-        <div>
-            <div class="sidebar-brand">TACTICAL HANGAR</div>
-            <div id="sidebar-rank-txt" style="font-size:11px; color:#00ffff; font-weight:800;">SECTOR 01</div>
-        </div>
-        <div style="display:flex; align-items:center; gap:12px;">
-            <span id="sidebar-credits-txt" class="sidebar-credits-badge">600 CR</span>
-            <button id="btn-close-sidebar" class="sidebar-close-btn">&times;</button>
-        </div>
-    </div>
-
-    <!-- Tab navigation -->
-    <div class="sidebar-nav-tabs">
-        <button class="sidebar-nav-btn active" data-tab="hangar">SKINS</button>
-        <button class="sidebar-nav-btn" data-tab="upgrades">UPGRADES</button>
-        <button class="sidebar-nav-btn" data-tab="sectors">SECTORS</button>
-        <button class="sidebar-nav-btn" data-tab="modes">MODES</button>
-    </div>
-
-    <!-- Tab panels -->
-    <div class="sidebar-content-area">
-        <div id="sidebar-tab-hangar" class="sidebar-tab-panel active">
-            <div id="sidebar-skins-list" class="sidebar-cards-grid"></div>
-        </div>
-        <div id="sidebar-tab-upgrades" class="sidebar-tab-panel">
-            <div id="sidebar-upgrades-list" class="sidebar-cards-grid"></div>
-        </div>
-        <div id="sidebar-tab-sectors" class="sidebar-tab-panel">
-            <div id="sidebar-sectors-list" class="sidebar-cards-grid"></div>
-        </div>
-        <div id="sidebar-tab-modes" class="sidebar-tab-panel">
-            <div id="sidebar-modes-list" class="sidebar-cards-grid"></div>
-        </div>
-    </div>
-
-    <div class="sidebar-footer">
-        <button id="sidebar-btn-academy" class="cta-button" style="background:rgba(255,255,255,0.12); font-size:13px;">FLIGHT ACADEMY & CONTROLS</button>
-    </div>
-</aside>
 
 <!-- Flight Academy & Controls Guide Modal -->
 <div id="help-modal" class="overlay-screen hidden">
@@ -683,7 +644,7 @@ window.addEventListener('load', () => {
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x07111f, 0.0018);
 
-    const camera = new THREE.PerspectiveCamera(CONFIG.CAMERA.BASE_FOV, window.innerWidth / window.innerHeight, 0.1, 2200);
+    const camera = new THREE.PerspectiveCamera(CONFIG.CAMERA.BASE_FOV, window.innerWidth / window.innerHeight, 0.1, 6500);
     const cameraRig = new CameraRig(camera);
 
     // 4. Lighting Rig
@@ -827,6 +788,7 @@ window.addEventListener('load', () => {
 
     let gameState = 'START';
     window._gameState = gameState;
+    let stagingTimer = 0;
     let currentLap = 1;
     let nextGateIndex = 1;
     let raceTotalTime = 0;
@@ -871,10 +833,13 @@ window.addEventListener('load', () => {
         // Synchronize browser URL bar with user session permalink
         coordinator.updateSessionUrl(coordinator.seed, selectedSkylineId, mode);
 
-        // Position player at origin or start gate
+        // Position player on designated Stratosphere Launch Slab (pad 1 = Cyan, x = -8)
         const startPos = track.spline.getPointAt(0);
         const startTangent = track.spline.getTangentAt(0).normalize();
-        playerDrone.position.copy(startPos);
+        const playerStagingPos = (track.stagingPositions && track.stagingPositions.length > 1)
+            ? track.stagingPositions[1]
+            : ((track.stagingPositions && track.stagingPositions[0]) || startPos);
+        playerDrone.setStaging(true, playerStagingPos);
         playerDrone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), startTangent);
         playerDrone.setTrackSpline(track.spline);
         stuntFsm.syncWithQuaternion(playerDrone.quaternion);
@@ -928,6 +893,14 @@ window.addEventListener('load', () => {
                 }
             }
         }
+
+        // Place AI racers on designated Stratosphere Launch Slabs (pads 0, 2, 3...)
+        aiRacers.forEach((ai, idx) => {
+            const padIdx = (idx >= 1) ? idx + 1 : 0;
+            if (track.stagingPositions && track.stagingPositions[padIdx]) {
+                ai.setStaging(track.stagingPositions[padIdx]);
+            }
+        });
     }
 
     // 8. Dynamic Resolution Scaling (DRS) & Wake Lock
@@ -972,7 +945,7 @@ window.addEventListener('load', () => {
 
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
-            if (window._gameState === 'RACING') {
+            if (window._gameState === 'RACING' || window._gameState === 'GRID_STAGING' || window._gameState === 'DIVING') {
                 hangarManager.openPause();
             }
             if (soundEngine.ctx && soundEngine.ctx.state === 'running') {
@@ -980,7 +953,7 @@ window.addEventListener('load', () => {
             }
             releaseWakeLock();
         } else {
-            if (soundEngine.ctx && (soundEngine.ctx.state === 'suspended' || soundEngine.ctx.state === 'interrupted') && window._gameState === 'RACING') {
+            if (soundEngine.ctx && (soundEngine.ctx.state === 'suspended' || soundEngine.ctx.state === 'interrupted') && (window._gameState === 'RACING' || window._gameState === 'GRID_STAGING' || window._gameState === 'DIVING')) {
                 soundEngine.resume();
                 // Safari fallback: arm one-time user-gesture unlock if resume is blocked
                 const resumeOnGesture = () => {
@@ -993,7 +966,7 @@ window.addEventListener('load', () => {
                     window.addEventListener(evt, resumeOnGesture, { once: true, capture: true });
                 });
             }
-            if (window._gameState === 'RACING') {
+            if (window._gameState === 'RACING' || window._gameState === 'GRID_STAGING' || window._gameState === 'DIVING') {
                 requestWakeLock();
             }
         }
@@ -1042,15 +1015,18 @@ window.addEventListener('load', () => {
 
         setupSectorAndMode(hangarManager.selectedSectorId, hangarManager.selectedMode);
 
-        gameState = 'RACING';
+        gameState = 'GRID_STAGING';
         window._gameState = gameState;
+        stagingTimer = 0;
         currentLap = 1;
         nextGateIndex = 0;  // Drone spawns before gate 0 at spline t=0
         raceTotalTime = 0;
         stuntsCompletedCount = 0;
         maxSpeedInRace = 0;
+        cameraRig.introPhase = 0;
         cameraRig.reset(playerDrone);
         cameraRig.setEpilogueMode(false);
+        hud.showCountdown('3');
     };
 
     // URL Router for /boost and /teamwork-preview
@@ -1239,7 +1215,81 @@ window.addEventListener('load', () => {
             window._desktopControls.update();
         }
 
-        if (window._gameState === 'RACING') {
+        if (window._gameState === 'GRID_STAGING') {
+            stagingTimer += dt;
+            const duration = CONFIG.STAGING?.COUNTDOWN_SECONDS || 3.5;
+            const progress = Math.min(1.0, stagingTimer / duration);
+
+            const inputState = inputManager.getState();
+            playerDrone.updatePhysics(inputState, stuntFsm, dt, track);
+            aiRacers.forEach(ai => ai.update(dt, playerDrone));
+
+            cameraRig.updateIntroSequence(playerDrone, track?.stagingPlatforms, progress, dt);
+
+            // Countdown digits sequence: 3... 2... 1... DIVE!
+            const remaining = duration - stagingTimer;
+            if (remaining > 2.0) {
+                hud.showCountdown('3');
+            } else if (remaining > 1.0) {
+                hud.showCountdown('2');
+            } else if (remaining > 0.0) {
+                hud.showCountdown('1');
+            } else {
+                hud.showCountdown('DIVE!', true);
+                gameState = 'DIVING';
+                window._gameState = gameState;
+                playerDrone.startDive();
+                aiRacers.forEach(ai => ai.startDive());
+                setTimeout(() => hud.hideCountdown(), 1000);
+            }
+
+            const currentSector = CONFIG.SECTORS.find(s => s.id === hangarManager.selectedSectorId) || CONFIG.SECTORS[0];
+            const isTeamwork = hangarManager.selectedMode === CONFIG.MODES.TEAMWORK_COOP;
+            hud.update(playerDrone, 1, 1, aiRacers.length + 1, false, currentSector.laps, isTeamwork, inputState);
+            soundEngine.updateTelemetry(playerDrone.speedKmh, inputState.forward, false, false);
+            playerDrone.updateParticles(dt);
+        } else if (window._gameState === 'DIVING') {
+            raceTotalTime += dt;
+            maxSpeedInRace = Math.max(maxSpeedInRace, playerDrone.speedKmh);
+            checkDRS(dt * 1000);
+
+            const inputState = inputManager.getState();
+            if (inputManager.state.autopilotEnabled) {
+                autopilot.update(playerDrone, inputState, track, nextGateIndex, extractionEngine, dt);
+            }
+            playerDrone.updatePhysics(inputState, stuntFsm, dt, track);
+            aiRacers.forEach(ai => ai.update(dt, playerDrone));
+
+            cameraRig.updateDive(playerDrone, inputState, dt);
+
+            // Reverse-rain vertical speed streaks rushing upward
+            if (playerDrone.particleSystem) {
+                _cameraForward.set(0, 0, -1).applyQuaternion(camera.quaternion);
+                playerDrone.particleSystem.emitVerticalSpeedStreaks(camera.position, _cameraForward, playerDrone.velocity.y, dt);
+            }
+
+            // Progressive atmospheric altitude clearing below 250m
+            if (playerDrone.position.y < 250.0) {
+                const clearT = Math.max(0, Math.min(1.0, (250.0 - playerDrone.position.y) / 200.0));
+                const currentSector = CONFIG.SECTORS.find(s => s.id === hangarManager.selectedSectorId) || CONFIG.SECTORS[0];
+                scene.fog.density = THREE.MathUtils.lerp(0.0016, currentSector.fogDensity || 0.0008, clearT);
+            }
+
+            // Pullout complete -> transition into RACING along 450m flat straightaway
+            if (!playerDrone.isDiving) {
+                gameState = 'RACING';
+                window._gameState = gameState;
+                cameraRig.reset(playerDrone);
+                hud.showStuntAlert('DIVE COMPLETE', 'AIRSPACE REACHED - STRAIGHTAWAY SPRINT');
+            }
+
+            soundEngine.updateTelemetry(playerDrone.speedKmh, inputState.forward, playerDrone.nitroStage > 1, playerDrone.nitroStage === 3);
+            playerDrone.updateParticles(dt);
+
+            const currentSector = CONFIG.SECTORS.find(s => s.id === hangarManager.selectedSectorId) || CONFIG.SECTORS[0];
+            const isTeamwork = hangarManager.selectedMode === CONFIG.MODES.TEAMWORK_COOP;
+            hud.update(playerDrone, currentLap, 1, aiRacers.length + 1, false, currentSector.laps, isTeamwork, inputState);
+        } else if (window._gameState === 'RACING') {
             raceTotalTime += dt;
             maxSpeedInRace = Math.max(maxSpeedInRace, playerDrone.speedKmh);
             checkDRS(dt * 1000);
@@ -1297,12 +1347,12 @@ window.addEventListener('load', () => {
                 track.checkBuildingCollision(playerDrone, cameraRig, soundEngine, hud, dt);
             }
 
-            // Out-of-bounds safety check & clean realignment (fixes camera whiplash & NaN)
+            // Out-of-bounds safety check & clean realignment (scaled for stratosphere elevation)
             const pos = playerDrone.position;
             const vel = playerDrone.velocity;
             const isInvalidPos = !Number.isFinite(pos.x) || !Number.isFinite(pos.y) || !Number.isFinite(pos.z) ||
                                  !Number.isFinite(vel.x) || !Number.isFinite(vel.y) || !Number.isFinite(vel.z);
-            const isOutOfBounds = pos.y < -65 || pos.y > 380 || (track && pos.length() > 2800);
+            const isOutOfBounds = pos.y < -65 || pos.y > 900 || (track && pos.length() > 4500);
 
             if (isInvalidPos || isOutOfBounds) {
                 hud.showStuntAlert('COURSE REALIGNMENT', 'RETURNING TO TRACK');
@@ -1343,6 +1393,13 @@ window.addEventListener('load', () => {
                         if (currentLap > currentSector.laps) {
                             finishRace(false);
                         }
+                    }
+                }
+
+                // Summit finish portal check during vertical sky ascension
+                if (playerDrone.isAscending && playerDrone.position.y >= 740.0) {
+                    if (currentLap >= currentSector.laps) {
+                        finishRace(false);
                     }
                 }
 
@@ -1402,10 +1459,14 @@ window.addEventListener('load', () => {
             // Update particle system
             playerDrone.updateParticles(dt);
             
-            // Emit speed streak particles from camera perspective (zero-allocation)
-            if (playerDrone.particleSystem && playerDrone.speedKmh > 55) {
+            // High-speed speed streaks & vertical sky ascension streaks
+            if (playerDrone.particleSystem) {
                 _cameraForward.set(0, 0, -1).applyQuaternion(camera.quaternion);
-                playerDrone.particleSystem.emitSpeedStreak(camera.position, _cameraForward, playerDrone.speedKmh);
+                if (playerDrone.isAscending) {
+                    playerDrone.particleSystem.emitVerticalSpeedStreaks(camera.position, _cameraForward, playerDrone.velocity.y, dt);
+                } else if (playerDrone.speedKmh > 55) {
+                    playerDrone.particleSystem.emitSpeedStreak(camera.position, _cameraForward, playerDrone.speedKmh);
+                }
             }
 
             // Cleanly consume one-shot stunt triggers
@@ -1414,12 +1475,14 @@ window.addEventListener('load', () => {
 
         // Update track energy chevron flow and atmospheric dome rotation
         if (track && typeof track.update === 'function') {
-            const activeSpeed = (window._gameState === 'RACING') ? playerDrone.speedKmh : 24.0;
+            const activeSpeed = (window._gameState === 'RACING' || window._gameState === 'DIVING') ? playerDrone.speedKmh : 24.0;
             track.update(activeSpeed, dt);
         }
 
         // Camera Tracking & Scene Rendering (guarded against WebGL context loss)
-        cameraRig.update(playerDrone, dt);
+        if (window._gameState !== 'GRID_STAGING' && window._gameState !== 'DIVING') {
+            cameraRig.update(playerDrone, dt);
+        }
         renderer.render(scene, camera);
     }
 

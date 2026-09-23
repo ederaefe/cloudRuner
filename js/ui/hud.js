@@ -82,8 +82,13 @@ export class RacingHUD {
     updateCompass(drone, targets = []) {
         if (!this.compassCtx || !drone || !drone.group) return;
         const ctx = this.compassCtx;
-        const w = this.compassCanvas.width || 260;
-        const h = this.compassCanvas.height || 28;
+        const isMobile = (typeof window !== 'undefined' && window.innerWidth <= 768);
+        const expectedW = isMobile ? 180 : 260;
+        const expectedH = isMobile ? 24 : 28;
+        if (this.compassCanvas.width !== expectedW) this.compassCanvas.width = expectedW;
+        if (this.compassCanvas.height !== expectedH) this.compassCanvas.height = expectedH;
+        const w = expectedW;
+        const h = expectedH;
 
         ctx.clearRect(0, 0, w, h);
 
@@ -93,10 +98,10 @@ export class RacingHUD {
         ctx.lineWidth = 1;
         ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
 
-        const yawRad = drone.group.rotation.y || 0;
-        let headingDeg = ((-yawRad * 180 / Math.PI) % 360 + 360) % 360;
+        const euler = new THREE.Euler().setFromQuaternion(drone.group.quaternion, 'YXZ');
+        let headingDeg = ((-euler.y * 180 / Math.PI) % 360 + 360) % 360;
 
-        const pixelsPerDeg = 1.4;
+        const pixelsPerDeg = isMobile ? 1.05 : 1.4;
         const centerX = w / 2;
 
         ctx.font = '9px monospace';
@@ -211,9 +216,10 @@ export class RacingHUD {
         }
 
         // Task 7: Peripheral Horizon Ladder Update
-        if (this.horizonBar && drone && drone.group) {
-            const pitch = drone.group.rotation.x || 0;
-            const roll = drone.group.rotation.z || 0;
+        if (this.horizonBar && drone && drone.group && drone.group.quaternion) {
+            const euler = new THREE.Euler().setFromQuaternion(drone.group.quaternion, 'YXZ');
+            const pitch = euler.x;
+            const roll = euler.z;
             const pitchOffset = Math.max(-45, Math.min(45, pitch * 50));
             this.horizonBar.style.transform = `translateY(${pitchOffset}px) rotate(${-roll}rad)`;
         }
@@ -263,6 +269,30 @@ export class RacingHUD {
             if (this.btnTouchAssist) {
                 this.btnTouchAssist.classList.toggle('active', !!st.flyAssistEnabled);
             }
+        }
+    }
+
+    showCountdown(text, isDive = false) {
+        if (!this.countdownEl) {
+            this.countdownEl = document.getElementById('hud-countdown');
+        }
+        if (!this.countdownEl) return;
+        this.countdownEl.textContent = text;
+        this.countdownEl.classList.remove('hidden');
+        this.countdownEl.classList.toggle('dive-go', isDive);
+        this.countdownEl.classList.remove('pulse-anim');
+        if (typeof this.countdownEl.offsetWidth === 'number') {
+            void this.countdownEl.offsetWidth;
+        }
+        this.countdownEl.classList.add('pulse-anim');
+    }
+
+    hideCountdown() {
+        if (!this.countdownEl) {
+            this.countdownEl = document.getElementById('hud-countdown');
+        }
+        if (this.countdownEl) {
+            this.countdownEl.classList.add('hidden');
         }
     }
 }

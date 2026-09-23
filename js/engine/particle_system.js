@@ -20,6 +20,8 @@ const PARTICLE_TYPES = {
 
 // Pre-allocated scratch objects to prevent garbage collection
 const _tempVector = new THREE.Vector3();
+const _streakPos = new THREE.Vector3();
+const _streakVel = new THREE.Vector3();
 
 export class ParticleSystem {
     constructor(scene, tier) {
@@ -208,22 +210,62 @@ export class ParticleSystem {
     }
     
     emitSpeedStreak(cameraPosition, forward, speed) {
-        if (speed < 140) return;
+        if (speed < 70) return;
         
-        const intensity = Math.min(1.0, (speed - 140) / 180);
-        const count = Math.floor(intensity * 2);
+        const intensity = Math.min(1.0, (speed - 70) / 180);
+        const count = Math.max(1, Math.floor(intensity * 3));
         
         for (let i = 0; i < count; i++) {
-            _tempVector.copy(forward).multiplyScalar(-1);
-            _tempVector.x += (Math.random() - 0.5) * 0.8;
-            _tempVector.y += (Math.random() - 0.5) * 0.5;
-            _tempVector.z += (Math.random() - 0.5) * 0.8;
+            const spawnDist = 18.0 + Math.random() * 24.0;
+            const lateralOffset = (Math.random() - 0.5) * 16.0;
+            const verticalOffset = (Math.random() - 0.5) * 10.0;
             
-            const color = new THREE.Color(speed > 280 ? 0x00ffff : 0xffffff);
-            const size = 2.0 + Math.random() * 3.0;
-            const lifetime = 0.2 + Math.random() * 0.2;
+            _streakPos.copy(cameraPosition).addScaledVector(forward, spawnDist);
+            _streakPos.x += lateralOffset;
+            _streakPos.y += verticalOffset;
             
-            this.emit(cameraPosition, color, _tempVector, size, lifetime, PARTICLE_TYPES.SPEED_STREAK);
+            _streakVel.copy(forward).multiplyScalar(-speed * 0.45);
+            _streakVel.x += (Math.random() - 0.5) * 4.0;
+            _streakVel.y += (Math.random() - 0.5) * 2.0;
+            
+            const color = new THREE.Color(speed > 240 ? 0x00ffff : (speed > 160 ? 0xaaccff : 0xffffff));
+            const size = 2.2 + Math.random() * 2.5;
+            const lifetime = 0.35 + Math.random() * 0.25;
+            
+            this.emit(_streakPos, color, _streakVel, size, lifetime, PARTICLE_TYPES.SPEED_STREAK);
+        }
+    }
+
+    emitVerticalSpeedStreaks(cameraPosition, forward, verticalSpeed, dt = 0.016) {
+        const absSpeed = Math.abs(verticalSpeed);
+        if (absSpeed < 25) return;
+
+        const intensity = Math.min(1.0, (absSpeed - 25) / 160);
+        const count = Math.max(1, Math.floor(intensity * 4));
+
+        for (let i = 0; i < count; i++) {
+            const spawnDist = 14.0 + Math.random() * 22.0;
+            const lateralOffset = (Math.random() - 0.5) * 20.0;
+            const depthOffset = (Math.random() - 0.5) * 16.0;
+
+            _streakPos.copy(cameraPosition).addScaledVector(forward, spawnDist);
+            _streakPos.x += lateralOffset;
+            _streakPos.z += depthOffset;
+            _streakPos.y += (Math.random() - 0.5) * 12.0;
+
+            // Dive: upward rushing particles (reverse rain); Ascension: downward rushing particles
+            const dirY = (verticalSpeed < 0) ? (absSpeed * 0.85) : (-absSpeed * 0.85);
+            _streakVel.set(
+                (Math.random() - 0.5) * 4.0,
+                dirY,
+                (Math.random() - 0.5) * 4.0
+            );
+
+            const color = new THREE.Color(absSpeed > 180 ? 0x00ffff : (absSpeed > 100 ? 0xaaccff : 0xffffff));
+            const size = 2.4 + Math.random() * 2.6;
+            const lifetime = 0.30 + Math.random() * 0.20;
+
+            this.emit(_streakPos, color, _streakVel, size, lifetime, PARTICLE_TYPES.SPEED_STREAK);
         }
     }
 
