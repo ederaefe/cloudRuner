@@ -95,3 +95,10 @@ This enables zero-latency P2P mesh synchronization via WebRTC DataChannels (`Pee
 * **Master Flight Telemetry Dossier & S-Rank Certification**: Implemented an algorithmic evaluation engine that scores flight performance (speed, stunt combo execution, placement/payload ratio), rendering an official Aero-Command Dossier with grades (S-Class Aegis Ace, A-Class Vanguard, B-Class Striker), tactical citation, and mission metrics.
 * **Legendary Campaign Reward ("Apex Sovereign")**: Created a 5th airframe skin with pearlescent obsidian and solar-gold livery (`APEX_PROTO`), locked strictly behind campaign completion (cannot be bought with currency).
 * **Automated Climax Test Coverage**: Expanded `scripts/test_engine.mjs` to 68 automated assertions verifying Sector 04 climax attributes, campaign-exclusive skin logic, camera orbit transitions, sound fanfare, and progression persistence.
+
+### Completed: GPU-Accelerated 3D Particle System & VFX Pipeline
+* **Pooled Instanced Point Cloud (`js/engine/particle_system.js`)**: Replaced DOM 2D canvas speed lines with a zero-allocation, pre-allocated `THREE.BufferGeometry` point cloud with custom vertex/fragment shader. Handles exhaust plume particles, high-speed radial streaks, stunt burst trails (rolls, knife-edge, cobra airbrake), and impact collision sparks.
+* **Tier-Scaled Particle Budget**: Particle pool caps scale according to the active hardware tier (Low: 40, Balanced: 60, Performance: 90, Ultra: 140), preserving 60 FPS on low-power mobile devices.
+* **Zero-Allocation Particle Updates**: All vector math uses pre-allocated module scratchpad vectors (`_tempVector`, `_exhaustPos`, `_exhaustDir`), guaranteeing zero runtime garbage collector spikes during intense dogfighting and overdrive flight.
+* **Offline PWA & Test Verification**: Added `particle_system.js` to `service-worker.js` pre-cache manifest and expanded automated test coverage in `scripts/test_engine.mjs` to 72 assertions.
+

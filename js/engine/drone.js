@@ -6,12 +6,15 @@ Articulated tilt-rotors, carbon/orange search-and-rescue livery, and vector phys
 */
 
 import { CONFIG } from '../config.js';
+import { ParticleSystem } from './particle_system.js';
 
 // Pre-allocated scratch objects to prevent garbage collection spikes
 const _fwdVector = new THREE.Vector3();
+const _exhaustDir = new THREE.Vector3();
+const _exhaustPos = new THREE.Vector3();
 
 export class Drone {
-    constructor(scene, isAi = false, aiColor = null) {
+    constructor(scene, isAi = false, aiColor = null, tier = null) {
         this.scene = scene;
         this.isAi = isAi;
         this.group = new THREE.Group();
@@ -30,6 +33,19 @@ export class Drone {
         this.rotorDiscs = [];
         this.navStrobes = [];
         this.exhaustParticles = [];
+        this.landingGear = [];
+
+        // Particle system integration
+        this.particleSystem = null;
+        if (!isAi && tier) {
+            this.particleSystem = new ParticleSystem(scene, tier);
+        }
+
+        // Animation state
+        this.currentNacelleAngle = 0;
+        this.targetNacelleAngle = 0;
+        this.landingGearExtended = true;
+        this.rotorBlurIntensity = 0;
 
         this.buildMesh(aiColor);
     }
@@ -161,6 +177,65 @@ export class Drone {
         this.exhaustMesh = new THREE.Mesh(exhaustGeo, exhaustMat);
         this.exhaustMesh.visible = false;
         this.group.add(this.exhaustMesh);
+
+        // 6. Landing Gear (animated based on speed)
+        this.createLandingGear();
+    }
+
+    createLandingGear() {
+        const gearMat = new THREE.MeshStandardMaterial({
+            color: 0x2a2a35,
+            roughness: 0.6,
+            metalness: 0.4
+        });
+
+        // Front landing gear
+        const frontGearGroup = new THREE.Group();
+        frontGearGroup.position.set(0, -0.8, 1.8);
+        
+        const frontStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.8, 8), gearMat);
+        frontStrut.rotation.x = Math.PI / 6;
+        frontGearGroup.add(frontStrut);
+
+        const frontWheel = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.08, 12), gearMat);
+        frontWheel.rotation.x = Math.PI / 2;
+        frontWheel.position.set(0, -0.3, 0.2);
+        frontGearGroup.add(frontWheel);
+
+        this.group.add(frontGearGroup);
+        this.landingGear.push(frontGearGroup);
+
+        // Rear landing gear (left)
+        const rearGearL = new THREE.Group();
+        rearGearL.position.set(1.2, -0.8, -1.2);
+        
+        const rearStrutL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.7, 8), gearMat);
+        rearStrutL.rotation.x = Math.PI / 8;
+        rearGearL.add(rearStrutL);
+
+        const rearWheelL = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.08, 12), gearMat);
+        rearWheelL.rotation.x = Math.PI / 2;
+        rearWheelL.position.set(0, -0.25, 0.15);
+        rearGearL.add(rearWheelL);
+
+        this.group.add(rearGearL);
+        this.landingGear.push(rearGearL);
+
+        // Rear landing gear (right)
+        const rearGearR = new THREE.Group();
+        rearGearR.position.set(-1.2, -0.8, -1.2);
+        
+        const rearStrutR = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.7, 8), gearMat);
+        rearStrutR.rotation.x = Math.PI / 8;
+        rearGearR.add(rearStrutR);
+
+        const rearWheelR = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.08, 12), gearMat);
+        rearWheelR.rotation.x = Math.PI / 2;
+        rearWheelR.position.set(0, -0.25, 0.15);
+        rearGearR.add(rearWheelR);
+
+        this.group.add(rearGearR);
+        this.landingGear.push(rearGearR);
     }
 
     applySkin(skin) {
@@ -270,9 +345,41 @@ export class Drone {
                 this.exhaustMesh.visible = false;
             }
         }
+
+        // Emit exhaust particles
+        if (this.particleSystem && this.speedKmh > 60) {
+            _fwdVector.set(0, 0, 1).applyQuaternion(this.quaternion);
+            _exhaustDir.copy(_fwdVector).multiplyScalar(-1);
+            
+            // Emit from rear of drone without GC allocation
+            _exhaustPos.copy(this.position).addScaledVector(_fwdVector, -2.0);
+            this.particleSystem.emitExhaust(_exhaustPos, _exhaustDir, this.speedKmh);
+        }
+    }
+
+    emitStuntParticles(type) {
+        if (this.particleSystem) {
+            this.particleSystem.emitStuntEffect(this.position, type);
+        }
+    }
+
+    emitCollisionParticles(normal) {
+        if (this.particleSystem) {
+            this.particleSystem.emitCollision(this.position, normal);
+        }
+    }
+
+    updateParticles(dt) {
+        if (this.particleSystem) {
+            this.particleSystem.update(dt);
+        }
     }
 
     dispose() {
+        if (this.particleSystem) {
+            this.particleSystem.dispose();
+        }
+        
         this.group.traverse(child => {
             if (child.isMesh) {
                 if (child.geometry) child.geometry.dispose();

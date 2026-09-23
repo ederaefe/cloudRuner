@@ -18,7 +18,7 @@ const _toPlayer = new THREE.Vector3();
 const _forwardVec = new THREE.Vector3();
 
 export class AiRacer {
-    constructor(scene, spline, index, totalRacers, isWingman = false) {
+    constructor(scene, spline, index, totalRacers, isWingman = false, tier = null) {
         this.scene = scene;
         this.spline = spline;
         this.index = index;
@@ -28,7 +28,7 @@ export class AiRacer {
         const aiColors = [0xbd2a2a, 0x2a8cbd, 0x9c2abd, 0x2abd5d];
         const color = isWingman ? (CONFIG.TEAMWORK?.WINGMAN_COLOR || 0x00e5ff) : aiColors[index % aiColors.length];
 
-        this.drone = new Drone(scene, true, color);
+        this.drone = new Drone(scene, true, color, tier);
         
         // Stagger initial progress along spline
         this.trackProgress = isWingman ? 0.01 : (0.02 + (index + 1) * 0.035);

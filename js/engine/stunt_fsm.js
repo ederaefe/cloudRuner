@@ -6,6 +6,9 @@ Manages Snap Aileron Rolls, Knife-Edge Flight, and Pugachev Cobra Airbrake
 */
 
 import { CONFIG } from '../config.js';
+import { ParticleSystem } from './particle_system.js';
+
+const PARTICLE_TYPES = ParticleSystem.PARTICLE_TYPES;
 
 export const STUNT_STATES = {
     NORMAL: 'NORMAL',
@@ -75,6 +78,7 @@ export class StuntFSM {
                 drone.group.scale.set(0.6, 0.6, 0.6); // Compress hitbox during roll
                 this.notify('SNAP ROLL LEFT', `+${stuntCfg.SNAP_ROLL_NITRO_GAIN}% NITRO`);
                 drone.nitroAmount = Math.min(maxNitro, drone.nitroAmount + stuntCfg.SNAP_ROLL_NITRO_GAIN);
+                drone.emitStuntParticles(PARTICLE_TYPES.STUNT_ROLL);
             } else if (inputState.stuntRollRight) {
                 inputState.stuntRollRight = false;
                 this.state = STUNT_STATES.SNAP_ROLL_RIGHT;
@@ -83,6 +87,7 @@ export class StuntFSM {
                 drone.group.scale.set(0.6, 0.6, 0.6);
                 this.notify('SNAP ROLL RIGHT', `+${stuntCfg.SNAP_ROLL_NITRO_GAIN}% NITRO`);
                 drone.nitroAmount = Math.min(maxNitro, drone.nitroAmount + stuntCfg.SNAP_ROLL_NITRO_GAIN);
+                drone.emitStuntParticles(PARTICLE_TYPES.STUNT_ROLL);
             } else if (inputState.isCobraTriggered) {
                 inputState.isCobraTriggered = false;
                 if (drone.speedKmh > 110) {
@@ -90,10 +95,12 @@ export class StuntFSM {
                     this.stateTimer = 0;
                     this.notify('COBRA AIRBRAKE', '-62% SPEED DUMP');
                     drone.velocity.multiplyScalar(1.0 - stuntCfg.COBRA_SPEED_DUMP);
+                    drone.emitStuntParticles(PARTICLE_TYPES.STUNT_COBRA);
                 }
             } else if (inputState.isKnifeEdgeHeld) {
                 this.state = STUNT_STATES.KNIFE_EDGE;
                 this.notify('KNIFE-EDGE ENGAGED', 'SLIT PENETRATION');
+                drone.emitStuntParticles(PARTICLE_TYPES.STUNT_KNIFE);
             }
         }
 

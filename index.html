@@ -19,9 +19,6 @@
 <!-- WebGL Viewport -->
 <canvas id="viewport-canvas"></canvas>
 
-<!-- Speed Lines 2D Overlay -->
-<canvas id="speed-lines-canvas"></canvas>
-
 <!-- Top Tactical Flight Telemetry -->
 <div id="top-hud">
     <div class="hud-panel">
@@ -264,6 +261,7 @@ import { AiRacer } from './js/engine/ai_racer.js';
 import { ExtractionEngine } from './js/engine/extraction_engine.js';
 import { HangarSettingsManager } from './js/ui/hangar_settings.js';
 import { RacingHUD } from './js/ui/hud.js';
+import { ParticleSystem } from './js/engine/particle_system.js';
 
 window.addEventListener('load', () => {
     // 1. Hardware Profiler & Coordinator
@@ -344,7 +342,7 @@ window.addEventListener('load', () => {
     scene.add(cyanRim);
 
     // 5. Instantiate Player Drone & HUD
-    const playerDrone = new Drone(scene, false);
+    const playerDrone = new Drone(scene, false, null, tier);
     const hud = new RacingHUD();
     let stuntsCompletedCount = 0;
     let maxSpeedInRace = 0;
@@ -419,7 +417,7 @@ window.addEventListener('load', () => {
 
             // Spawn AI Racers
             for (let i = 0; i < CONFIG.AI.RACER_COUNT; i++) {
-                aiRacers.push(new AiRacer(scene, track.spline, i, CONFIG.AI.RACER_COUNT));
+                aiRacers.push(new AiRacer(scene, track.spline, i, CONFIG.AI.RACER_COUNT, false, tier));
             }
         } else if (mode === CONFIG.MODES.TEAMWORK_COOP) {
             if (modeBadge) modeBadge.textContent = 'TEAMWORK SQUAD';
@@ -427,9 +425,9 @@ window.addEventListener('load', () => {
             if (lapOrTargetLabel) lapOrTargetLabel.textContent = 'LAP';
 
             // Spawn 1 Wingman AI in escort formation + 2 Rivals
-            aiRacers.push(new AiRacer(scene, track.spline, 0, 1, true)); // isWingman = true
-            aiRacers.push(new AiRacer(scene, track.spline, 1, 3, false));
-            aiRacers.push(new AiRacer(scene, track.spline, 2, 3, false));
+            aiRacers.push(new AiRacer(scene, track.spline, 0, 1, true, tier)); // isWingman = true
+            aiRacers.push(new AiRacer(scene, track.spline, 1, 3, false, tier));
+            aiRacers.push(new AiRacer(scene, track.spline, 2, 3, false, tier));
             hud.showStuntAlert('TEAMWORK ESCORT', 'WINGMAN ECHO-01 READY');
         } else {
             // Extraction Mode (Solo or Versus)
@@ -452,7 +450,7 @@ window.addEventListener('load', () => {
 
             if (mode === CONFIG.MODES.EXTRACTION_VERSUS) {
                 for (let i = 0; i < 2; i++) {
-                    aiRacers.push(new AiRacer(scene, track.spline, i, 2));
+                    aiRacers.push(new AiRacer(scene, track.spline, i, 2, false, tier));
                 }
             }
         }
@@ -725,12 +723,19 @@ window.addEventListener('load', () => {
                 if (hudSpeed) hudSpeed.textContent = Math.round(playerDrone.speedKmh);
                 if (hudAlt) hudAlt.textContent = Math.round(playerDrone.position.y);
                 if (hudLap) hudLap.textContent = `${extractionEngine.deliveredCount} / ${extractionEngine.totalCount}`;
-
-                hud.renderSpeedLines(playerDrone.speedKmh, playerDrone.nitroStage);
             }
 
             // Audio Telemetry
             soundEngine.updateTelemetry(playerDrone.speedKmh, inputState.forward, playerDrone.nitroStage > 1, playerDrone.nitroStage === 3);
+
+            // Update particle system
+            playerDrone.updateParticles(dt);
+            
+            // Emit speed streak particles from camera perspective
+            if (playerDrone.particleSystem && playerDrone.speedKmh > 140) {
+                const cameraForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                playerDrone.particleSystem.emitSpeedStreak(camera.position, cameraForward, playerDrone.speedKmh);
+            }
 
             // Cleanly consume one-shot stunt triggers
             inputManager.resetStuntFlags();

@@ -22,6 +22,7 @@ const STATIC_ASSETS = [
     './js/engine/ai_racer.js',
     './js/engine/extraction_engine.js',
     './js/engine/camera_rig.js',
+    './js/engine/particle_system.js',
     './js/ui/hangar_settings.js',
     './js/ui/hud.js',
     'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',

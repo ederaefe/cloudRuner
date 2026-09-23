@@ -21,34 +21,6 @@ export class RacingHUD {
         this.stuntTitle = document.getElementById('stunt-title-txt');
         this.stuntBonus = document.getElementById('stunt-bonus-txt');
         this.stuntTimeout = null;
-
-        // Speed lines canvas
-        this.speedLinesCanvas = document.getElementById('speed-lines-canvas');
-        this.slCtx = this.speedLinesCanvas ? this.speedLinesCanvas.getContext('2d') : null;
-        this.resizeCanvas();
-        window.addEventListener('resize', () => this.resizeCanvas());
-
-        this.particles = [];
-        this.initSpeedParticles();
-    }
-
-    resizeCanvas() {
-        if (!this.speedLinesCanvas) return;
-        this.speedLinesCanvas.width = window.innerWidth;
-        this.speedLinesCanvas.height = window.innerHeight;
-    }
-
-    initSpeedParticles() {
-        this.particles = [];
-        const count = 50;
-        for (let i = 0; i < count; i++) {
-            this.particles.push({
-                x: Math.random() * window.innerWidth,
-                y: Math.random() * window.innerHeight,
-                len: 10 + Math.random() * 40,
-                speed: 15 + Math.random() * 30
-            });
-        }
     }
 
     showStuntAlert(title, bonus) {
@@ -113,52 +85,6 @@ export class RacingHUD {
             }
         }
 
-        // Draw radial speed lines during high speed / Nitro
-        this.renderSpeedLines(drone.speedKmh, drone.nitroStage);
-    }
-
-    renderSpeedLines(speedKmh, nitroStage) {
-        if (!this.slCtx || !this.speedLinesCanvas) return;
-        const w = this.speedLinesCanvas.width;
-        const h = this.speedLinesCanvas.height;
-        const cx = w / 2;
-        const cy = h / 2;
-
-        this.slCtx.clearRect(0, 0, w, h);
-
-        const threshold = 145.0;
-        if (speedKmh < threshold) {
-            this.speedLinesCanvas.style.opacity = '0';
-            return;
-        }
-
-        const intensity = Math.min(1.0, (speedKmh - threshold) / (CONFIG.FLIGHT.STAGE3_BOOST_SPEED - threshold));
-        this.speedLinesCanvas.style.opacity = `${0.2 + intensity * 0.8}`;
-
-        this.slCtx.strokeStyle = (nitroStage === 3) ? 'rgba(0, 255, 255, 0.8)' : (nitroStage === 2 ? 'rgba(244, 164, 38, 0.65)' : 'rgba(255, 255, 255, 0.35)');
-        this.slCtx.lineWidth = (nitroStage === 3) ? 2.5 : (nitroStage === 2 ? 2.0 : 1.2);
-
-        for (let i = 0; i < this.particles.length; i++) {
-            const p = this.particles[i];
-            const dx = p.x - cx;
-            const dy = p.y - cy;
-            const dist = Math.hypot(dx, dy) || 1.0;
-
-            // Move outward towards periphery
-            p.x += (dx / dist) * p.speed * intensity;
-            p.y += (dy / dist) * p.speed * intensity;
-
-            // Tail line pointing back to screen center
-            this.slCtx.beginPath();
-            this.slCtx.moveTo(p.x, p.y);
-            this.slCtx.lineTo(p.x - (dx / dist) * p.len * intensity, p.y - (dy / dist) * p.len * intensity);
-            this.slCtx.stroke();
-
-            // Reset when leaving screen
-            if (p.x < 0 || p.x > w || p.y < 0 || p.y > h || isNaN(p.x)) {
-                p.x = cx + (Math.random() - 0.5) * (w * 0.5);
-                p.y = cy + (Math.random() - 0.5) * (h * 0.5);
-            }
-        }
+        // Speed lines are now handled by 3D particle system
     }
 }
