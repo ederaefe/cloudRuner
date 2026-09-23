@@ -55,6 +55,8 @@ export class AiRacer {
         this.stagingPos = stagingPos ? stagingPos.clone() : null;
         if (stagingPos) {
             this.drone.position.copy(stagingPos);
+            const startPtX = (this.spline && typeof this.spline.getPointAt === 'function') ? this.spline.getPointAt(0).x : 0;
+            this.laneOffset = stagingPos.x - startPtX;
         }
         this.isDiving = false;
         this.diveProgress = 0;
@@ -92,7 +94,12 @@ export class AiRacer {
             const currentPt = this.spline.getPointAt(clampedT);
             const currentTan = this.spline.getTangentAt(clampedT).normalize();
 
-            _normal.crossVectors(currentTan, _up).normalize();
+            _normal.crossVectors(_up, currentTan);
+            if (_normal.lengthSq() < 0.001) {
+                _normal.set(1, 0, 0);
+            } else {
+                _normal.normalize();
+            }
             _targetPos.copy(currentPt).addScaledVector(_normal, this.laneOffset);
             this.drone.position.copy(_targetPos);
             this.drone.quaternion.setFromUnitVectors(_dirFwd, currentTan);
@@ -140,7 +147,12 @@ export class AiRacer {
         // Evaluate spline position and forward tangent (zero-allocation)
         const centerPos = this.spline.getPointAt(this.trackProgress % 1.0);
         const tangent = this.spline.getTangentAt(this.trackProgress % 1.0).normalize();
-        _normal.crossVectors(tangent, _up).normalize();
+        _normal.crossVectors(tangent, _up);
+        if (_normal.lengthSq() < 0.001) {
+            _normal.set(1, 0, 0);
+        } else {
+            _normal.normalize();
+        }
 
         // Calculate lane wobble
         this.wobblePhase += dt * CONFIG.AI.LANE_WOBBLE_FREQ;

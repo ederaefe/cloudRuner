@@ -333,8 +333,12 @@ export class TrackBuilder {
             const tan = this.spline.getTangentAt(t).normalize();
             
             // Perpendicular horizontal normal along curve
-            const norm = new THREE.Vector3().crossVectors(tan, _worldUp).normalize();
-            if (norm.lengthSq() < 0.01) norm.set(1, 0, 0);
+            const norm = new THREE.Vector3().crossVectors(tan, _worldUp);
+            if (norm.lengthSq() < 0.001) {
+                norm.set(1, 0, 0);
+            } else {
+                norm.normalize();
+            }
 
             // Position ribbon slightly below hover altitude, directly threading through gate bases
             const center = new THREE.Vector3(pt.x, pt.y - 1.1, pt.z);
@@ -654,7 +658,12 @@ export class TrackBuilder {
             const t = s / sampleCount;
             const pt = this.spline.getPointAt(t);
             const tan = this.spline.getTangentAt(t).normalize();
-            const norm = new THREE.Vector3().crossVectors(tan, _up).normalize();
+            const norm = new THREE.Vector3().crossVectors(tan, _up);
+            if (norm.lengthSq() < 0.001) {
+                norm.set(1, 0, 0);
+            } else {
+                norm.normalize();
+            }
             splineSamples.push(pt);
             splineNormals.push(norm);
         }
@@ -908,7 +917,8 @@ export class TrackBuilder {
 
     createSkyBridges() {
         if (!this.spline) return;
-        const bridgeFractions = [0.25, 0.62, 0.88];
+        // Position skybridges across horizontal canyon corridors (avoiding vertical dive and ascension ramp)
+        const bridgeFractions = [0.42, 0.54, 0.66];
         const bridgeGeo = new THREE.BoxGeometry(42, 3.5, 8);
         const bridgeMat = new THREE.MeshStandardMaterial({
             color: 0x1a2332,
@@ -924,7 +934,12 @@ export class TrackBuilder {
         bridgeFractions.forEach((f) => {
             const pt = this.spline.getPointAt(f);
             const tan = this.spline.getTangentAt(f).normalize();
-            const norm = new THREE.Vector3().crossVectors(tan, _up).normalize();
+            const norm = new THREE.Vector3().crossVectors(tan, _up);
+            if (norm.lengthSq() < 0.001) {
+                norm.set(1, 0, 0);
+            } else {
+                norm.normalize();
+            }
 
             const bridgeGroup = new THREE.Group();
             const mainMesh = new THREE.Mesh(bridgeGeo, bridgeMat);

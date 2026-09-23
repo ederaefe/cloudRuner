@@ -277,6 +277,10 @@ export class RacingHUD {
             this.countdownEl = document.getElementById('hud-countdown');
         }
         if (!this.countdownEl) return;
+        if (this.currentCountdownText === text && !this.countdownEl.classList.contains('hidden')) {
+            return;
+        }
+        this.currentCountdownText = text;
         this.countdownEl.textContent = text;
         this.countdownEl.classList.remove('hidden');
         this.countdownEl.classList.toggle('dive-go', isDive);
@@ -293,6 +297,8 @@ export class RacingHUD {
         }
         if (this.countdownEl) {
             this.countdownEl.classList.add('hidden');
+            this.countdownEl.classList.remove('pulse-anim', 'dive-go');
+            this.currentCountdownText = null;
         }
     }
 }

@@ -1255,12 +1255,30 @@ window.addEventListener('load', () => {
 
             const inputState = inputManager.getState();
             if (inputManager.state.autopilotEnabled) {
-                autopilot.update(playerDrone, inputState, track, nextGateIndex, extractionEngine, dt);
+                // In dive funnel, autopilot assists with lane centering and full throttle
+                inputState.forward = 1.0;
+                inputState.turn = THREE.MathUtils.clamp(-playerDrone.diveLaneOffset * 0.15, -0.6, 0.6);
             }
             playerDrone.updatePhysics(inputState, stuntFsm, dt, track);
             aiRacers.forEach(ai => ai.update(dt, playerDrone));
 
             cameraRig.updateDive(playerDrone, inputState, dt);
+
+            // Gate checkpoint detection during dive funnel
+            if (track && track.gates && track.gates.length > 0) {
+                const targetGate = track.gates[nextGateIndex % track.gates.length];
+                const distToGate = playerDrone.position.distanceTo(targetGate.position);
+                const gateProgress = (targetGate.index / track.gates.length);
+                const passedByProgress = (playerDrone.diveProgress > gateProgress + 0.01) && (targetGate.index < Math.floor(track.gates.length * 0.35));
+
+                if (distToGate < (CONFIG.TRACK.CHECKPOINT_RADIUS || 9.0) * 2.0 || passedByProgress) {
+                    targetGate.mesh.material.color.setHex(0x00ff88);
+                    setTimeout(() => {
+                        targetGate.mesh.material.color.setHex(targetGate.index === 0 ? 0xE8580A : 0x00ffff);
+                    }, 400);
+                    nextGateIndex++;
+                }
+            }
 
             // Reverse-rain vertical speed streaks rushing upward
             if (playerDrone.particleSystem) {
@@ -1279,7 +1297,11 @@ window.addEventListener('load', () => {
             if (!playerDrone.isDiving) {
                 gameState = 'RACING';
                 window._gameState = gameState;
-                cameraRig.reset(playerDrone);
+                // Align nextGateIndex so it points to the upcoming gate along the 450m straightaway
+                const minStraightawayGate = Math.floor(track.gates.length * 0.27);
+                if (nextGateIndex < minStraightawayGate) {
+                    nextGateIndex = minStraightawayGate;
+                }
                 hud.showStuntAlert('DIVE COMPLETE', 'AIRSPACE REACHED - STRAIGHTAWAY SPRINT');
             }
 
@@ -1392,14 +1414,32 @@ window.addEventListener('load', () => {
                         currentLap++;
                         if (currentLap > currentSector.laps) {
                             finishRace(false);
+                        } else {
+                            playerDrone.startDive();
+                            aiRacers.forEach(ai => ai.startDive());
+                            gameState = 'DIVING';
+                            window._gameState = gameState;
+                            hud.showStuntAlert(`LAP ${currentLap}`, 'DIVING STRATOSPHERE RE-ENTRY');
                         }
                     }
                 }
 
                 // Summit finish portal check during vertical sky ascension
-                if (playerDrone.isAscending && playerDrone.position.y >= 740.0) {
+                if ((playerDrone.isAscending || playerDrone.hasReachedSummit) && playerDrone.position.y >= 740.0) {
+                    playerDrone.isAscending = false;
+                    playerDrone.hasReachedSummit = false;
+                    if (track && track.finishPortal && track.finishPortal.material) {
+                        track.finishPortal.material.color.setHex(0xffffff);
+                    }
                     if (currentLap >= currentSector.laps) {
                         finishRace(false);
+                    } else {
+                        currentLap++;
+                        playerDrone.startDive();
+                        aiRacers.forEach(ai => ai.startDive());
+                        gameState = 'DIVING';
+                        window._gameState = gameState;
+                        hud.showStuntAlert(`LAP ${currentLap}`, 'DIVING STRATOSPHERE RE-ENTRY');
                     }
                 }
 

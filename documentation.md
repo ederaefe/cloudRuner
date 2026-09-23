@@ -403,7 +403,53 @@ This enables zero-latency P2P mesh synchronization via WebRTC DataChannels (`Pee
   * **Minimalist Countdown Pill Overlay (`index.html`, `js/ui/hud.js`)**: Frosted countdown overlay displaying `3... 2... 1... DIVE!` with pulse animations and cyan portal flare, avoiding all screen clutter.
   * **Out-of-Bounds Elevation Re-calibration (`index.html`)**: Expanded ceiling boundary from 380m to 900m and radial bounds to 4500m, accommodating stratosphere staging and vertical climb without false-positive resets.
 
+### Completed: Complete Migration from Vercel to Render Static Sites Infrastructure
 
+* **Render Blueprint Infrastructure-as-Code (`render.yaml`)**:
+  * Adopted Render's declarative Blueprint specification to manage hosting infrastructure in version control without dashboard configuration drift.
+  * Specified `type: web` with `runtime: static` to provision an edge-distributed static CDN distribution with 0 recurring compute cost and 0 cold starts.
+  * Configured `staticPublishPath: .` and `buildCommand: ""` to serve client assets directly from the repository root, completing deploys in seconds.
+* **Edge Security & Cache Control Headers (`render.yaml`)**:
+  * Configured automated edge HTTP response headers:
+    * `Cache-Control: public, max-age=0, must-revalidate` across all paths (`/*`) and `/service-worker.js` for zero-stale development revalidation.
+    * `X-Content-Type-Options: nosniff` to block MIME-type sniffing.
+    * `X-Frame-Options: DENY` to defend against framing and clickjacking.
+    * `Referrer-Policy: strict-origin-when-cross-origin` to safeguard navigation context.
+* **Single Page Application (SPA) Deep-Link Rewrites (`render.yaml`)**:
+  * Added edge rewrite rules for direct deep-link access (`/boost`, `/teamwork-preview`, and `/*` wildcard fallback to `/index.html`).
+  * Relies on Render's path-matching priority where physical assets (`.js`, `.css`, `.svg`, `.json`) are always served directly before rewrite rules are evaluated.
+* **Native Build Pipeline Conservation (`render.yaml`)**:
+  * Configured `buildFilter.ignoredPaths` (`.antigravity/**`, `.cursorrules`, `.vscode/**`, `*.md`, `scripts/**`) to ignore documentation and tooling changes, conserving the free tier's 500 monthly build pipeline minutes.
+* **Legacy Vercel Decommissioning**:
+  * Permanently removed legacy files: `vercel.json`, `.vercelignore`, `VERCEL_RULES.md`, and `scripts/vercel-ignore.sh`.
+  * Authored `RENDER_RULES.md` as the definitive runbook for Render static sites, detailing bandwidth (100 GB/month), build quotas, client-side zero-compute constraints, and deployment workflows.
+  * Updated `.cursorrules` and `README.md` to reflect Render hosting best practices.
+
+### Completed: Stratosphere Circuit Physics Hardening, Degenerate Vector Defenses & Summit Synchronization
+
+* **Mathematical Lateral Vector & Launch Pad Continuity (`js/engine/drone.js`, `js/engine/ai_racer.js`)**:
+  * Corrected lateral dive funnel cross-vector in `drone.js` from `currentTan.cross(0, 1, 0)` to `(0, 1, 0).cross(currentTan)`. This resolves the inverted lateral steering bug and aligns $+X$ with the pilot's right-hand visual axis.
+  * Synchronized lateral lane offsets for both player and AI racers against the spline start coordinate (`stagingPos.x - spline.getPointAt(0).x`), eliminating 16-meter coordinate teleportation on frame 1 of launch.
+* **Degenerate Normal Protection & Zero Path Encroachment (`js/engine/track_builder.js`, `js/engine/ai_racer.js`, `js/engine/drone.js`)**:
+  * On near-vertical track segments (the 720m stratosphere dive funnel and the 90-degree rocket ascension ramp), the tangent vector is parallel to world up `(0, 1, 0)`, causing `crossVectors(tan, _up)` to evaluate to a degenerate zero vector `(0, 0, 0)`.
+  * In `track_builder.js`, building setback corridor samples now safeguard against zero-length normals by falling back to `(1, 0, 0)`. This completely eliminates the critical bug where buildings were spawned directly at `(sp.x, sp.z)` in the center of the vertical dive and climb paths.
+  * In `ai_racer.js`, the standard flight update loop now includes a non-zero fallback for `_normal`, preventing AI racers from corrupting into `(NaN, NaN, NaN)` during vertical ascension climbs.
+  * In `drone.js`, ADAS adaptive yaw cross-vectors are safeguarded against vertical headings.
+* **Stratosphere Summit Finish Portal Synchronization (`js/engine/drone.js`, `index.html`)**:
+  * Fixed a race condition during vertical rocket ascension where `drone.isAscending` was reset to `false` inside `updateAscensionPhysics` before the game loop in `index.html` could inspect the altitude threshold ($y \ge 740\text{m}$).
+  * Added `hasReachedSummit` state tracking in `Drone` and updated `index.html` to evaluate `(playerDrone.isAscending || playerDrone.hasReachedSummit) && playerDrone.position.y >= 740.0`.
+  * Triggered gold portal flash feedback (`track.finishPortal.material.color.setHex(0xffffff)`) and clean lap advancement or epilogue sequence initiation.
+* **Dynamic Airframe Configuration & SAR VTOL Roleplay Preservation (`js/engine/drone.js`)**:
+  * Integrated `setAirframeMode('ATTACK' | 'SAR_VTOL')` to switch between razor-sharp combat geometry (needle nose spike, swept wings, narrow fuselage) and industrial search-and-rescue configuration (stout fuselage, retracted spike).
+  * Automatically binds `SAR_ORANGE` skin to toggle industrial VTOL mode while combat skins select supersonic attack mode.
+* **VTOL Emergency Hover Stop Airbraking During Dive (`js/engine/drone.js`)**:
+  * Enabled active airbraking during the 750m sky dive via `inputState.hoverStopActive` (`B` key / touch stop button), bleeding speed smoothly toward controlled hover descent (~65 km/h) with 90-degree nacelle tilt and extended skids.
+* **Synchronous Layout Reflow Elimination (`js/ui/hud.js`)**:
+  * Gated `RacingHUD.showCountdown` DOM mutations behind `currentCountdownText !== text`, eliminating 210 redundant synchronous layout reflows (`offsetWidth`) and CSS class resets during the 3.5s countdown.
+* **Elevated Skybridge Realignment (`js/engine/track_builder.js`)**:
+  * Relocated skybridges from spline fractions `[0.25, 0.62, 0.88]` to horizontal canyon corridors `[0.42, 0.54, 0.66]`, preventing elevated bridges from obstructing the 90-degree ascension climb.
+* **Automated Regression Verification (`scripts/test_engine.mjs`)**:
+  * Expanded test suite from 176 to 227 automated assertions verifying launch pad continuity, dive steering direction, VTOL airbraking, airframe switching, summit finish triggers, AI non-NaN climb stability, and building clearance envelopes.
 
 
 

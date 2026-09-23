@@ -79,8 +79,21 @@ export class Drone {
         this.diveProgress = 0;
         this.diveLaneOffset = 0;
         this.isAscending = false;
+        this.hasReachedSummit = false;
+        this.airframeMode = 'ATTACK';
 
         this.buildMesh(aiColor);
+    }
+
+    setAirframeMode(mode = 'ATTACK') {
+        this.airframeMode = mode;
+        const isSar = (mode === 'SAR_VTOL');
+        if (this.noseSpike) {
+            this.noseSpike.visible = !isSar;
+        }
+        if (this.fuselage) {
+            this.fuselage.scale.set(isSar ? 1.4 : 1.25, isSar ? 0.65 : 0.55, 1.0);
+        }
     }
 
     buildMesh(customColor) {
@@ -371,6 +384,11 @@ export class Drone {
         this.matBody.color.setHex(skin.bodyColor);
         this.matAccent.color.setHex(skin.accentColor);
         if (this.thrustGlow) this.thrustGlow.color.setHex(skin.glowColor);
+        if (skin.id === 'SAR_ORANGE') {
+            this.setAirframeMode('SAR_VTOL');
+        } else {
+            this.setAirframeMode('ATTACK');
+        }
     }
 
     applyUpgrades(stats) {
@@ -478,6 +496,15 @@ export class Drone {
         let currentSpeedMs = this.speedKmh / 3.6;
         const maxDiveSpeedMs = isThrottling ? (320.0 / 3.6) : (180.0 / 3.6);
         currentSpeedMs = Math.min(maxDiveSpeedMs, currentSpeedMs + totalAcc * dt);
+
+        // VTOL Emergency Hover Stop during dive: airbrake to controlled hover descent (~65 km/h)
+        if (inputState && inputState.hoverStopActive) {
+            const targetAirbrakeSpeed = 65.0 / 3.6;
+            currentSpeedMs = THREE.MathUtils.lerp(currentSpeedMs, targetAirbrakeSpeed, dt * 5.0);
+            this.targetNacelleAngle = Math.PI / 2.0;
+            this.landingGearExtended = true;
+        }
+
         this.speedKmh = currentSpeedMs * 3.6;
 
         // Progress along dive funnel (spline t = 0 to pullout ~0.28)
@@ -494,7 +521,13 @@ export class Drone {
         this.diveLaneOffset = (this.diveLaneOffset || 0) + turnInput * dt * 26.0;
         this.diveLaneOffset = THREE.MathUtils.clamp(this.diveLaneOffset, -16.0, 16.0);
 
-        _crossScratch.crossVectors(currentTan, new THREE.Vector3(0, 1, 0)).normalize();
+        // Right-hand horizontal lateral vector: (0, 1, 0) x currentTan -> points along +X (Right)
+        _crossScratch.crossVectors(new THREE.Vector3(0, 1, 0), currentTan);
+        if (_crossScratch.lengthSq() < 0.001) {
+            _crossScratch.set(1, 0, 0);
+        } else {
+            _crossScratch.normalize();
+        }
         this.position.copy(currentPt).addScaledVector(_crossScratch, this.diveLaneOffset);
 
         // Orient along dive tangent with banking roll
@@ -522,6 +555,7 @@ export class Drone {
 
     startAscension() {
         this.isAscending = true;
+        this.hasReachedSummit = false;
     }
 
     updateAscensionPhysics(inputState, dt, trackBuilder) {
@@ -554,6 +588,7 @@ export class Drone {
         }
 
         if (this.position.y >= 740.0) {
+            this.hasReachedSummit = true;
             this.isAscending = false;
         }
     }
@@ -750,7 +785,12 @@ export class Drone {
                 _fwdVector.lerp(trackTangent, blendAmount).normalize();
                 // Only apply if roughly going the same direction (dot > 0.5)
                 if (_fwdVector.dot(trackTangent) > 0.5) {
-                    _crossScratch.crossVectors(new THREE.Vector3(0, 1, 0), _fwdVector).normalize();
+                    _crossScratch.crossVectors(new THREE.Vector3(0, 1, 0), _fwdVector);
+                    if (_crossScratch.lengthSq() < 0.001) {
+                        _crossScratch.set(1, 0, 0);
+                    } else {
+                        _crossScratch.normalize();
+                    }
                     _quatScratch.setFromAxisAngle(new THREE.Vector3(0, 1, 0),
                         Math.atan2(_fwdVector.x, _fwdVector.z));
                 }

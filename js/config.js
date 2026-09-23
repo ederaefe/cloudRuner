@@ -21,7 +21,7 @@ export const CONFIG = {
             name: 'Downtown Canyons',
             subtitle: 'Daylight urban corridors with wide sky-lanes',
             briefing: 'Establish flight telemetry and secure preliminary energy relays across low-altitude skyscrapers.',
-            laps: 2,
+            laps: 1,
             payloads: 4,
             requiredSectorId: null,
             fogDensity: 0.0008,

@@ -1,38 +1,39 @@
-# Vercel Free Tier Compute and Resource Conservation Rules
+# Render Free Tier Compute and Resource Conservation Rules
 
-You are working on BARCH Aero-Canyon Racing, a 3D WebGL game hosted on Vercel Hobby (Free Tier).
-The Vercel Hobby tier imposes hard resource caps:
-- Active CPU Time: 4 hours / month
-- Provisioned Memory: 360 GB-hours / month
-- Function Invocations: 1,000,000 / month
-- Fast Data Transfer (Edge Bandwidth): 100 GB / month
-- Build Execution Minutes: 6,000 minutes / month (1 concurrent build)
+You are working on BARCH Aero-Canyon Racing, a 3D WebGL game hosted on Render Static Sites (Free Tier).
+The Render Free Tier for Static Sites provides permanent CDN hosting with workspace allowances:
+- Compute Cost: $0 (Edge CDN static asset distribution; no container runtimes or cold starts)
+- Outbound Bandwidth: 100 GB / month per workspace ($0.15/GB overage)
+- Build Pipeline Minutes: 500 minutes / month per workspace ($5/1,000 minutes overage)
+- Concurrent Builds: 1 build pipeline at a time
 
-To guarantee zero compute consumption, avoid account suspension, and maximize edge performance, adhere strictly to these rules:
+To guarantee zero recurring compute consumption, avoid account overages, and maximize CDN edge performance, adhere strictly to these rules:
 
 1. ARCHITECTURAL ZERO-COMPUTE MANDATE
-   - Never add serverless functions (/api/* routes, Node runtimes, or Edge Functions) to this repository.
+   - Never add serverless functions (/api/* routes, Node runtimes, or backend services) to this repository.
    - Never introduce Server-Side Rendering (SSR), Server Components, or framework runtimes that require backend execution.
-   - The application must remain a 100% static client-side PWA served directly from Vercel's global Edge CDN.
+   - The application must remain a 100% static client-side PWA served directly from Render's global CDN.
 
-2. BUILD POLICY (DEVELOPMENT VS. RELEASE)
-   - CURRENT STAGE: Active Development. All builds on Vercel are unblocked (`ignoreCommand` disabled, `max-age=0, must-revalidate` enabled) so local changes, tests, and preview deployments trigger immediate updates.
-   - RELEASE STAGE (FUTURE): Once ready for production launch, re-enable `ignoreCommand` in `vercel.json` (`bash scripts/vercel-ignore.sh` with `DEV_MODE=false`) and restore long-term immutable caching (`max-age=31536000, immutable`) to save build minutes and bandwidth.
+2. BUILD POLICY & BLUEPRINT CONFIGURATION (render.yaml)
+   - Configuration is version-controlled via `render.yaml` (Render Blueprint Infrastructure-as-Code).
+   - Use `buildCommand: ""` and `staticPublishPath: .` to bypass compilation pipelines and minimize build duration to seconds.
+   - Native build filters (`buildFilter.ignoredPaths`) in `render.yaml` prevent build triggers when changes only affect documentation (`*.md`), scripts, or IDE configs.
    - Do not introduce heavy compilation or bundling pipelines that inflate build duration. Use native ES modules and browser-compatible CDNs.
 
 3. CACHE AND EDGE EGRESS MINIMIZATION
-   - Static assets (scripts in `js/`, styles in `css/`, audio, 3D models, textures) must remain cacheable with `Cache-Control: public, max-age=31536000, immutable`.
+   - CURRENT STAGE: Active Development. All assets are configured with `Cache-Control: public, max-age=0, must-revalidate` in `render.yaml` to ensure instant revalidation of local code updates.
+   - RELEASE STAGE (FUTURE): Transition `/js/*` and `/css/*` static assets to `Cache-Control: public, max-age=31536000, immutable` in `render.yaml` to conserve workspace outbound egress.
    - For asset updates, use content hashing or explicit query parameter versioning (`game.js?v=2`) so cache busts are deterministic.
-   - Maintain the Service Worker (`service-worker.js`) with a Cache-First strategy to ensure returning players generate 0 HTTP requests to Vercel's edge network.
+   - Maintain the Service Worker (`service-worker.js`) with a Cache-First strategy to ensure returning players generate 0 HTTP requests to Render's CDN.
 
-4. STATE PERSISTENCE AND MULTIPLAYER WITHOUT VERCEL COMPUTE
+4. STATE PERSISTENCE AND MULTIPLAYER WITHOUT RENDER COMPUTE
    - Player profiles, unlocked skins, upgrade trees, and settings must persist exclusively in browser `localStorage` or `IndexedDB`.
-   - Telemetry, analytics, and multiplayer state synchronization must never use Vercel Serverless Functions.
-   - Peer-to-peer multiplayer must utilize client-to-client WebRTC DataChannels (e.g., PeerJS CDN) or external free BaaS/PubSub endpoints, bypassing Vercel infrastructure entirely.
+   - Telemetry, analytics, and multiplayer state synchronization must never use Render web services or databases.
+   - Peer-to-peer multiplayer must utilize client-to-client WebRTC DataChannels (e.g., PeerJS CDN) or external free BaaS/PubSub endpoints, bypassing Render infrastructure entirely.
 
-5. ZERO VERCEL IMAGE OPTIMIZATION COMPUTE
-   - Never invoke `/_vercel/image` or runtime image transformation endpoints (limited to 5,000 source images/month on Hobby).
+5. ZERO SERVER-SIDE IMAGE PROCESSING
    - Use pre-optimized SVG, WebP, AVIF, or procedural canvas/WebGL rendering.
+   - Never route runtime image processing through backend compute services.
 
 6. ZERO SERVER-SIDE CRON JOBS
-   - Do not configure cron jobs in `vercel.json`. Any scheduled or timed routines must run client-side via `requestAnimationFrame` or Web Workers.
+   - Do not configure cron services in `render.yaml`. Any scheduled or timed routines must run client-side via `requestAnimationFrame` or Web Workers.

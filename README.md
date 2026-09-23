@@ -157,7 +157,7 @@ npx serve .
 Navigate to `http://localhost:8080` in Chrome, Safari, Edge, or Firefox.
 
 ### Deploying to Production
-* **Vercel**: Run `vercel` in the project root or import the GitHub repository. No build command required.
+* **Render (Recommended)**: Import the GitHub repository in the [Render Dashboard](https://dashboard.render.com). Render will automatically detect `render.yaml` (Blueprint) and provision the static site with edge caching, security headers, and clean SPA rewrite routes.
 * **GitHub Pages**: Push to the `master` or `main` branch and enable GitHub Pages in repository settings pointing to root (`/`).
 
 ---

@@ -1,0 +1,51 @@
+# Render Blueprint Specification for BARCH Aero-Canyon Racing
+# Documentation: https://render.com/docs/blueprint-spec
+# Static Sites: https://render.com/docs/static-sites
+
+services:
+  - type: web
+    name: barch-aero-canyon
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
+    autoDeployTrigger: commit
+    
+    # Selective build trigger filters to conserve free-tier build pipeline minutes
+    buildFilter:
+      ignoredPaths:
+        - .antigravity/**
+        - .cursorrules
+        - .vscode/**
+        - "*.md"
+        - scripts/**
+
+    # Edge response headers for zero-revalidation development and security hardening
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /service-worker.js
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+
+    # Single Page Application rewrites for direct clean URLs
+    # Note: Render prioritizes physical files over rewrite rules.
+    routes:
+      - type: rewrite
+        source: /boost
+        destination: /index.html
+      - type: rewrite
+        source: /teamwork-preview
+        destination: /index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html

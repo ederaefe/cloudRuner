@@ -367,9 +367,37 @@ global.THREE = {
         }
     },
     CatmullRomCurve3: class {
-        constructor(points) { this.points = points; }
-        getPointAt(t) { return new MockVector3(t * 100, 15, t * 100); }
-        getTangentAt(t) { return new MockVector3(0, 0, 1); }
+        constructor(points) {
+            this.points = points || [];
+        }
+        getPointAt(t) {
+            if (!this.points || this.points.length === 0) return new MockVector3(0, 0, 0);
+            const pts = this.points;
+            const n = pts.length;
+            const clampedT = Math.max(0, Math.min(1.0, t));
+            const p = clampedT * (n - 1);
+            const i = Math.floor(p);
+            const weight = p - i;
+            const p0 = pts[Math.max(0, i - 1)];
+            const p1 = pts[i];
+            const p2 = pts[Math.min(n - 1, i + 1)];
+            const p3 = pts[Math.min(n - 1, i + 2)];
+            // Catmull-Rom spline interpolation
+            const w2 = weight * weight;
+            const w3 = w2 * weight;
+            const x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * weight + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * w2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * w3);
+            const y = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * weight + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * w2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * w3);
+            const z = 0.5 * ((2 * p1.z) + (-p0.z + p2.z) * weight + (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * w2 + (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * w3);
+            return new MockVector3(x, y, z);
+        }
+        getTangentAt(t) {
+            const delta = 0.002;
+            const t1 = Math.max(0, t - delta);
+            const t2 = Math.min(1.0, t + delta);
+            const p1 = this.getPointAt(t1);
+            const p2 = this.getPointAt(t2);
+            return new MockVector3(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z).normalize();
+        }
     },
     MathUtils: {
         lerp: (x, y, t) => x + (y - x) * t,
@@ -959,6 +987,31 @@ assert(boostedSpeed > passiveSpeed, 'Boosted throttle dive accelerates significa
 const preLaneX = testCombatDrone.position.x;
 testCombatDrone.updateDivePhysics({ forward: 1.0, turn: 1.0 }, 0.1, stagingTrack);
 assert(testCombatDrone.diveLaneOffset !== 0, 'Dive physics supports lateral lane shifting within funnel');
+assert(testCombatDrone.position.x > preLaneX, 'Dive physics right turn increases position X toward the right');
+
+// Pad 1 dive launch continuity (x = -8 starts at x = -8 without teleport)
+const laneDrone = new Drone(scene, false);
+laneDrone.setTrackSpline(stagingTrack.spline);
+laneDrone.setStaging(true, stagingTrack.stagingPositions[1]);
+laneDrone.startDive();
+laneDrone.updateDivePhysics({ forward: 1.0, turn: 0 }, 0.016, stagingTrack);
+assert(Math.abs(laneDrone.position.x - stagingTrack.stagingPositions[1].x) < 0.5, 'Drone starts dive seamlessly on pad 1 coordinate without teleporting');
+
+// VTOL Hover Stop active airbrake during dive
+const stopDrone = new Drone(scene, false);
+stopDrone.setTrackSpline(stagingTrack.spline);
+stopDrone.speedKmh = 250;
+stopDrone.startDive();
+stopDrone.updateDivePhysics({ hoverStopActive: true }, 0.1, stagingTrack);
+assert(stopDrone.speedKmh < 250, 'VTOL hover stop actively airbrakes dive speed');
+
+// Airframe Mode switching (ATTACK vs SAR_VTOL)
+testCombatDrone.setAirframeMode('SAR_VTOL');
+assert(testCombatDrone.airframeMode === 'SAR_VTOL' && testCombatDrone.noseSpike.visible === false, 'SAR VTOL mode engages industrial search and rescue configuration');
+testCombatDrone.setAirframeMode('ATTACK');
+assert(testCombatDrone.airframeMode === 'ATTACK' && testCombatDrone.noseSpike.visible === true, 'Attack mode engages razor sharp combat needle fuselage');
+testCombatDrone.applySkin(CONFIG.SKINS.find(s => s.id === 'SAR_ORANGE'));
+assert(testCombatDrone.airframeMode === 'SAR_VTOL', 'Applying SAR_ORANGE skin automatically configures SAR VTOL airframe');
 
 // Ascension Sprint up 90-degree sky ramp
 testCombatDrone.startAscension();
@@ -969,6 +1022,11 @@ for (let t = 0; t < 10; t++) {
 }
 assert(testCombatDrone.speedKmh > 200, 'Ascension sprint reaches extreme Mach climb velocity');
 assert(testCombatDrone.nitroAmount < 80, 'Vertical ascension consumes nitro fuel cell');
+
+// Summit threshold arrival flag
+testCombatDrone.splineProgress = 0.996;
+testCombatDrone.updateAscensionPhysics({}, 0.05, stagingTrack);
+assert(testCombatDrone.hasReachedSummit === true, 'Drone triggers hasReachedSummit upon reaching summit threshold');
 
 // AI Racer Staging and Dive Acceleration
 const testAiRacer = new AiRacer(scene, stagingTrack.spline, 0, 3, false, coordinator.tier);
@@ -981,6 +1039,31 @@ testAiRacer.startDive();
 assert(testAiRacer.isDiving === true, 'AiRacer launches into dive');
 testAiRacer.update(0.1, null);
 assert(testAiRacer.speedKmh > 50, 'AiRacer accelerates dynamically down dive funnel');
+
+// AI Racer 0 dive launch continuity (starts on pad 0 without teleport)
+const aiLane0 = new AiRacer(scene, stagingTrack.spline, 0, 3, false, coordinator.tier);
+aiLane0.setStaging(stagingTrack.stagingPositions[0]);
+aiLane0.startDive();
+aiLane0.update(0.016, null);
+assert(Math.abs(aiLane0.drone.position.x - stagingTrack.stagingPositions[0].x) < 0.5, 'AI racer 0 starts dive seamlessly on pad 0 coordinate without teleporting');
+
+// AI Racer vertical climb non-NaN stability
+const climbingAi = new AiRacer(scene, stagingTrack.spline, 1, 3, false, coordinator.tier);
+climbingAi.trackProgress = 0.90; // on vertical ascension sky ramp
+climbingAi.update(0.016, null);
+assert(Number.isFinite(climbingAi.drone.position.x) && Number.isFinite(climbingAi.drone.position.y) && Number.isFinite(climbingAi.drone.position.z), 'AI racer maintains finite non-NaN position during vertical climb');
+
+// Track building placement clearance check (no building placed directly on spline origin)
+let buildingsOverlapSpline = false;
+for (let b = 0; b < stagingTrack.buildingAABBs.length; b++) {
+    const aabb = stagingTrack.buildingAABBs[b];
+    const dx = Math.abs(stagingTrack.spline.getPointAt(0).x - (aabb.min.x + aabb.max.x) * 0.5);
+    const dz = Math.abs(stagingTrack.spline.getPointAt(0).z - (aabb.min.z + aabb.max.z) * 0.5);
+    if (dx < 10 && dz < 10) {
+        buildingsOverlapSpline = true;
+    }
+}
+assert(!buildingsOverlapSpline, 'No buildings are placed directly on the staging dive/ascension spline coordinate');
 
 // CameraRig Asphalt 360 Intro Sequence and Dynamic FOV Dive
 cameraRig.introPhase = 0;
@@ -1023,6 +1106,32 @@ assert(hudCountdownMock.textContent === 'DIVE!', 'RacingHUD displays DIVE! promp
 assert(hudCountdownMock.classList.contains('dive-go'), 'RacingHUD marks countdown with dive-go style');
 hud.hideCountdown();
 assert(hudCountdownMock.classList.contains('hidden'), 'RacingHUD hides countdown overlay');
+
+// Countdown reflow optimization check
+let reflowCount = 0;
+const reflowTrackMock = {
+    _classes: new Set(),
+    textContent: '',
+    classList: {
+        add: function(c) { reflowTrackMock._classes.add(c); },
+        remove: function(c) { reflowTrackMock._classes.delete(c); },
+        toggle: function(c, v) { if (v) reflowTrackMock._classes.add(c); else reflowTrackMock._classes.delete(c); },
+        contains: function(c) { return reflowTrackMock._classes.has(c); }
+    },
+    get offsetWidth() { reflowCount++; return 100; }
+};
+hud.countdownEl = reflowTrackMock;
+hud.currentCountdownText = null;
+hud.showCountdown('3');
+const initialReflows = reflowCount;
+hud.showCountdown('3'); // redundant call with same text
+assert(reflowCount === initialReflows, 'showCountdown skips redundant DOM layout reflow when digit unchanged');
+
+// Skybridge placement sanity check (canyon corridor only)
+stagingTrack.skyBridges.forEach((sb, idx) => {
+    assert(Number.isFinite(sb.position.x) && Number.isFinite(sb.position.y) && Number.isFinite(sb.position.z), `Skybridge ${idx} has finite position`);
+    assert(sb.position.y < 200, `Skybridge ${idx} is safely placed in canyon, not stratosphere vertical climb`);
+});
 
 stagingTrack.dispose();
 
