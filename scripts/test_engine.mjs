@@ -146,6 +146,8 @@ class MockVector3 {
     clone() { return new MockVector3(this.x, this.y, this.z); }
     add(v) { this.x += v.x; this.y += v.y; this.z += v.z; return this; }
     sub(v) { this.x -= v.x; this.y -= v.y; this.z -= v.z; return this; }
+    subVectors(a, b) { this.x = a.x - b.x; this.y = a.y - b.y; this.z = a.z - b.z; return this; }
+    addVectors(a, b) { this.x = a.x + b.x; this.y = a.y + b.y; this.z = a.z + b.z; return this; }
     multiplyScalar(s) { this.x *= s; this.y *= s; this.z *= s; return this; }
     addScaledVector(v, s) { this.x += v.x * s; this.y += v.y * s; this.z += v.z * s; return this; }
     length() { return Math.hypot(this.x, this.y, this.z); }
@@ -182,6 +184,8 @@ class MockQuaternion {
     setFromEuler(e) { return this; }
     slerp(q, t) { return this; }
     copy(q) { return this; }
+    invert() { return this; }
+    clone() { return new MockQuaternion(); }
 }
 
 class MockEuler {
@@ -845,6 +849,62 @@ circleTrack.dispose();
 // Test ADAS configuration presence
 assert(CONFIG.ASSIST.HOVERCAR_ADAS.WALL_REPULSION_DIST === 4.5, 'CONFIG defines ADAS wall repulsion distance (4.5m)');
 assert(CONFIG.ASSIST.HOVERCAR_ADAS.ESC_LATERAL_STABILITY === 0.92, 'CONFIG defines ADAS ESC lateral stability factor');
+
+// 18. Autopilot, Flight Assist, Altitude Hold & Full Sidebar Suite
+const { Autopilot } = await import('../js/engine/autopilot.js');
+const autoCopilot = new Autopilot();
+assert(autoCopilot.isOverridden === false, 'Autopilot initializes in non-overridden state');
+
+const assistInput = new InputManager();
+assert(assistInput.state.flyAssistEnabled === true, 'InputManager defaults flyAssistEnabled to true');
+assert(assistInput.state.altitudeHoldEnabled === false, 'InputManager defaults altitudeHoldEnabled to false');
+assert(assistInput.state.autopilotEnabled === false, 'InputManager defaults autopilotEnabled to false');
+assert(assistInput.state.hoverStopActive === false, 'InputManager defaults hoverStopActive to false');
+
+// Toggle Altitude Hold and step target altitude
+const altHoldActive = assistInput.toggleAltitudeHold(25.0);
+assert(altHoldActive === true && assistInput.state.altitudeHoldEnabled === true, 'toggleAltitudeHold engages altitude hold');
+assert(assistInput.state.targetAltitude === 25.0, 'toggleAltitudeHold captures current altitude');
+
+const steppedUp = assistInput.adjustTargetAltitude(5);
+assert(steppedUp === 30.0 && assistInput.state.targetAltitude === 30.0, 'adjustTargetAltitude steps altitude up (+5m)');
+
+const steppedDown = assistInput.adjustTargetAltitude(-10);
+assert(steppedDown === 20.0 && assistInput.state.targetAltitude === 20.0, 'adjustTargetAltitude steps altitude down (-10m)');
+
+// Toggle Hover Stop
+const stopActive = assistInput.toggleHoverStop();
+assert(stopActive === true && assistInput.state.hoverStopActive === true, 'toggleHoverStop engages emergency hover stop');
+assert(assistInput.state.autopilotEnabled === false, 'Hover stop disengages autopilot for safety');
+
+const stopReleased = assistInput.toggleHoverStop();
+assert(stopReleased === false && assistInput.state.hoverStopActive === false, 'toggleHoverStop releases hover stop');
+
+// Autopilot engagement and manual pilot override
+assistInput.toggleAutopilot();
+assert(assistInput.state.autopilotEnabled === true, 'toggleAutopilot engages autopilot');
+
+const testDrone = new Drone(scene, false);
+testDrone.position.set(0, 15, 0);
+
+// Run autopilot update with neutral manual controls
+autoCopilot.update(testDrone, assistInput.state, null, 1, null, 0.016);
+assert(autoCopilot.isOverridden === false, 'Autopilot navigates without override on hands-off flight');
+
+// Simulate manual pilot grab of the controls
+assistInput.state.steerYaw = 0.8;
+autoCopilot.update(testDrone, assistInput.state, null, 1, null, 0.016);
+assert(autoCopilot.isOverridden === true, 'Autopilot yields control when pilot grabs manual steering');
+
+// CustomizationSidebar All Tabs Switching
+sidebar.switchTab('manual');
+assert(sidebar.activeTab === 'manual', 'CustomizationSidebar switches to manual tab');
+sidebar.switchTab('settings');
+assert(sidebar.activeTab === 'settings', 'CustomizationSidebar switches to settings tab');
+sidebar.switchTab('sectors');
+assert(sidebar.activeTab === 'sectors', 'CustomizationSidebar switches to sectors tab');
+sidebar.switchTab('modes');
+assert(sidebar.activeTab === 'modes', 'CustomizationSidebar switches to modes tab');
 
     console.log(`\n========================================`);
     console.log(`ALL TESTS PASSED: ${passedTests}/${totalTests} ASSERTIONS VERIFIED`);

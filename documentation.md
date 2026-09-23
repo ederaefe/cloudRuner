@@ -266,5 +266,56 @@ This enables zero-latency P2P mesh synchronization via WebRTC DataChannels (`Pee
 * **Expanded Verification Suite (`scripts/test_engine.mjs`)**:
   * Added 9 automated assertions in Section 17 verifying neutral-stick hover stops, forward throttle acceleration, locked level pitch, circular ring geometry, aerial corridor guides, and ADAS stability parameters, bringing the total suite to 157 passing assertions.
 
+### Completed: Flight Kinematics Suite, LA Cyberpunk UI & All-in-One Customization Sidebar
+
+* **Zero-Allocation Autonomous Co-Pilot / Autopilot Engine (`js/engine/autopilot.js`, `index.html`)**:
+  * Added `Autopilot` autonomous navigation class operating with static pre-allocated vectors (`_toTarget`, `_localTarget`, `_invQuat`, `_avoidVec`) to guarantee zero GC stutter at 60–120 FPS.
+  * Navigates the spline track by looking ahead 38m along the spline or toward the upcoming floating holographic gate ring.
+  * Computes yaw steering setpoints and proportional pitch elevation alignment with dampening.
+  * Dynamically scans nearby skyscraper AABBs to bias the steering vector away from architectural obstacles.
+  * Seamless Hands-on Pilot Override: Yields control immediately when the player provides manual steering (`Math.abs(steerYaw) > 0.35`), pitch (`Math.abs(pitch) > 0.4`), or airbrake (`forward < -0.2`), resuming autonomous navigation smoothly 0.8s after pilot hands leave the controls.
+  * Hotkeys: `O` or `U` toggle Autopilot; status reflected on `#btn-hud-auto` and mobile `#btn-touch-auto`.
+
+* **Fixed Altitude Hold & Elevation Stepping (`js/engine/drone.js`, `js/input/input_manager.js`, `index.html`)**:
+  * Implemented PD altitude tracking controller in `Drone.stepPhysics`: computes error between `position.y` and `targetAltitude`, applying clamped vertical velocity with fallback exponential damping (`AUTO_ELEVATION_RATE = 6.0`).
+  * Captures current elevation automatically upon engagement if no target is specified.
+  * Incremental stepping hotkeys: `T` or `[` increases target altitude by +5m; `G` or `]` decreases target altitude by -5m.
+  * Dedicated HUD step controls: `#btn-hud-alt-down` (-5m), `#btn-hud-alt` (toggle), and `#btn-hud-alt-up` (+5m).
+  * Hotkey: `H` toggles altitude hold; status dynamically rendered on HUD and touch controls.
+
+* **VTOL Emergency Hover Stop Airbrake (`js/engine/drone.js`, `js/input/input_manager.js`, `index.html`)**:
+  * High-drag emergency deceleration protocol dumping forward momentum rapidly (`DECEL_RATE = 42.0 m/s^2`) down to an absolute 0 km/h stationary hover.
+  * Dynamically articulates VTOL nacelles to 90 degrees vertical hover pitch and extends landing skids.
+  * Station-keeping damping locks 3D velocity (`velocity.multiplyScalar(0.05)`).
+  * Automatically disengages autopilot for safety upon activation.
+  * Automatic throttle release: Applying forward or reverse thrust (`|forward| > 0.15`) instantly cancels hover stop and returns craft to manual flight.
+  * Hotkey: `B` toggles Hover Stop; touch button `#btn-touch-stop` provides instant haptic-vibrating airbrake.
+
+* **Flyer Assist Auto-Leveling & Proximity Deflection (`js/engine/stunt_fsm.js`, `js/engine/drone.js`)**:
+  * Active stability control damping roll and pitch excursions back to wings-level (`roll = 0.0, pitch = 0.0`) when manual controls are neutral.
+  * Soft facade proximity cushion: four raycast deflection vectors repel the airframe gently when skimming skyscraper walls without velocity loss.
+  * Hotkey: `J` toggles Fly Assist; status synced on `#btn-hud-assist` and `#btn-touch-assist`.
+
+* **"LA Cyberpunk Meets Slow Roads" Aesthetic & Unified Flight Deck (`css/game.css`, `index.html`)**:
+  * Redesigned visual palette with calm, authentic neo-noir tokens: Dusky Obsidian (`#070a10`), Tungsten Amber (`#f59e0b`), Marine Cyan (`#06b6d4`), and Muted Smog Lavender (`#64748b`).
+  * Eliminated the separate disruptive preloader modal (`#preload-screen { display: none !important; }`), integrating calibration progress into the live-rendered 3D flight deck.
+  * Replaced text-heavy mobile buttons with sleek, minimalist SVG vector icons (pure vector lines, zero emojis, zero sparkles icons).
+  * Glassmorphism avionics briefing card displaying active flight assist hotkeys and protocols directly within the launch deck.
+  * Non-blocking contextual toast stack (`#hud-toast-stack`) for alert pacing.
+
+* **All-in-One Customizations & Avionics Sidebar Drawer (`js/ui/sidebar.js`, `css/game.css`, `index.html`)**:
+  * Centralized drawer hub (`#customization-sidebar`) toggled via `TAB` key or the top HUD menu button (`#btn-toggle-sidebar`), backed by a blurred backdrop (`#sidebar-backdrop`).
+  * 6-tab navigation layout:
+    1. `MANUAL`: Full flight operation manual, explaining Autopilot hand-off, altitude hold stepping, VTOL stop, flight assist, and stunts.
+    2. `SETTINGS`: Graphics profiles (Auto/Tier 1/Tier 2/Tier 3), Slow Roads atmospheric skylines (`EVENING_GLOOMY`, `MORNING_CALM`, `NIGHT_NEON`), master volume, pitch invert, haptic vibration, and default assist toggles.
+    3. `HANGAR`: Grid of airframe skins with preview color swatches, cost badges, and equipping logic.
+    4. `UPGRADES`: Visual progress meters and upgrade purchasing for thrusters, nitro capacity, shields, and magnetic winch.
+    5. `SECTORS`: Campaign progression selector with status badges (Ready, Cleared, Climax, Locked).
+    6. `MODES`: Circuit Grand Prix, Cargo Solo, Cargo Versus AI, and Teamwork Squad selection.
+
+* **Automated Verification Harness Expansion (`scripts/test_engine.mjs`)**:
+  * Added Section 18 covering Autopilot instantiation, override timer, input manager assist flags, altitude hold toggling, target altitude stepping (+5m/-10m), emergency hover stop engagement and safety release, hands-on manual steering override, and CustomizationSidebar tab switching across all 6 panels.
+  * Total passing assertions expanded to **176/176** verified tests.
+
 
 
