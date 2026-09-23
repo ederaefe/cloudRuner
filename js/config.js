@@ -284,19 +284,19 @@ export const CONFIG = {
 
     // Aircraft Kinematics & Aerodynamics (Hovercar Configuration)
     FLIGHT: {
-        BASE_SPEED: 0.0, // Direct throttle: neutral stick idles at 0 km/h hover
+        BASE_SPEED: 0.0,       // Direct throttle: neutral stick idles at 0 km/h hover
         IDLE_SPEED: 0.0,
-        MAX_CRUISE_SPEED: 190.0,
-        REVERSE_SPEED: 45.0,
-        STAGE2_BOOST_SPEED: 250.0,
-        STAGE3_BOOST_SPEED: 320.0,
-        ACCELERATION: 85.0,
-        BRAKING_DECEL: 95.0,
+        MAX_CRUISE_SPEED: 95.0, // Comfortable hovercar cruise – feels grounded & controllable
+        REVERSE_SPEED: 25.0,
+        STAGE2_BOOST_SPEED: 140.0,
+        STAGE3_BOOST_SPEED: 190.0,
+        ACCELERATION: 42.0,    // Gradual build-up, not instant lunge
+        BRAKING_DECEL: 55.0,
         ROLL_RATE: 2.0,
-        PITCH_RATE: 0.0, // Pitch locked to 0 to prevent helicopter nose-dives
-        YAW_RATE: 2.8,
-        BANKING_TILT: 0.10, // Subtle aesthetic chassis lean (level horizon)
-        PITCH_TILT: 0.0, // Fixed level flight
+        PITCH_RATE: 0.0,       // Pitch locked to 0 – no helicopter nose-dives
+        YAW_RATE: 1.6,         // Smooth car-like heading changes, not snap turns
+        BANKING_TILT: 0.40,    // Pronounced chassis lean into turns (aircraft-like body roll)
+        PITCH_TILT: 0.0,       // Fixed level flight
         VERTICAL_THRUST: 38.0,
         INDUCED_DRAG: 0.032,
         DRAFTING_DISTANCE: 22.0,

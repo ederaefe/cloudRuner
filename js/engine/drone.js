@@ -565,36 +565,18 @@ export class Drone {
     }
 
     checkCourseRealignment(dt, trackBuilder) {
+        // In hovercar mode the player steers freely – the spline is a gate layout guide only.
+        // Realignment is handled by the out-of-bounds check in the animate loop instead.
         if (this.realignmentCooldown > 0) {
             this.realignmentCooldown -= dt;
-            return;
-        }
-
-        const spline = this.trackSpline || trackBuilder?.spline;
-        if (!spline) return;
-
-        const approxT = (this.splineProgress || 0) % 1.0;
-        const splinePt = spline.getPointAt(approxT);
-        const distSq = this.position.distanceToSquared(splinePt);
-
-        if (distSq > 2304) { // 48m threshold squared
-            const tangent = spline.getTangentAt(approxT).normalize();
-            this.position.copy(splinePt).addScaledVector(new THREE.Vector3(0, 1, 0), 3.0);
-            
-            _quatScratch.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
-            this.quaternion.copy(_quatScratch);
-            
-            const preserveSpeed = Math.max(28.0, this.velocity.length());
-            this.velocity.copy(tangent).multiplyScalar(preserveSpeed);
-
-            this.realignmentCooldown = 3.5;
-            this.emitStuntParticles('REALIGN');
         }
     }
 
     updateVisualEffects(dt) {
         const flightCfg = CONFIG.FLIGHT;
-        const cruiseRatio = Math.min(1.0, this.speedKmh / flightCfg.BASE_SPEED);
+        // Use MAX_CRUISE_SPEED as the reference (BASE_SPEED is 0 in hovercar mode)
+        const refSpeed = flightCfg.MAX_CRUISE_SPEED > 0 ? flightCfg.MAX_CRUISE_SPEED : 95.0;
+        const cruiseRatio = Math.min(1.0, this.speedKmh / refSpeed);
         this.targetNacelleAngle = THREE.MathUtils.lerp(Math.PI / 2.5, 0.0, cruiseRatio);
         
         // Smooth nacelle transition
