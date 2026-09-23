@@ -128,4 +128,31 @@ This enables zero-latency P2P mesh synchronization via WebRTC DataChannels (`Pee
   * *Aerobatic Stunt Aerodynamics*: In-depth tactical guide detailing Triple-Stage Nitro Overcharge sweet spots (>70%), Snap Aileron Roll hitbox compression (+22% Nitro), Knife-Edge slit slicing, Pugachev's Cobra airbrake flare (dumping 62% speed for hairpins), Near-Miss facade buzzing, AI Wingman energy tethering, and Magnetic Cargo Winch retrieval.
 * **Offline PWA & Test Verification**: Upgraded Service Worker cache to `barch-aero-v3`, pre-caching all new UI modules. Expanded `scripts/test_engine.mjs` to 102 automated assertions verifying all visual palettes, preloader transitions, sidebar state toggling, and controls guide lifecycle.
 
+### Completed: Engine Bug Bounty, Crash-Points & Fail-Safe Hardening Architecture
+* **Building Penetration Deflection & Near-Miss Facade Buzzing (`js/engine/track_builder.js`)**: Implemented zero-allocation AABB boundary penetration checks (`checkBuildingCollision`) for all urban canyon skyscrapers. When a drone penetrates an obstacle at high speeds (up to 320 km/h), the engine computes the surface reflection normal, pushes the hull cleanly outside the barrier, absorbs kinetic shock (`0.72x` velocity damping), triggers camera buffeting (`0.38` shake), emits collision spark particles, and alerts the pilot. When passing within 3.8m at >150 km/h, triggers dynamic Near-Miss Facade Buzzing with audio sonic crack, camera shake, and continuous Nitro cell recharge (+6%).
+* **Universal Input Architecture & Multi-Touch Capture Shield (`js/input/touch_controls.js`, `js/input/desktop_controls.js`)**:
+  * Decoupled desktop controls from touch device detection, ensuring hybrid 2-in-1 laptops, tablets with hardware keyboards, and gamepads function seamlessly alongside touch controls.
+  * Globalized pointer movement and release listeners across `window` in `TouchControls`, eliminating virtual stick drops and sticky throttle when fingers slide beyond the visual touchpad boundary.
+  * Prevented mobile browser long-press context menu freezes via `contextmenu` suppression and added automatic touch/key cancellation on `window.blur` and `touchcancel`.
+* **Mobile Safari / WebKit Audio Context Auto-Resume & Mute Engine (`js/audio/sound_engine.js`)**:
+  * Implemented `toggle()` with seamless gain ramp muting between 0.8 and 0.0 and engine telemetry gain suppression to conserve mobile CPU.
+  * Handled mobile Safari `'interrupted'` audio context state and added 1-sample silent Web Audio buffer playback during user touch gestures to reliably unlock iOS audio sessions.
+  * Added one-time gesture auto-resume fallback when returning to the tab via `visibilitychange`.
+* **Aerobatic Stunt FSM Heading & Course Realignment Synchronization (`js/engine/stunt_fsm.js`, `index.html`)**:
+  * Ensured `stuntFsm.syncWithQuaternion()` is called during sector startup and out-of-bounds course realignment, preventing orientation whiplash from resetting yaw to 0 on frame 1.
+  * Hardened out-of-bounds boundary detection using `!Number.isFinite(...)` across all 3D axes, enforcing radial track clamping (<680m), lower floor limit (y < -65m), and vertical ceiling limit (y > 380m) with safe fallback to origin if gates are unavailable.
+* **WebGL Context Loss Memory & Shader State Restoration (`index.html`)**:
+  * Preserved the pre-loss game state and restored it smoothly upon `webglcontextrestored` without inappropriately forcing an uninitialized `RACING` state.
+  * Traversed scene hierarchy on context restoration to mark all mesh and instanced materials with `needsUpdate = true`, prompting clean shader recompilation.
+* **Zero-Allocation Render Loop & Point Size Attenuation (`js/engine/particle_system.js`, `index.html`)**:
+  * Replaced per-frame `new THREE.Vector3` heap allocations with static scratch vectors.
+  * Clamped GPU shader point size divisor to avoid divide-by-zero / NaN pipeline crashes on mobile GPUs.
+  * Integrated forward particle positions via `velocity * dt` on update, reducing GPU attribute re-uploads to active position and lifetime channels.
+* **Direct Deep-Link URL Routing (`index.html`, `vercel.json`)**:
+  * Updated router to inspect `window.location.pathname` for direct `/boost` (overcharge nitro) and `/teamwork-preview` (squad escort mode) access.
+  * Configured Vercel SPA rewrites for direct clean URLs without 404 routing errors.
+* **Automated Verification Suite Expansion (`scripts/test_engine.mjs`)**:
+  * Expanded automated test harness to 124 assertions verifying audio toggles, keyboard blur resets, touch release failsafes, stunt quaternion synchronization, building collision deflection, particle kinematics, out-of-bounds validators, and direct pathname routes with exit code 0.
+
+
 

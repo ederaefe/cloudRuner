@@ -24,6 +24,46 @@ global.window = {
     removeEventListener: () => {},
     location: { hash: '', search: '', pathname: '/' }
 };
+
+class MockAudioParam {
+    constructor(val = 1) { this.value = val; }
+    setValueAtTime(v) { this.value = v; }
+    setTargetAtTime(v) { this.value = v; }
+    exponentialRampToValueAtTime(v) { this.value = v; }
+    linearRampToValueAtTime(v) { this.value = v; }
+}
+
+class MockAudioNode {
+    constructor() {
+        this.gain = new MockAudioParam(1);
+        this.frequency = new MockAudioParam(440);
+        this.detune = new MockAudioParam(0);
+        this.Q = new MockAudioParam(1);
+    }
+    connect() {}
+    disconnect() {}
+    start() {}
+    stop() {}
+}
+
+class MockAudioContext {
+    constructor() {
+        this.state = 'running';
+        this.currentTime = 0;
+        this.sampleRate = 44100;
+        this.destination = new MockAudioNode();
+    }
+    createGain() { return new MockAudioNode(); }
+    createOscillator() { return new MockAudioNode(); }
+    createBiquadFilter() { return new MockAudioNode(); }
+    createBuffer(ch, len, sr) { return { getChannelData: () => new Float32Array(len) }; }
+    createBufferSource() { return new MockAudioNode(); }
+    resume() { this.state = 'running'; return Promise.resolve(); }
+    suspend() { this.state = 'suspended'; return Promise.resolve(); }
+}
+
+global.window.AudioContext = MockAudioContext;
+global.AudioContext = MockAudioContext;
 Object.defineProperty(globalThis, 'navigator', {
     value: {
         hardwareConcurrency: 8,
@@ -146,6 +186,10 @@ class MockEuler {
     }
     set(x, y, z, order) {
         this.x = x; this.y = y; this.z = z; this.order = order || this.order;
+        return this;
+    }
+    setFromQuaternion(q, order) {
+        this.order = order || this.order;
         return this;
     }
 }
@@ -599,23 +643,25 @@ const toggledOn = soundEngine.toggle();
 assert(toggledOn === true && soundEngine.enabled === true, 'SoundEngine.toggle() un-mutes audio and enables engine');
 
 // 16.2 Desktop Controls Blur Reset
-desktopControls.keys['w'] = true;
-desktopControls.keys[' '] = true;
-inputManager.state.isNitroHeld = true;
-desktopControls.resetKeys();
-assert(Object.keys(desktopControls.keys).length === 0, 'DesktopControls.resetKeys() clears all active keyboard keys');
-assert(inputManager.state.isNitroHeld === false, 'DesktopControls.resetKeys() unlatches nitro hold');
+const { DesktopControls } = await import('../js/input/desktop_controls.js');
+const dtControls = new DesktopControls(input);
+dtControls.keys['w'] = true;
+dtControls.keys[' '] = true;
+input.state.isNitroHeld = true;
+dtControls.resetKeys();
+assert(Object.keys(dtControls.keys).length === 0, 'DesktopControls.resetKeys() clears all active keyboard keys');
+assert(input.state.isNitroHeld === false, 'DesktopControls.resetKeys() unlatches nitro hold');
 
 // 16.3 Touch Controls Multi-Touch & Safe Interruption Release
-const touch = new TouchControls(inputManager);
+const touch = new TouchControls(input);
 touch.stickPointerId = 99;
-inputManager.state.steerYaw = 0.8;
-inputManager.state.forward = 1.0;
-inputManager.state.isNitroHeld = true;
+input.state.steerYaw = 0.8;
+input.state.forward = 1.0;
+input.state.isNitroHeld = true;
 touch.releaseAll();
 assert(touch.stickPointerId === null, 'TouchControls.releaseAll() clears active pointer capture id');
-assert(inputManager.state.steerYaw === 0 && inputManager.state.forward === 0, 'TouchControls.releaseAll() resets steering and forward thrust to 0');
-assert(inputManager.state.isNitroHeld === false, 'TouchControls.releaseAll() clears nitro hold');
+assert(input.state.steerYaw === 0 && input.state.forward === 0, 'TouchControls.releaseAll() resets steering and forward thrust to 0');
+assert(input.state.isNitroHeld === false, 'TouchControls.releaseAll() clears nitro hold');
 
 // 16.4 StuntFSM Quaternion Synchronization at Start & Realignment
 const syncEuler = new MockEuler(0, 0, 0);
