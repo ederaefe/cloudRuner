@@ -38,6 +38,8 @@ export class CustomizationSidebar {
         this.tabPanels = document.querySelectorAll('.sidebar-tab-panel');
 
         // Container Elements
+        this.manualContainer = document.getElementById('sidebar-manual-content');
+        this.settingsContainer = document.getElementById('sidebar-settings-content');
         this.skinsContainer = document.getElementById('sidebar-skins-list');
         this.upgradesContainer = document.getElementById('sidebar-upgrades-list');
         this.sectorsContainer = document.getElementById('sidebar-sectors-list');
@@ -127,10 +129,147 @@ export class CustomizationSidebar {
 
     renderAll() {
         this.renderHeader();
+        this.renderManual();
+        this.renderSettings();
         this.renderSkins();
         this.renderUpgrades();
         this.renderSectors();
         this.renderModes();
+    }
+
+    renderManual() {
+        if (!this.manualContainer) return;
+        this.manualContainer.innerHTML = `
+            <div class="manual-card">
+                <div class="manual-title">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>
+                    AUTOPILOT HAND-OFF MODE <span class="manual-key">O</span> <span class="manual-key">U</span>
+                </div>
+                <div class="manual-desc">
+                    Hands-off autonomous navigation. When engaged, the browser navigates the spline track, hits checkpoint gates, avoids skyscrapers, and modulates throttle and boost. Touching manual steering immediately overrides.
+                </div>
+            </div>
+
+            <div class="manual-card">
+                <div class="manual-title">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="8 7 12 3 16 7"/><polyline points="8 17 12 21 16 17"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    FIXED ALTITUDE HOLD <span class="manual-key">H</span> (ADJUST: <span class="manual-key">T</span>/<span class="manual-key">G</span> or <span class="manual-key">[</span>/<span class="manual-key">]</span>)
+                </div>
+                <div class="manual-desc">
+                    Locks elevation to current or target altitude with PD thrust damping. Step target altitude up/down by 5 meters using hotkeys or the in-flight HUD step buttons.
+                </div>
+            </div>
+
+            <div class="manual-card">
+                <div class="manual-title">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><rect x="9" y="9" width="6" height="6" fill="currentColor"/></svg>
+                    VTOL HOVER STOP AIRBRAKE <span class="manual-key">B</span>
+                </div>
+                <div class="manual-desc">
+                    Emergency full stop. Dumps forward momentum to 0 km/h rapidly, articulates tilt-nacelles to 90 degrees vertical hover, extends landing gear, and locks 3D station-keeping. Applying throttle immediately resumes flight.
+                </div>
+            </div>
+
+            <div class="manual-card">
+                <div class="manual-title">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/><polyline points="9 12 11 14 15 10"/></svg>
+                    FLIGHT ASSIST & AUTO-LEVELING <span class="manual-key">J</span>
+                </div>
+                <div class="manual-desc">
+                    Active roll and pitch stabilization dampens oversteer and restores wings level when controls are released. Includes soft building facade proximity deflection.
+                </div>
+            </div>
+
+            <div class="manual-card">
+                <div class="manual-title">FLIGHT KINEMATICS & OVERDRIVE</div>
+                <div class="manual-desc">
+                    <span class="manual-key">W</span> / <span class="manual-key">S</span> Throttle & Pitch<br>
+                    <span class="manual-key">A</span> / <span class="manual-key">D</span> Steer & Banking Roll<br>
+                    <span class="manual-key">SPACE</span> Afterburner & Hyper-Overdrive<br>
+                    <span class="manual-key">Q</span> / <span class="manual-key">E</span> Snap Aileron Rolls (+22% Nitro)<br>
+                    <span class="manual-key">C</span> Knife-Edge Flight (Hold 90 deg bank)<br>
+                    <span class="manual-key">X</span> Cobra Airbrake (-62% speed dump)
+                </div>
+            </div>
+        `;
+    }
+
+    renderSettings() {
+        if (!this.settingsContainer) return;
+        this.settingsContainer.innerHTML = `
+            <div class="sidebar-settings-group">
+                <div class="sidebar-setting-item">
+                    <span class="sidebar-setting-label">GRAPHICS PROFILE</span>
+                    <select id="sidebar-setting-graphics" class="settings-select" style="background:#0c111a; border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:6px; padding:4px 8px; font-family:inherit;">
+                        <option value="AUTO">AUTO-DETECT</option>
+                        <option value="1">TIER 1 (MOBILE LOW)</option>
+                        <option value="2">TIER 2 (MID-RANGE)</option>
+                        <option value="3">TIER 3 (DESKTOP ULTRA)</option>
+                    </select>
+                </div>
+
+                <div class="sidebar-setting-item">
+                    <span class="sidebar-setting-label">ATMOSPHERIC SKYLINE</span>
+                    <select id="sidebar-setting-skyline" class="settings-select" style="background:#0c111a; border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:6px; padding:4px 8px; font-family:inherit;">
+                        <option value="EVENING_GLOOMY">EVENING GLOOMY (DUSK)</option>
+                        <option value="MORNING_CALM">MORNING BRIGHT (DAWN)</option>
+                        <option value="NIGHT_NEON">NIGHT NEON (CYBERPUNK)</option>
+                    </select>
+                </div>
+
+                <div class="sidebar-setting-item">
+                    <span class="sidebar-setting-label">MASTER AUDIO</span>
+                    <input type="range" id="sidebar-slider-audio" min="0" max="1" step="0.05" value="0.8" style="accent-color:var(--cyber-cyan); width:100px;">
+                </div>
+
+                <div class="sidebar-setting-item">
+                    <span class="sidebar-setting-label">INVERT PITCH</span>
+                    <input type="checkbox" id="sidebar-chk-invert" style="accent-color:var(--cyber-cyan); width:18px; height:18px;">
+                </div>
+
+                <div class="sidebar-setting-item">
+                    <span class="sidebar-setting-label">HAPTIC VIBRATION</span>
+                    <input type="checkbox" id="sidebar-chk-haptic" checked style="accent-color:var(--cyber-cyan); width:18px; height:18px;">
+                </div>
+
+                <div class="sidebar-setting-item">
+                    <span class="sidebar-setting-label">DEFAULT FLIGHT ASSIST</span>
+                    <input type="checkbox" id="sidebar-chk-assist" checked style="accent-color:var(--cyber-cyan); width:18px; height:18px;">
+                </div>
+            </div>
+        `;
+
+        const selSky = document.getElementById('sidebar-setting-skyline');
+        if (selSky) {
+            selSky.value = window._activeSkylineId || 'EVENING_GLOOMY';
+            selSky.addEventListener('change', (e) => {
+                if (window._setAtmosphericSkyline) window._setAtmosphericSkyline(e.target.value);
+            });
+        }
+
+        const chkInvert = document.getElementById('sidebar-chk-invert');
+        if (chkInvert) {
+            chkInvert.checked = !!window._invertPitch;
+            chkInvert.addEventListener('change', (e) => {
+                window._invertPitch = e.target.checked;
+            });
+        }
+
+        const chkHaptic = document.getElementById('sidebar-chk-haptic');
+        if (chkHaptic) {
+            chkHaptic.checked = window._hapticEnabled !== false;
+            chkHaptic.addEventListener('change', (e) => {
+                window._hapticEnabled = e.target.checked;
+            });
+        }
+
+        const chkAssist = document.getElementById('sidebar-chk-assist');
+        if (chkAssist && window._inputManager) {
+            chkAssist.checked = window._inputManager.state.flyAssistEnabled;
+            chkAssist.addEventListener('change', (e) => {
+                window._inputManager.state.flyAssistEnabled = e.target.checked;
+            });
+        }
     }
 
     renderHeader() {

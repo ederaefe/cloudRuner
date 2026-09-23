@@ -69,10 +69,34 @@
             <span id="lap-or-target-label" class="telemetry-label">LAP</span>
             <div id="hud-lap" class="telemetry-value">1 / 2</div>
         </div>
-        <button id="btn-toggle-sidebar" class="hud-quick-btn" data-tooltip="Open Hangar, Upgrades & Mission Customizations (TAB)" data-tooltip-pos="bottom">CUSTOMIZE [TAB]</button>
-        <button id="btn-pause-game" data-tooltip="Pause Game & Flight Systems (ESC)" data-tooltip-pos="bottom" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:6px 12px; font-weight:800; font-family:inherit; cursor:pointer;">PAUSE</button>
-        <button id="btn-audio-toggle" data-tooltip="Toggle Master Turbine & Sound Effects" data-tooltip-pos="bottom" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:6px 10px; font-weight:800; font-family:inherit; cursor:pointer;">AUDIO: OFF</button>
+        <button id="btn-toggle-sidebar" class="hud-quick-btn" data-tooltip="Open Hangar, Manual & Settings (TAB)" data-tooltip-pos="bottom">MENU [TAB]</button>
+        <button id="btn-pause-game" data-tooltip="Pause Game & Flight Systems (ESC)" data-tooltip-pos="bottom" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; border-radius:8px; padding:6px 12px; font-weight:800; font-family:inherit; cursor:pointer;">PAUSE</button>
+        <button id="btn-audio-toggle" data-tooltip="Toggle Master Turbine & Sound Effects" data-tooltip-pos="bottom" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; border-radius:8px; padding:6px 10px; font-weight:800; font-family:inherit; cursor:pointer;">AUDIO: OFF</button>
     </div>
+</div>
+
+<!-- Tactical Flight Assist Bar -->
+<div id="assist-control-bar" class="assist-control-bar">
+    <button id="btn-hud-auto" class="assist-pill-btn" data-tooltip="Autopilot Hand-off (O): Browser flies autonomously" data-tooltip-pos="bottom">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>
+        <span id="hud-auto-label">AUTOPILOT [O]</span>
+    </button>
+    <div class="alt-hold-group">
+        <button id="btn-hud-alt-down" class="assist-step-btn" title="Altitude -5m (G or [)">-</button>
+        <button id="btn-hud-alt" class="assist-pill-btn" data-tooltip="Fixed Altitude Hold (H): Lock elevation" data-tooltip-pos="bottom">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="8 7 12 3 16 7"/><polyline points="8 17 12 21 16 17"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span id="hud-alt-hold-label">ALT HOLD: OFF</span>
+        </button>
+        <button id="btn-hud-alt-up" class="assist-step-btn" title="Altitude +5m (T or ])">+</button>
+    </div>
+    <button id="btn-hud-stop" class="assist-pill-btn btn-pill-stop" data-tooltip="VTOL Hover Stop (B): Emergency airbrake & hover in place" data-tooltip-pos="bottom">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><rect x="9" y="9" width="6" height="6" fill="currentColor"/></svg>
+        <span>HOVER STOP [B]</span>
+    </button>
+    <button id="btn-hud-assist" class="assist-pill-btn active" data-tooltip="Flight Assist (J): Stability & wall repulsion" data-tooltip-pos="bottom">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/><polyline points="9 12 11 14 15 10"/></svg>
+        <span id="hud-assist-label">ASSIST: ON [J]</span>
+    </button>
 </div>
 
 <!-- Non-Blocking Contextual Notification Toast Stack (Task 35) -->
@@ -101,69 +125,121 @@
     <div id="stunt-bonus-txt" class="stunt-bonus">+22% NITRO</div>
 </div>
 
-<!-- Mobile Touch Controls Overlay -->
+<!-- Mobile Touch Controls Overlay (Minimalist Icon-Driven) -->
 <div id="touch-controls">
     <div id="touch-stick-zone" class="touch-stick-zone">
         <div id="touch-stick-knob" class="touch-stick-knob"></div>
     </div>
 
     <div class="touch-action-pad">
-        <button id="btn-touch-roll-l" class="touch-btn">ROLL L</button>
-        <button id="btn-touch-roll-r" class="touch-btn">ROLL R</button>
-        <button id="btn-touch-knife" class="touch-btn">KNIFE</button>
-        <button id="btn-touch-cobra" class="touch-btn">COBRA</button>
-        <button id="btn-touch-boost" class="touch-btn touch-btn-boost" style="grid-column: span 2; width: 100%; height: 50px;">NITRO BOOST</button>
+        <!-- Top Assist Row -->
+        <button id="btn-touch-assist" class="touch-icon-btn active" title="Flight Assist (J)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/><polyline points="9 12 11 14 15 10"/></svg>
+        </button>
+        <button id="btn-touch-alt" class="touch-icon-btn" title="Altitude Hold (H)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="8 7 12 3 16 7"/><polyline points="8 17 12 21 16 17"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <button id="btn-touch-auto" class="touch-icon-btn" title="Autopilot (O)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>
+        </button>
+        <button id="btn-touch-stop" class="touch-icon-btn touch-btn-stop" title="VTOL Hover Stop (B)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><rect x="9" y="9" width="6" height="6" fill="currentColor"/></svg>
+        </button>
+
+        <!-- Stunts Row -->
+        <button id="btn-touch-roll-l" class="touch-icon-btn" title="Roll Left (Q)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><polyline points="3 3 3 8 8 8"/></svg>
+        </button>
+        <button id="btn-touch-roll-r" class="touch-icon-btn" title="Roll Right (E)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><polyline points="21 3 21 8 16 8"/></svg>
+        </button>
+        <button id="btn-touch-knife" class="touch-icon-btn" title="Knife-Edge Flight (C)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="20" x2="20" y2="4"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <button id="btn-touch-cobra" class="touch-icon-btn" title="Cobra Airbrake (X)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>
+        </button>
+
+        <!-- Wide Nitro Boost Button -->
+        <button id="btn-touch-boost" class="touch-btn touch-btn-boost" style="grid-column: span 4; width: 100%; height: 44px;" title="Nitro Boost">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c1 3-2 5-2 8 0 2.2 1.8 4 4 4s4-1.8 4-4c0-4-3-6-3-8-1 1-1.5 2-1.5 3 0 1-.5 1.5-1.5 1.5-1 0-1.5-.5-1.5-1.5 0-1.2.6-2.2 1.5-3z"/><path d="M8.5 14c-1.5 1-2.5 2.7-2.5 4.5 0 3.3 2.7 5.5 6 5.5s6-2.2 6-5.5c0-1.8-1-3.5-2.5-4.5"/></svg>
+        </button>
     </div>
 </div>
 
-<!-- Briefing & Mode Launch Modal -->
+<!-- Unified Cinematic Intro Flight Deck -->
 <div id="start-modal" class="overlay-screen">
-    <div class="glass-modal" style="max-width: 500px;">
-        <h1>Aero-Canyon Racing</h1>
-        <p style="font-size: 13px; color: #aaccff; margin-bottom: 8px; letter-spacing: 0.5px;">HIGH-VELOCITY INDUSTRIAL VTOL FLIGHT</p>
+    <div class="glass-modal" style="max-width: 520px;">
+        <h1>BARCH AERO-CANYON</h1>
+        <p style="font-size: 12px; color: var(--cyber-text-dim); margin-bottom: 8px; letter-spacing: 0.1em;">CALM CYBERPUNK INDUSTRIAL VTOL FLIGHT</p>
 
         <!-- Mode Select Tabs -->
-        <div style="font-size:11px; font-weight:800; color:rgba(255,255,255,0.6); text-align:left;">SELECT MISSION MODE</div>
+        <div style="font-size:10px; font-weight:800; color:rgba(255,255,255,0.6); text-align:left; letter-spacing:0.08em;">MISSION MODE</div>
         <div class="mode-row">
-            <button class="mode-select-btn active" data-mode="CIRCUIT_RACE">CIRCUIT GRAND PRIX</button>
+            <button class="mode-select-btn active" data-mode="CIRCUIT_RACE">CIRCUIT GP</button>
             <button class="mode-select-btn" data-mode="EXTRACTION_SOLO">CARGO SOLO</button>
-            <button class="mode-select-btn" data-mode="EXTRACTION_VERSUS">CARGO VERSUS AI</button>
-            <button class="mode-select-btn" data-mode="TEAMWORK_COOP">TEAMWORK SQUAD</button>
-        </div>
-        <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:11px; padding:0 2px;">
-            <a href="#boost" id="link-route-boost" style="color:var(--nitro-amber); text-decoration:none; font-weight:800;">[OVERCHARGE /BOOST]</a>
-            <a href="#teamwork-preview" id="link-route-teamwork" style="color:var(--hyper-cyan); text-decoration:none; font-weight:800;">[PREVIEW /TEAMWORK]</a>
+            <button class="mode-select-btn" data-mode="EXTRACTION_VERSUS">CARGO VERSUS</button>
+            <button class="mode-select-btn" data-mode="TEAMWORK_COOP">TEAM SQUAD</button>
         </div>
 
         <!-- Sector Level Cards -->
-        <div style="font-size:11px; font-weight:800; color:rgba(255,255,255,0.6); text-align:left; margin-top:8px;">CAMPAIGN SECTOR</div>
+        <div style="font-size:10px; font-weight:800; color:rgba(255,255,255,0.6); text-align:left; margin-top:6px; letter-spacing:0.08em;">CAMPAIGN SECTOR</div>
         <div class="sector-row" id="sector-selection-list">
             <!-- Dynamically populated from CONFIG.SECTORS by HangarSettingsManager -->
         </div>
 
-        <!-- Slow Roads Inspired Atmospheric Skyline Presets -->
-        <div style="font-size:11px; font-weight:800; color:rgba(255,255,255,0.6); text-align:left; margin-top:8px;">ATMOSPHERIC SKYLINE</div>
-        <div class="skyline-row" id="skyline-selection-list" style="display:flex; gap:6px; margin: 4px 0 10px 0;">
+        <!-- Slow Roads Atmospheric Skyline Presets -->
+        <div style="font-size:10px; font-weight:800; color:rgba(255,255,255,0.6); text-align:left; margin-top:6px; letter-spacing:0.08em;">ATMOSPHERIC SKYLINE</div>
+        <div class="skyline-row" id="skyline-selection-list" style="display:flex; gap:6px; margin: 4px 0 8px 0;">
             <button class="mode-select-btn" data-sky="MORNING_CALM" style="font-size:10px; padding:6px 8px;">MORNING BRIGHT</button>
             <button class="mode-select-btn active" data-sky="EVENING_GLOOMY" style="font-size:10px; padding:6px 8px;">EVENING GLOOMY</button>
             <button class="mode-select-btn" data-sky="NIGHT_NEON" style="font-size:10px; padding:6px 8px;">NIGHT NEON</button>
         </div>
 
-        <div style="display:flex; gap:8px; margin: 14px 0 10px 0;">
-            <button id="btn-open-sidebar-menu" class="cta-button" data-tooltip="Open Drone Hangar & Customization Drawer" style="background:rgba(0,255,255,0.18); border:1px solid #00ffff; color:#00ffff; flex:1;">CUSTOMIZE [TAB]</button>
-            <button id="btn-open-help" class="cta-button" data-tooltip="View Flight Academy & Keyboard Controls" style="background:rgba(255,255,255,0.12); flex:1;">CONTROLS</button>
-            <button id="btn-open-settings" class="cta-button" data-tooltip="Adjust Graphics, Audio & Flight Sensitivity" style="background:rgba(255,255,255,0.12); flex:1;">SETTINGS</button>
+        <!-- Pre-Flight Avionics & Assist Briefing Card -->
+        <div class="avionics-card">
+            <div style="font-size:11px; font-weight:800; color:#fff; letter-spacing:0.08em;">AVIONICS & FLIGHT ASSIST PROTOCOLS</div>
+            <div class="avionics-grid">
+                <div class="avionics-item">
+                    <span class="avionics-badge">AUTOPILOT [O]</span>
+                    <span class="avionics-desc">Hands-off browser flight along spline & gates</span>
+                </div>
+                <div class="avionics-item">
+                    <span class="avionics-badge">ALT HOLD [H]</span>
+                    <span class="avionics-desc">Locks altitude (T / G or [ / ] adjust +/-5m)</span>
+                </div>
+                <div class="avionics-item">
+                    <span class="avionics-badge">HOVER STOP [B]</span>
+                    <span class="avionics-desc">Emergency full airbrake & station-keeping hover</span>
+                </div>
+                <div class="avionics-item">
+                    <span class="avionics-badge">FLIGHT ASSIST [J]</span>
+                    <span class="avionics-desc">Active auto-leveling & facade deflection</span>
+                </div>
+            </div>
         </div>
 
-        <div style="display:flex; gap:8px; margin-bottom:8px;">
-            <button id="btn-copy-flight-link" class="cta-button" data-tooltip="Copy Direct URL with Sector & Mode Parameters" style="background:rgba(255,255,255,0.10); border:1px solid rgba(255,255,255,0.25); font-size:12px; flex:1;">SHARE FLIGHT LINK</button>
-            <label class="cta-button" data-tooltip="Import Recorded .aeroghost Flight Telemetry File" style="background:rgba(0,255,255,0.12); border:1px solid rgba(0,255,255,0.4); font-size:12px; flex:1; cursor:pointer; display:flex; align-items:center; justify-content:center;">
-                LOAD .AEROGHOST
+        <!-- Calibration Progress Ticker -->
+        <div class="calibration-ticker">
+            <div class="calibration-bar-track">
+                <div id="preload-bar-fill" class="calibration-bar-fill"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:10px; font-weight:800; color:var(--cyber-text-dim);">
+                <span id="preload-status-txt">CALIBRATING AVIONICS...</span>
+                <span id="preload-percent-txt" style="color:var(--cyber-cyan);">100%</span>
+            </div>
+        </div>
+
+        <div style="display:flex; gap:8px; margin: 8px 0 10px 0;">
+            <button id="btn-open-sidebar-menu" class="cta-button" data-tooltip="Open Tactical Hangar, Manual & Settings (TAB)" style="background:rgba(6,182,212,0.18); border:1px solid var(--cyber-cyan); color:var(--cyber-cyan); flex:1; font-size:12px; padding:10px;">ALL-IN-ONE MENU [TAB]</button>
+            <button id="btn-copy-flight-link" class="cta-button" data-tooltip="Copy Direct URL with Sector & Mode Parameters" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); font-size:12px; flex:1; padding:10px;">SHARE LINK</button>
+            <label class="cta-button" data-tooltip="Import Recorded .aeroghost Flight Telemetry File" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2); font-size:12px; flex:1; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:10px;">
+                LOAD GHOST
                 <input type="file" id="input-ghost-file" accept=".aeroghost,.json" style="display:none;">
             </label>
         </div>
 
-        <button id="btn-launch-race" class="cta-button" data-tooltip="Engage VTOL Rotors & Launch Mission" style="background:linear-gradient(135deg, var(--primary-teal), #075251); font-size:17px;">LAUNCH MISSION</button>
+        <button id="btn-launch-race" class="cta-button ready-pulse" data-tooltip="Engage VTOL Rotors & Launch Mission" style="font-size:16px;">LAUNCH FLIGHT</button>
         <div id="tier-display-badge" class="tier-indicator">HARDWARE PROFILE: DETECTING...</div>
     </div>
 </div>
@@ -1035,8 +1111,9 @@ window.addEventListener('load', () => {
             maxSpeedInRace = Math.max(maxSpeedInRace, playerDrone.speedKmh);
             checkDRS(dt * 1000);
 
-            // Update Player Physics with Fixed-Timestep Accumulator and Track context
+            // Update Player Physics with Fixed-Timestep Accumulator, ADAS gate tracking, and Track context
             const inputState = inputManager.getState();
+            playerDrone.nextGateIndex = nextGateIndex;
             playerDrone.updatePhysics(inputState, stuntFsm, dt, track);
 
             // Atmospheric turbulence check (Task 6)

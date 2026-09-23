@@ -296,165 +296,67 @@ export class TrackBuilder {
     }
 
     createTrackRibbon() {
-        // Extrude a dual-rail energy track ribbon along the spline
-        const segments = 240;
-        const width = CONFIG.TRACK.RIBBON_WIDTH;
-
-        const ribbonGeo = new THREE.BufferGeometry();
-        const positions = [];
-        const uvs = [];
-        const indices = [];
-
-        for (let i = 0; i <= segments; i++) {
-            const t = i / segments;
-            const pt = this.spline.getPointAt(t);
-            const tangent = this.spline.getTangentAt(t).normalize();
-            
-            // Task 3: Calculate curvature and banking angle for superelevation
-            const nextT = Math.min(1.0, t + 0.005);
-            const nextTangent = this.spline.getTangentAt(nextT).normalize();
-            const turnRate = (nextTangent.x * tangent.z - nextTangent.z * tangent.x) / 0.005;
-            const bankAngle = Math.max(-0.55, Math.min(0.55, turnRate * 0.4));
-            
-            const localUp = _up.clone().applyAxisAngle(tangent, bankAngle);
-            _normal.crossVectors(tangent, localUp).normalize();
-
-            // Left and right track edge coordinates
-            const pL = pt.clone().addScaledVector(_normal, -width / 2);
-            const pR = pt.clone().addScaledVector(_normal, width / 2);
-
-            positions.push(pL.x, pL.y, pL.z);
-            positions.push(pR.x, pR.y, pR.z);
-
-            const v = (i / segments) * 60.0;
-            uvs.push(0, v);
-            uvs.push(1, v);
-
-            if (i < segments) {
-                const base = i * 2;
-                indices.push(base, base + 1, base + 2);
-                indices.push(base + 1, base + 3, base + 2);
-            }
-        }
-
-        ribbonGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        ribbonGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-        ribbonGeo.setIndex(indices);
-        ribbonGeo.computeVertexNormals();
-
-        // High-tech procedural track ribbon texture with directional speed chevrons
+        // Open-air aerial flight guides linking floating circles (replaces solid roadbed)
+        const segments = 180;
         const trackEmissiveHex = (this.sector.trackEmissive !== undefined) ? this.sector.trackEmissive : 0x00f0ff;
-        const trackEmissiveRgb = '#' + trackEmissiveHex.toString(16).padStart(6, '0');
         const trackEdgeHex = (this.sector.trackEdge !== undefined) ? this.sector.trackEdge : 0x0E7C7B;
-        const trackEdgeRgb = '#' + trackEdgeHex.toString(16).padStart(6, '0');
 
-        this.trackTexture = createProceduralTexture(128, 256, (ctx, w, h) => {
-            // Dark carbon roadbed base
-            ctx.fillStyle = '#090d16';
-            ctx.fillRect(0, 0, w, h);
+        const centerPts = [];
+        const upperPts = [];
+        const lowerPts = [];
 
-            // Subtle carbon-weave pattern
-            ctx.fillStyle = '#0f1724';
-            for (let y = 0; y < h; y += 4) {
-                ctx.fillRect(0, y, w, 2);
-            }
-
-            // Luminous neon side boundaries
-            ctx.fillStyle = trackEdgeRgb;
-            ctx.fillRect(0, 0, 8, h);
-            ctx.fillRect(w - 8, 0, 8, h);
-
-            // Center lane energy channel
-            ctx.fillStyle = '#06101d';
-            ctx.fillRect(w * 0.5 - 18, 0, 36, h);
-
-            // Glowing directional chevrons (forward motion indicator)
-            ctx.strokeStyle = trackEmissiveRgb;
-            ctx.lineWidth = 5;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-
-            const numChevrons = 4;
-            const spacing = h / numChevrons;
-            for (let c = 0; c < numChevrons; c++) {
-                const cy = c * spacing + spacing * 0.5;
-                ctx.beginPath();
-                ctx.moveTo(w * 0.5 - 14, cy - 10);
-                ctx.lineTo(w * 0.5, cy + 6);
-                ctx.lineTo(w * 0.5 + 14, cy - 10);
-                ctx.stroke();
-            }
-
-            // High-intensity core glow
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
-            for (let c = 0; c < numChevrons; c++) {
-                const cy = c * spacing + spacing * 0.5;
-                ctx.beginPath();
-                ctx.moveTo(w * 0.5 - 12, cy - 9);
-                ctx.lineTo(w * 0.5, cy + 5);
-                ctx.lineTo(w * 0.5 + 12, cy - 9);
-                ctx.stroke();
-            }
-        });
-
-        if (this.trackTexture) {
-            this.trackTexture.repeat.set(1, 1);
-        }
-
-        this.trackMaterial = new THREE.MeshStandardMaterial({
-            color: 0xffffff,
-            map: this.trackTexture,
-            roughness: 0.35,
-            metalness: 0.65,
-            side: THREE.DoubleSide
-        });
-
-        const trackMesh = new THREE.Mesh(ribbonGeo, this.trackMaterial);
-        trackMesh.receiveShadow = this.tier.shadows;
-        this.scene.add(trackMesh);
-        this.trackMesh = trackMesh;
-
-        // Neon track borders
-        const lineMat = new THREE.LineBasicMaterial({ color: trackEdgeHex, linewidth: 2 });
-        const edgePtsL = [];
-        const edgePtsR = [];
         for (let i = 0; i <= segments; i++) {
             const t = i / segments;
             const pt = this.spline.getPointAt(t);
-            const tangent = this.spline.getTangentAt(t).normalize();
-            
-            const nextT = Math.min(1.0, t + 0.005);
-            const nextTangent = this.spline.getTangentAt(nextT).normalize();
-            const turnRate = (nextTangent.x * tangent.z - nextTangent.z * tangent.x) / 0.005;
-            const bankAngle = Math.max(-0.55, Math.min(0.55, turnRate * 0.4));
-            
-            const localUp = _up.clone().applyAxisAngle(tangent, bankAngle);
-            _normal.crossVectors(tangent, localUp).normalize();
-            
-            edgePtsL.push(pt.clone().addScaledVector(_normal, -width / 2));
-            edgePtsR.push(pt.clone().addScaledVector(_normal, width / 2));
+            centerPts.push(pt.clone());
+            upperPts.push(pt.clone().add(new THREE.Vector3(0, 4.0, 0)));
+            lowerPts.push(pt.clone().add(new THREE.Vector3(0, -4.0, 0)));
         }
 
-        const edgeLineL = new THREE.Line(new THREE.BufferGeometry().setFromPoints(edgePtsL), lineMat);
-        const edgeLineR = new THREE.Line(new THREE.BufferGeometry().setFromPoints(edgePtsR), lineMat);
-        this.scene.add(edgeLineL);
-        this.scene.add(edgeLineR);
+        const centerMat = new THREE.LineBasicMaterial({
+            color: trackEmissiveHex,
+            transparent: true,
+            opacity: 0.85,
+            linewidth: 2
+        });
 
-        this.trackObjects.push(trackMesh, edgeLineL, edgeLineR);
+        const corridorMat = new THREE.LineBasicMaterial({
+            color: trackEdgeHex,
+            transparent: true,
+            opacity: 0.35,
+            linewidth: 1
+        });
+
+        const centerLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(centerPts), centerMat);
+        const upperLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(upperPts), corridorMat);
+        const lowerLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(lowerPts), corridorMat);
+
+        this.scene.add(centerLine);
+        this.scene.add(upperLine);
+        this.scene.add(lowerLine);
+
+        this.trackObjects.push(centerLine, upperLine, lowerLine);
     }
 
     createHolographicGates() {
         const totalGates = CONFIG.TRACK.TOTAL_GATES;
         const gateRadius = CONFIG.TRACK.GATE_RADIUS;
 
-        // Hexagonal holographic ring geometry
-        const hexGeo = new THREE.RingGeometry(gateRadius - 0.4, gateRadius, 6);
-        const hexMat = new THREE.MeshBasicMaterial({
+        // Circular holographic ring geometry (32-segment smooth circle)
+        const circleGeo = new THREE.RingGeometry(gateRadius - 0.45, gateRadius, 32);
+        const circleMat = new THREE.MeshBasicMaterial({
             color: 0x00ffff,
             side: THREE.DoubleSide,
             transparent: true,
             opacity: 0.85
+        });
+
+        const innerGeo = new THREE.RingGeometry(gateRadius * 0.72, gateRadius * 0.76, 32);
+        const innerMat = new THREE.MeshBasicMaterial({
+            color: 0x00e5ff,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.45
         });
 
         for (let i = 0; i < totalGates; i++) {
@@ -462,22 +364,32 @@ export class TrackBuilder {
             const pos = this.spline.getPointAt(t);
             const tangent = this.spline.getTangentAt(t).normalize();
 
-            const gateMesh = new THREE.Mesh(hexGeo, hexMat.clone());
-            gateMesh.position.copy(pos);
-            gateMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+            const gateGroup = new THREE.Group();
+            gateGroup.position.copy(pos);
+            gateGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tangent);
+
+            // Outer primary circular ring
+            const outerMesh = new THREE.Mesh(circleGeo, circleMat.clone());
+            gateGroup.add(outerMesh);
+
+            // Inner concentric pulse ring
+            const innerMesh = new THREE.Mesh(innerGeo, innerMat.clone());
+            gateGroup.add(innerMesh);
 
             // Start/Finish gate has distinctive orange tint
             if (i === 0) {
-                gateMesh.material.color.setHex(0xE8580A);
-                gateMesh.scale.set(1.2, 1.2, 1.2);
+                outerMesh.material.color.setHex(0xE8580A);
+                innerMesh.material.color.setHex(0xffaa00);
+                gateGroup.scale.set(1.2, 1.2, 1.2);
             }
 
-            this.scene.add(gateMesh);
+            this.scene.add(gateGroup);
             this.gates.push({
                 index: i,
                 position: pos,
                 normal: tangent,
-                mesh: gateMesh,
+                mesh: outerMesh,
+                group: gateGroup,
                 passed: false
             });
         }
@@ -1075,10 +987,16 @@ export class TrackBuilder {
         }
 
         this.gates.forEach(g => {
-            if (g.mesh) {
-                this.scene.remove(g.mesh);
-                if (g.mesh.geometry) g.mesh.geometry.dispose();
-                if (g.mesh.material) g.mesh.material.dispose();
+            const target = g.group || g.mesh;
+            if (target) {
+                this.scene.remove(target);
+                target.traverse?.(c => {
+                    if (c.geometry) c.geometry.dispose();
+                    if (c.material) {
+                        if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+                        else c.material.dispose();
+                    }
+                });
             }
         });
         this.gates = [];

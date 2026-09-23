@@ -282,47 +282,58 @@ export const CONFIG = {
         }
     },
 
-    // Aircraft Kinematics & Aerodynamics
+    // Aircraft Kinematics & Aerodynamics (Hovercar Configuration)
     FLIGHT: {
-        BASE_SPEED: 140.0,
-        MAX_CRUISE_SPEED: 200.0,
+        BASE_SPEED: 0.0, // Direct throttle: neutral stick idles at 0 km/h hover
+        IDLE_SPEED: 0.0,
+        MAX_CRUISE_SPEED: 190.0,
+        REVERSE_SPEED: 45.0,
         STAGE2_BOOST_SPEED: 250.0,
         STAGE3_BOOST_SPEED: 320.0,
-        ACCELERATION: 65.0,
-        BRAKING_DECEL: 70.0,
-        ROLL_RATE: 3.5,
-        PITCH_RATE: 2.8,
-        YAW_RATE: 2.4,
-        BANKING_TILT: 0.72,
-        PITCH_TILT: 0.48,
+        ACCELERATION: 85.0,
+        BRAKING_DECEL: 95.0,
+        ROLL_RATE: 2.0,
+        PITCH_RATE: 0.0, // Pitch locked to 0 to prevent helicopter nose-dives
+        YAW_RATE: 2.8,
+        BANKING_TILT: 0.10, // Subtle aesthetic chassis lean (level horizon)
+        PITCH_TILT: 0.0, // Fixed level flight
         VERTICAL_THRUST: 38.0,
         INDUCED_DRAG: 0.032,
         DRAFTING_DISTANCE: 22.0,
         DRAFTING_BOOST_RATE: 20.0
     },
 
-    // Flight Assist, Fixed Altitude Hold, Autopilot & Hover Stop
+    // Flight Assist, Fixed Altitude Hold, Autopilot & Hovercar ADAS
     ASSIST: {
+        HOVERCAR_ADAS: {
+            ESC_LATERAL_STABILITY: 0.92, // Anti-slide electronic stability
+            WALL_REPULSION_DIST: 4.5,
+            WALL_REPULSION_FORCE: 35.0,
+            GATE_MAGNETISM_DIST: 28.0,
+            GATE_MAGNETISM_FORCE: 14.0,
+            AUTO_ELEVATION_RATE: 6.0,
+            HOVER_HEIGHT_DEFAULT: 18.0
+        },
         FLY_ASSIST: {
-            AUTO_LEVEL_RATE: 5.5,
-            DRIFT_DAMPENING: 0.94,
+            AUTO_LEVEL_RATE: 8.0,
+            DRIFT_DAMPENING: 0.95,
             OBSTACLE_REPULSION_DIST: 9.0,
-            OBSTACLE_REPULSION_FORCE: 28.0
+            OBSTACLE_REPULSION_FORCE: 32.0
         },
         ALTITUDE_HOLD: {
-            DEFAULT_ALT: 35.0,
+            DEFAULT_ALT: 18.0,
             MIN_ALT: 8.0,
             MAX_ALT: 280.0,
             STEP: 5.0,
-            P_GAIN: 1.85,
-            D_GAIN: 0.75,
-            MAX_VERT_SPEED: 18.0
+            P_GAIN: 2.2,
+            D_GAIN: 0.85,
+            MAX_VERT_SPEED: 22.0
         },
         AUTOPILOT: {
             LOOKAHEAD_DIST: 38.0,
             SPLINE_TENSION: 0.5,
             STEER_GAIN: 3.2,
-            PITCH_GAIN: 2.6,
+            PITCH_GAIN: 0.0,
             TARGET_CRUISE_RATIO: 0.95,
             ALLOW_BOOST_ON_STRAIGHTS: true,
             MIN_BOOST_HEADING_ALIGNMENT: 0.94

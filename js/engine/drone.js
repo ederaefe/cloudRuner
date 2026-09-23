@@ -385,12 +385,31 @@ export class Drone {
             this.nitroAmount = Math.min(maxNitro, this.nitroAmount + nitroCfg.NATURAL_RECHARGE_RATE * dt);
         }
 
-        // Determine target cruise speed
-        let targetSpeedKmh = flightCfg.BASE_SPEED;
-        if (this.nitroStage === 3) targetSpeedKmh = flightCfg.STAGE3_BOOST_SPEED;
-        else if (this.nitroStage === 2) targetSpeedKmh = flightCfg.STAGE2_BOOST_SPEED;
-        else if (inputState.forward > 0) targetSpeedKmh = maxCruiseSpeed;
-        else if (inputState.forward < 0) targetSpeedKmh = flightCfg.BASE_SPEED * 0.5;
+        // Determine target hovercar speed based directly on user input
+        let targetSpeedKmh = 0.0;
+        const forwardInput = (typeof inputState.forward === 'number') ? inputState.forward : 0;
+
+        if (inputState.hoverStopActive) {
+            targetSpeedKmh = 0.0;
+            const decelDamp = Math.max(0, 1.0 - (CONFIG.ASSIST?.HOVER_STOP?.DECEL_RATE || 160.0) * dt / 22.0);
+            this.velocity.multiplyScalar(decelDamp);
+            if (this.velocity.length() < 0.15) this.velocity.set(0, 0, 0);
+            this.targetNacelleAngle = Math.PI / 2.0; // 90° VTOL vertical hover posture
+            this.landingGearExtended = true;
+        } else if (this.nitroStage === 3 && forwardInput >= 0) {
+            targetSpeedKmh = flightCfg.STAGE3_BOOST_SPEED;
+        } else if (this.nitroStage === 2 && forwardInput >= 0) {
+            targetSpeedKmh = flightCfg.STAGE2_BOOST_SPEED;
+        } else if (forwardInput > 0) {
+            // Proportional forward throttle: 0 to maxCruiseSpeed
+            targetSpeedKmh = maxCruiseSpeed * Math.min(1.0, forwardInput);
+        } else if (forwardInput < 0) {
+            // Active braking and reverse drive
+            targetSpeedKmh = -flightCfg.REVERSE_SPEED * Math.min(1.0, Math.abs(forwardInput));
+        } else {
+            // Neutral stick / no keys: smooth coasting to stationary 0 km/h hover
+            targetSpeedKmh = 0.0;
+        }
 
         // Turbulence drag modifier (Task 6)
         if (this.isTurbulenceActive) {
@@ -400,34 +419,97 @@ export class Drone {
         // Let Stunt FSM modulate speed and orientation
         stuntFsm.update(this, inputState, dt);
 
-        if (!stuntFsm.isCobraActive()) {
+        if (!stuntFsm.isCobraActive() && !inputState.hoverStopActive) {
             const targetSpeedMs = targetSpeedKmh / 3.6;
-            const currentSpeedMs = this.velocity.length();
+            _fwdVector.set(0, 0, 1).applyQuaternion(this.quaternion);
 
-            const accelRate = (targetSpeedMs > currentSpeedMs) ? flightCfg.ACCELERATION : flightCfg.BRAKING_DECEL;
-            const speedStep = accelRate * dt;
+            // Compute current forward velocity component
+            let currentSpeedMs = this.velocity.dot(_fwdVector);
+            if (!Number.isFinite(currentSpeedMs)) currentSpeedMs = 0;
+
+            const isAccelerating = (targetSpeedMs >= 0 && targetSpeedMs > currentSpeedMs) || (targetSpeedMs < 0 && targetSpeedMs < currentSpeedMs);
+            const rate = isAccelerating ? flightCfg.ACCELERATION : flightCfg.BRAKING_DECEL;
+            const speedStep = rate * dt;
             let newSpeedMs = currentSpeedMs;
 
             if (targetSpeedMs > currentSpeedMs) {
                 newSpeedMs = Math.min(targetSpeedMs, currentSpeedMs + speedStep);
-            } else {
+            } else if (targetSpeedMs < currentSpeedMs) {
                 newSpeedMs = Math.max(targetSpeedMs, currentSpeedMs - speedStep);
             }
 
-            // Forward direction vector in world space (zero-allocation)
-            _fwdVector.set(0, 0, 1).applyQuaternion(this.quaternion);
+            // Snap micro-speeds to zero for stationary hover
+            if (Math.abs(newSpeedMs) < 0.08 && Math.abs(forwardInput) < 0.05 && this.nitroStage === 1) {
+                newSpeedMs = 0;
+            }
+
             this.velocity.copy(_fwdVector).multiplyScalar(newSpeedMs);
+        }
+
+        // ADAS: Electronic Stability Control (ESC) - dampens lateral hover slide
+        const adasCfg = CONFIG.ASSIST?.HOVERCAR_ADAS || {
+            ESC_LATERAL_STABILITY: 0.92,
+            WALL_REPULSION_DIST: 4.5,
+            WALL_REPULSION_FORCE: 35.0,
+            GATE_MAGNETISM_DIST: 28.0,
+            GATE_MAGNETISM_FORCE: 14.0,
+            AUTO_ELEVATION_RATE: 6.0,
+            HOVER_HEIGHT_DEFAULT: 18.0
+        };
+
+        if (stuntFsm && typeof stuntFsm.isDriftActive === 'function' ? !stuntFsm.isDriftActive() : true) {
+            _fwdVector.set(0, 0, 1).applyQuaternion(this.quaternion);
+            const fwdMag = this.velocity.dot(_fwdVector);
+            _tangentScratch.copy(_fwdVector).multiplyScalar(fwdMag);
+            _tangentScratch.y = this.velocity.y; // Preserve vertical glide
+            this.velocity.lerp(_tangentScratch, dt * (adasCfg.ESC_LATERAL_STABILITY * 12.0));
+        }
+
+        // ADAS: Static Hover Altitude Hold & Auto-Elevation Glide
+        if (!inputState.hoverStopActive) {
+            let targetY = inputState.targetAltitude || adasCfg.HOVER_HEIGHT_DEFAULT;
+            
+            // Auto-elevation toward upcoming holographic ring
+            if (trackBuilder && trackBuilder.gates && trackBuilder.gates.length > 0) {
+                const targetGate = trackBuilder.gates[(this.nextGateIndex || 0) % trackBuilder.gates.length];
+                if (targetGate && targetGate.position) {
+                    const distToGate = this.position.distanceTo(targetGate.position);
+                    if (distToGate < 100) {
+                        targetY = targetGate.position.y;
+                    }
+                }
+            }
+
+            const altErr = targetY - this.position.y;
+            const altCfg = CONFIG.ASSIST?.ALTITUDE_HOLD || { P_GAIN: 2.2, D_GAIN: 0.85, MAX_VERT_SPEED: 22.0 };
+            const targetVy = THREE.MathUtils.clamp(altErr * altCfg.P_GAIN - this.velocity.y * altCfg.D_GAIN, -altCfg.MAX_VERT_SPEED, altCfg.MAX_VERT_SPEED);
+            this.velocity.y += (targetVy - this.velocity.y) * (1 - Math.exp(-(adasCfg.AUTO_ELEVATION_RATE || 6.0) * dt));
+        }
+
+        // ADAS: Gate Trajectory Magnetism (Funnel into upcoming floating circles)
+        if (trackBuilder && trackBuilder.gates && trackBuilder.gates.length > 0 && this.velocity.length() > 3.0) {
+            const targetGate = trackBuilder.gates[(this.nextGateIndex || 0) % trackBuilder.gates.length];
+            if (targetGate && targetGate.position) {
+                const distToGate = this.position.distanceTo(targetGate.position);
+                const magnetDist = adasCfg.GATE_MAGNETISM_DIST || 28.0;
+                if (distToGate < magnetDist && distToGate > 3.5) {
+                    _tangentScratch.subVectors(targetGate.position, this.position);
+                    _tangentScratch.y *= 0.4; // Favor horizontal trajectory alignment
+                    const pullStrength = (1.0 - (distToGate / magnetDist)) * (adasCfg.GATE_MAGNETISM_FORCE || 14.0);
+                    this.position.addScaledVector(_tangentScratch.normalize(), pullStrength * dt * 0.35);
+                }
+            }
         }
 
         // Task 2: Ground-Effect Aerodynamic Repulsion Engine
         this.applyGroundEffect(dt, trackBuilder);
 
-        // Task 4: Dynamic 4-Point Hover Raycast Cushioning & Wall Deflection
-        this.applyHoverDeflection(dt, trackBuilder);
+        // ADAS: Dynamic 4-Point Hover Raycast Cushioning & Wall Deflection
+        this.applyHoverDeflection(dt, trackBuilder, inputState);
 
         // Apply position delta
         this.position.addScaledVector(this.velocity, dt);
-        this.speedKmh = this.velocity.length() * 3.6;
+        this.speedKmh = Math.hypot(this.velocity.x, this.velocity.z) * 3.6;
 
         // Task 10: Smooth Course Realignment & Spline Projection Guard
         this.checkCourseRealignment(dt, trackBuilder);
@@ -454,13 +536,14 @@ export class Drone {
         if (!trackBuilder || !trackBuilder.buildingAABBs || trackBuilder.buildingAABBs.length === 0) return;
         
         const pos = this.position;
-        const margin = 2.4; // Safety cushion radius
+        const margin = CONFIG.ASSIST?.HOVERCAR_ADAS?.WALL_REPULSION_DIST || 4.5; // ADAS safety cushion
+        const baseDeflect = CONFIG.ASSIST?.HOVERCAR_ADAS?.WALL_REPULSION_FORCE || 35.0;
 
         for (let i = 0; i < trackBuilder.buildingAABBs.length; i++) {
             const box = trackBuilder.buildingAABBs[i];
             if (pos.x > box.min.x - margin && pos.x < box.max.x + margin &&
                 pos.z > box.min.z - margin && pos.z < box.max.z + margin &&
-                pos.y > box.min.y && pos.y < box.max.y) {
+                pos.y > box.min.y && pos.y < box.max.y + 4.0) {
                 
                 const dxMin = Math.abs(pos.x - (box.min.x - margin));
                 const dxMax = Math.abs(pos.x - (box.max.x + margin));
@@ -468,11 +551,14 @@ export class Drone {
                 const dzMax = Math.abs(pos.z - (box.max.z + margin));
                 const minDist = Math.min(dxMin, dxMax, dzMin, dzMax);
 
-                const deflectSpeed = Math.max(12.0, this.speedKmh * 0.12);
+                const deflectSpeed = Math.max(baseDeflect, this.speedKmh * 0.22);
                 if (minDist === dxMin) pos.x -= deflectSpeed * dt;
                 else if (minDist === dxMax) pos.x += deflectSpeed * dt;
                 else if (minDist === dzMin) pos.z -= deflectSpeed * dt;
                 else if (minDist === dzMax) pos.z += deflectSpeed * dt;
+
+                // Smooth kinetic cushion damping
+                this.velocity.multiplyScalar(Math.max(0.94, 1.0 - dt * 1.5));
                 break;
             }
         }

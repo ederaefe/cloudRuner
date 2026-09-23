@@ -87,17 +87,15 @@ export class DesktopControls {
         let roll = 0;
         let pitch = 0;
 
-        // Responsive keyboard flight mapping (Forward cruise with intuitive pitch & banking)
+        // Responsive keyboard hovercar mapping (W = throttle, S = brake/reverse, A/D = car steer)
         if (this.keys['w'] || this.keys['arrowup']) {
             fwd += 1.0;
-            pitch -= 1.0; // Nose down / dive
         }
         if (this.keys['s'] || this.keys['arrowdown']) {
-            fwd -= 0.6;
-            pitch += 1.0; // Nose up / climb
+            fwd -= 0.8;
         }
         if (this.keys['shift']) {
-            fwd += 0.6;
+            fwd += 0.4;
         }
 
         // Auto-release Hover Stop if pilot commands forward thrust
@@ -109,9 +107,7 @@ export class DesktopControls {
         if (this.keys['a'] || this.keys['arrowleft']) { yaw -= 1.0; roll -= 1.0; }
         if (this.keys['d'] || this.keys['arrowright']) { yaw += 1.0; roll += 1.0; }
 
-        // Dedicated pitch override keys (R/F or PageUp/PageDown)
-        if (this.keys['r'] || this.keys['pageup']) pitch += 1.0;
-        if (this.keys['f'] || this.keys['pagedown']) pitch -= 1.0;
+        pitch = 0.0; // Pitch clamped to 0 for level windshield hovercar
 
         if (this.keys[' ']) {
             this.input.state.isNitroHeld = true;
@@ -125,7 +121,7 @@ export class DesktopControls {
         if (this.gamepadIndex !== null && navigator.getGamepads) {
             const gp = navigator.getGamepads()[this.gamepadIndex];
             if (gp) {
-                // Axes: 0 is Left Stick X (Yaw), 1 is Left Stick Y (Pitch)
+                // Axes: 0 is Left Stick X (Yaw), 1 is Left Stick Y (Throttle/Brake)
                 const deadzone = 0.12;
                 const axis0 = Math.abs(gp.axes[0]) > deadzone ? gp.axes[0] : 0;
                 const axis1 = Math.abs(gp.axes[1]) > deadzone ? gp.axes[1] : 0;
@@ -135,7 +131,7 @@ export class DesktopControls {
                     roll = axis0;
                 }
                 if (axis1 !== 0) {
-                    pitch = -axis1;
+                    fwd = -axis1; // Direct throttle/reverse from stick Y
                 }
 
                 // Triggers / Buttons

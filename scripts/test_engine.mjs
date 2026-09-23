@@ -364,7 +364,8 @@ global.THREE = {
     },
     MathUtils: {
         lerp: (x, y, t) => x + (y - x) * t,
-        clamp: (val, min, max) => Math.max(min, Math.min(max, val))
+        clamp: (val, min, max) => Math.max(min, Math.min(max, val)),
+        damp: (x, y, lambda, dt) => x + (y - x) * (1 - Math.exp(-lambda * dt))
     },
     DoubleSide: 2,
     AdditiveBlending: 2,
@@ -810,6 +811,40 @@ const morningSkyline = CONFIG.SKYLINES.find(s => s.id === 'MORNING_CALM');
 const morningTrack = new TrackBuilder(scene, coordinator.tier, CONFIG.SECTORS[0], 'MORNING-TEST', morningSkyline);
 assert(morningTrack.sector.skyColor === morningSkyline.skyColor, 'TrackBuilder applies skyline skyColor override');
 morningTrack.dispose();
+
+// 17. Hovercar Direct Throttle, Locked Pitch, ADAS & Floating Rings Verification
+const hoverDrone = new Drone(scene, false);
+const hoverInput = new InputManager();
+
+// Test neutral stick -> 0 km/h stationary hover
+hoverInput.state.forward = 0;
+hoverDrone.velocity.set(0, 0, 10);
+for (let i = 0; i < 60; i++) {
+    hoverDrone.updatePhysics(hoverInput.state, stuntFsm, 0.016);
+}
+assert(hoverDrone.speedKmh < 0.1, 'Hovercar decelerates to 0 km/h stationary hover on neutral stick');
+
+// Test positive throttle forward acceleration
+hoverInput.state.forward = 1.0;
+for (let i = 0; i < 60; i++) {
+    hoverDrone.updatePhysics(hoverInput.state, stuntFsm, 0.016);
+}
+assert(hoverDrone.speedKmh > 50, 'Hovercar accelerates forward when stick pushed forward');
+
+// Test locked level pitch
+hoverInput.state.pitch = 1.0;
+stuntFsm.update(hoverDrone, hoverInput.state, 0.016);
+assert(Math.abs(stuntFsm.currentPitch) < 0.05, 'StuntFSM maintains locked level pitch in normal hovercar state');
+
+// Test floating ring gate geometry
+const circleTrack = new TrackBuilder(scene, coordinator.tier, CONFIG.SECTORS[0]);
+assert(circleTrack.gates.length > 0 && circleTrack.gates[0].mesh.isMesh, 'TrackBuilder constructs floating circular rings');
+assert(circleTrack.trackObjects.length === 3, 'TrackBuilder maintains aerial flight corridor guide lines');
+circleTrack.dispose();
+
+// Test ADAS configuration presence
+assert(CONFIG.ASSIST.HOVERCAR_ADAS.WALL_REPULSION_DIST === 4.5, 'CONFIG defines ADAS wall repulsion distance (4.5m)');
+assert(CONFIG.ASSIST.HOVERCAR_ADAS.ESC_LATERAL_STABILITY === 0.92, 'CONFIG defines ADAS ESC lateral stability factor');
 
     console.log(`\n========================================`);
     console.log(`ALL TESTS PASSED: ${passedTests}/${totalTests} ASSERTIONS VERIFIED`);

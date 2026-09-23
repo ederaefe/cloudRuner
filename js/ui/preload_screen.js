@@ -1,7 +1,7 @@
 /*
 ================================================================================
-BARCH AERO-CANYON RACING - ARCADE PRELOADER SCREEN
-Orchestrates hardware profiling, shader warm-up, font readiness, and audio unlock
+BARCH AERO-CANYON RACING - UNIFIED FLIGHT DECK CALIBRATION RUNNER
+Smoothly warms up shaders, GPU pipeline, and audio within the cinematic intro
 ================================================================================
 */
 
@@ -16,17 +16,10 @@ export class PreloadScreen {
     }
 
     initDOMElements() {
-        this.overlay = document.getElementById('preload-screen');
         this.barFill = document.getElementById('preload-bar-fill');
         this.percentText = document.getElementById('preload-percent-txt');
         this.statusText = document.getElementById('preload-status-txt');
-        this.btnStart = document.getElementById('btn-preload-start');
-
-        if (this.btnStart) {
-            this.btnStart.addEventListener('click', () => {
-                this.dismiss();
-            });
-        }
+        this.btnLaunch = document.getElementById('btn-launch-race');
     }
 
     updateProgress(targetPercent, statusMessage) {
@@ -43,24 +36,24 @@ export class PreloadScreen {
     }
 
     async runBootSequence(coordinator, renderer, scene, camera) {
-        this.updateProgress(15, 'PROBING HARDWARE PROFILE & GPU TIER...');
-        await new Promise(r => setTimeout(r, 120));
+        this.updateProgress(20, 'INITIALIZING HARDWARE PROFILES...');
+        await new Promise(r => setTimeout(r, 60));
 
         // 1. Font verification
-        this.updateProgress(35, 'VERIFYING TYPOGRAPHY & INTERFACE TEXTURES...');
+        this.updateProgress(45, 'VERIFYING AVIONICS & INTERFACE ASSETS...');
         if (document.fonts && document.fonts.ready) {
             try {
                 await Promise.race([
                     document.fonts.ready,
-                    new Promise(r => setTimeout(r, 600))
+                    new Promise(r => setTimeout(r, 400))
                 ]);
             } catch (e) {
                 // Non-blocking fallback
             }
         }
 
-        // 2. WebGL Pipeline & Shader Warm-Up (compiles shaders without stuttering first frame)
-        this.updateProgress(60, 'WARMING UP WEBLGL GEOMETRY & SHADER PIPELINE...');
+        // 2. WebGL Pipeline & Shader Warm-Up
+        this.updateProgress(75, 'WARMING UP WEBLGL GEOMETRY & SHADER PIPELINE...');
         if (renderer && scene && camera) {
             try {
                 renderer.compile(scene, camera);
@@ -68,27 +61,28 @@ export class PreloadScreen {
                 // Non-blocking fallback
             }
         }
-        await new Promise(r => setTimeout(r, 150));
+        await new Promise(r => setTimeout(r, 80));
 
         // 3. Audio engine readiness
-        this.updateProgress(85, 'SYNTHESIZING PROCEDURAL AUDIO BUFFERS...');
+        this.updateProgress(90, 'SYNTHESIZING PROCEDURAL AUDIO BUFFERS...');
         if (this.soundEngine && typeof this.soundEngine.init === 'function') {
             try {
                 this.soundEngine.init();
             } catch (e) {}
         }
-        await new Promise(r => setTimeout(r, 120));
+        await new Promise(r => setTimeout(r, 60));
 
-        // 4. Ready state
-        this.updateProgress(100, 'FLIGHT SYSTEMS CALIBRATED - READY');
+        // 4. Calibration Ready State
+        this.updateProgress(100, 'AVIONICS READY // PRESS LAUNCH TO ENGAGE');
         this.isComplete = true;
 
-        if (this.btnStart) {
-            this.btnStart.classList.remove('hidden');
-            this.btnStart.focus();
-        } else {
-            // If button is absent, auto-dismiss
-            setTimeout(() => this.dismiss(), 350);
+        if (this.btnLaunch) {
+            this.btnLaunch.classList.add('ready-pulse');
+            this.btnLaunch.disabled = false;
+        }
+
+        if (typeof this.onComplete === 'function') {
+            this.onComplete();
         }
     }
 
@@ -97,16 +91,8 @@ export class PreloadScreen {
             this.soundEngine.unlockAudio();
             this.soundEngine.resume();
         }
-
         if (typeof this.onComplete === 'function') {
             this.onComplete();
-        }
-
-        if (this.overlay) {
-            this.overlay.classList.add('preload-fade-out');
-            setTimeout(() => {
-                this.overlay.classList.add('hidden');
-            }, 500);
         }
     }
 }

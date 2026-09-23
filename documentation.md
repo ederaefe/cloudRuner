@@ -246,5 +246,25 @@ This enables zero-latency P2P mesh synchronization via WebRTC DataChannels (`Pee
 * **Comprehensive QA Verification (`scripts/test_engine.mjs`)**:
   * Expanded automated test suite from 139 to 148 verified assertions, confirming zero regressions across all subsystems.
 
+### Completed: Arcade Hovercar Flight Model, Floating Rings & Advanced Driver Assist (ADAS)
+* **Direct Proportional Throttle & Stationary Hover (`js/engine/drone.js`, `js/input/touch_controls.js`, `js/input/desktop_controls.js`)**:
+  * Replaced forced auto-cruise (`BASE_SPEED = 140 km/h`) with direct 1:1 user-commanded throttle.
+  * Neutral joystick and released keys decelerate the craft smoothly into a stationary 0 km/h hover without control jitter or drift.
+  * Pushing forward accelerates proportionally up to maximum cruise speed (190 km/h) or nitro overdrive (320 km/h); pulling back commands active reverse thrusters and braking (-45 km/h).
+* **Locked Horizon & Zero-Pitch Level Flight (`js/engine/drone.js`, `js/engine/stunt_fsm.js`)**:
+  * Clamped pitch Euler rotation to 0.0 rad, completely eliminating helicopter nose-dives, sky stalls, and camera pitching.
+  * Constrained roll banking to subtle aesthetic chassis lean (0.10 rad / ~6 degrees), preserving a rock-solid level windshield view through canyon corridors.
+* **Open-Air Floating Holographic Rings ("Circles") (`js/engine/track_builder.js`)**:
+  * Completely eliminated the solid extruded roadbed ribbon mesh and asphalt textures that previously boxed the drone onto an elevated highway.
+  * Replaced hexagonal gate frames with 32-segment circular holographic rings featuring concentric inner pulse energy discs.
+  * Integrated an aerial trajectory flight guide stream connecting successive rings, allowing pilots to anticipate turns around skyscrapers in open 3D airspace without a floor.
+* **Integrated Advanced Driver Assist System (ADAS) (`js/config.js`, `js/engine/drone.js`)**:
+  * *Electronic Stability Control (ESC)*: Dampens lateral hovercraft slide by 92%, giving the hovercar crisp automotive cornering traction rather than slippery air-hockey drift.
+  * *Predictive Wall Repulsion Cushion*: Monitors skyscraper bounding boxes up to 4.5m ahead, applying smooth repelling counter-vectors that allow the hovercar to glide along glass facades without dead-stop impacts.
+  * *Ring Trajectory Magnetism*: Provides subtle magnetic funnelling when within 28m of upcoming floating circles, pulling the craft smoothly through gate centers.
+  * *Automated Elevation Glide*: Automatically tracks upcoming gate ring altitudes and terrain clearance, lifting the hovercar up or down smoothly without requiring manual vertical pitch input.
+* **Expanded Verification Suite (`scripts/test_engine.mjs`)**:
+  * Added 9 automated assertions in Section 17 verifying neutral-stick hover stops, forward throttle acceleration, locked level pitch, circular ring geometry, aerial corridor guides, and ADAS stability parameters, bringing the total suite to 157 passing assertions.
+
 
 

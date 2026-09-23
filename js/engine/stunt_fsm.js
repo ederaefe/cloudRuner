@@ -53,6 +53,12 @@ export class StuntFSM {
         this.stuntRollProgress = 0;
     }
 
+    isDriftActive() {
+        return this.state === STUNT_STATES.SNAP_ROLL_LEFT || 
+               this.state === STUNT_STATES.SNAP_ROLL_RIGHT || 
+               this.state === STUNT_STATES.KNIFE_EDGE;
+    }
+
     isCobraActive() {
         return this.state === STUNT_STATES.COBRA_AIRBRAKE;
     }
@@ -143,9 +149,9 @@ export class StuntFSM {
                 this.stateTimer += dt;
                 const progress = Math.min(1.0, this.stateTimer / stuntCfg.COBRA_DURATION);
 
-                // Pitch up sharply to 75 degrees, then smoothly recover
+                // Subtle retro-thrust pitch cushion, then smoothly recover
                 if (progress < 0.5) {
-                    this.currentPitch = THREE.MathUtils.lerp(this.currentPitch, stuntCfg.COBRA_PITCH_ANGLE, dt * 16.0);
+                    this.currentPitch = THREE.MathUtils.lerp(this.currentPitch, 0.15, dt * 16.0);
                 } else {
                     this.currentPitch = THREE.MathUtils.lerp(this.currentPitch, 0.0, dt * 8.0);
                 }
@@ -159,16 +165,18 @@ export class StuntFSM {
 
             case STUNT_STATES.NORMAL:
             default: {
-                // Standard flight kinematics
+                // Standard car-like yaw steering
                 this.currentYaw -= inputState.steerYaw * flightCfg.YAW_RATE * dt;
                 
-                // Visual banking based on turn rate
+                // Visual chassis banking based on turn rate (level camera horizon)
                 const targetRoll = -inputState.steerYaw * flightCfg.BANKING_TILT;
-                this.currentRoll = THREE.MathUtils.lerp(this.currentRoll, targetRoll, dt * 6.0);
+                const rollRate = (inputState.flyAssistEnabled !== false && Math.abs(inputState.steerYaw) < 0.08)
+                    ? (CONFIG.ASSIST?.FLY_ASSIST?.AUTO_LEVEL_RATE || 8.0) * 1.5
+                    : 8.0;
+                this.currentRoll = THREE.MathUtils.lerp(this.currentRoll, targetRoll, dt * rollRate);
 
-                // Vertical pitch control
-                const targetPitch = inputState.pitch * flightCfg.PITCH_TILT;
-                this.currentPitch = THREE.MathUtils.lerp(this.currentPitch, targetPitch, dt * 6.0);
+                // Locked level horizon: pitch held firmly at 0.0
+                this.currentPitch = THREE.MathUtils.lerp(this.currentPitch, 0.0, dt * 10.0);
                 break;
             }
         }

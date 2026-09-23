@@ -134,11 +134,20 @@ export class TouchControls {
         const radius = this.stickRadius || 65;
         const nx = dx / radius;
         const ny = dy / radius;
+        const normDist = Math.hypot(nx, ny);
 
-        // Steering: X controls Yaw and Roll; Y controls forward thrust / brake
+        // Deadzone check: snap to complete stationary hover when thumb is near center
+        if (normDist < 0.08) {
+            this.input.state.steerYaw = 0;
+            this.input.state.roll = 0;
+            this.input.state.forward = 0;
+            return;
+        }
+
+        // Steering: X controls car Yaw and subtle chassis Roll; Y controls forward throttle / brake
         this.input.state.steerYaw = nx;
         this.input.state.roll = nx;
-        this.input.state.forward = -ny; // Up is forward thrust
+        this.input.state.forward = -ny; // Up is forward thrust (> 0), Down is brake/reverse (< 0)
     }
 
     bindActionButtons() {
