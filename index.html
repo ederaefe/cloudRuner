@@ -97,23 +97,17 @@
             <button class="mode-select-btn active" data-mode="CIRCUIT_RACE">CIRCUIT GRAND PRIX</button>
             <button class="mode-select-btn" data-mode="EXTRACTION_SOLO">CARGO SOLO</button>
             <button class="mode-select-btn" data-mode="EXTRACTION_VERSUS">CARGO VERSUS AI</button>
+            <button class="mode-select-btn" data-mode="TEAMWORK_COOP">TEAMWORK SQUAD</button>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:11px; padding:0 2px;">
+            <a href="#boost" id="link-route-boost" style="color:var(--nitro-amber); text-decoration:none; font-weight:800;">[OVERCHARGE /BOOST]</a>
+            <a href="#teamwork-preview" id="link-route-teamwork" style="color:var(--hyper-cyan); text-decoration:none; font-weight:800;">[PREVIEW /TEAMWORK]</a>
         </div>
 
         <!-- Sector Level Cards -->
         <div style="font-size:11px; font-weight:800; color:rgba(255,255,255,0.6); text-align:left; margin-top:8px;">CAMPAIGN SECTOR</div>
-        <div class="sector-row">
-            <button class="sector-card-btn active" data-sector="1">
-                <div style="font-weight:900; font-size:14px; color:#F4A426;">SECTOR 01: DOWNTOWN CANYONS</div>
-                <div style="font-size:11px; color:#aaccff;">Daylight urban corridors with wide sky-lanes</div>
-            </button>
-            <button class="sector-card-btn" data-sector="2">
-                <div style="font-weight:900; font-size:14px; color:#F4A426;">SECTOR 02: INDUSTRIAL PORT & CRANES</div>
-                <div style="font-size:11px; color:#aaccff;">Overcast twilight with dense gantries and chicanes</div>
-            </button>
-            <button class="sector-card-btn" data-sector="3">
-                <div style="font-weight:900; font-size:14px; color:#F4A426;">SECTOR 03: STRATOSPHERE MONOLITHS</div>
-                <div style="font-size:11px; color:#aaccff;">High-altitude storm run with vertical climbs</div>
-            </button>
+        <div class="sector-row" id="sector-selection-list">
+            <!-- Dynamically populated from CONFIG.SECTORS by HangarSettingsManager -->
         </div>
 
         <div style="display:flex; gap:10px; margin: 14px 0 10px 0;">
@@ -198,14 +192,59 @@
     </div>
 </div>
 
-<!-- Mission Finished Modal -->
+<!-- Mission Finished / Campaign Epilogue Modal -->
 <div id="end-modal" class="overlay-screen hidden">
-    <div class="glass-modal">
+    <div class="glass-modal" id="end-modal-card" style="max-width: 520px; max-height: 90vh; overflow-y: auto;">
         <h1 id="end-title" style="color:#F4A426;">MISSION ACCOMPLISHED</h1>
-        <p id="end-rank-desc" style="font-size: 16px; margin: 12px 0;"></p>
-        <div id="end-lap-times" style="background:rgba(0,0,0,0.5); padding:10px; border-radius:8px; font-family:monospace; margin-bottom:16px; font-size:13px; color:#00ffff;"></div>
-        <div id="end-rewards-txt" style="font-size: 14px; font-weight: 800; color: #F4A426; margin-bottom: 16px;"></div>
-        <button id="btn-restart-race" class="cta-button">NEXT MISSION</button>
+        <p id="end-rank-desc" style="font-size: 15px; margin: 8px 0; color:#aaccff;"></p>
+
+        <!-- Master Telemetry Dossier Box -->
+        <div id="end-dossier-box" class="dossier-container">
+            <div class="rank-display-box">
+                <div id="end-pilot-grade" class="pilot-grade-badge">S</div>
+                <div class="pilot-grade-desc">
+                    <span id="end-pilot-rating-title" class="pilot-grade-title">S-CLASS AEGIS ACE</span>
+                    <span class="pilot-grade-sub">AERO-COMMAND PERFORMANCE CLASSIFICATION</span>
+                </div>
+            </div>
+
+            <div class="dossier-grid">
+                <div class="dossier-row">
+                    <span class="dossier-label">MISSION TIME</span>
+                    <span id="dossier-time" class="dossier-val">00:00.00</span>
+                </div>
+                <div class="dossier-row">
+                    <span class="dossier-label">TOP VELOCITY</span>
+                    <span id="dossier-speed" class="dossier-val">0 KM/H</span>
+                </div>
+                <div class="dossier-row">
+                    <span class="dossier-label">STUNTS EXECUTED</span>
+                    <span id="dossier-stunts" class="dossier-val">0</span>
+                </div>
+                <div class="dossier-row">
+                    <span class="dossier-label">CAMPAIGN SECTOR</span>
+                    <span id="dossier-sector" class="dossier-val">01 / 04</span>
+                </div>
+            </div>
+
+            <div id="end-citation-box" class="citation-banner hidden"></div>
+
+            <div id="end-trophy-box" class="trophy-unlock-card hidden">
+                <div class="skin-color-preview" style="background:#ffc400; width:40px; height:40px; box-shadow:0 0 12px #ffc400; border-radius:50%; border:2px solid #fff;"></div>
+                <div style="flex:1; text-align:left;">
+                    <div style="font-weight:900; font-size:13px; color:#ffc400;">LEGENDARY AIRFRAME UNLOCKED</div>
+                    <div style="font-size:11px; color:#fff;">APEX SOVEREIGN (Solar Gold & Obsidian)</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="end-unlock-notice" style="font-size:13px; font-weight:800; color:#00ffaa; margin-bottom:8px;"></div>
+        <div id="end-rewards-txt" style="font-size: 14px; font-weight: 800; color: #F4A426; margin-bottom: 14px;"></div>
+        
+        <div style="display:flex; gap:10px;">
+            <button id="btn-equip-trophy" class="cta-button hidden" style="background:linear-gradient(135deg, #ffc400, #b28500); color:#000; font-weight:900; flex:1;">EQUIP APEX SOVEREIGN</button>
+            <button id="btn-restart-race" class="cta-button" style="flex:1;">CONTINUE</button>
+        </div>
     </div>
 </div>
 
@@ -238,6 +277,7 @@ window.addEventListener('load', () => {
 
     // 2. Audio & Input Architecture
     const soundEngine = new SoundEngine();
+    soundEngine.unlockAudio();
     const inputManager = new InputManager();
 
     if (coordinator.profile.isTouch) {
@@ -306,8 +346,12 @@ window.addEventListener('load', () => {
     // 5. Instantiate Player Drone & HUD
     const playerDrone = new Drone(scene, false);
     const hud = new RacingHUD();
+    let stuntsCompletedCount = 0;
+    let maxSpeedInRace = 0;
+
     const stuntFsm = new StuntFSM(soundEngine, (title, bonus) => {
         hud.showStuntAlert(title, bonus);
+        stuntsCompletedCount++;
     });
 
     // 6. Hangar & Settings Manager
@@ -348,7 +392,10 @@ window.addEventListener('load', () => {
         // Clean previous systems
         if (track) track.dispose();
         if (extractionEngine) extractionEngine.dispose();
-        aiRacers.forEach(ai => scene.remove(ai.drone.group));
+        aiRacers.forEach(ai => {
+            if (ai && typeof ai.dispose === 'function') ai.dispose();
+            else if (ai && ai.drone) scene.remove(ai.drone.group);
+        });
         aiRacers = [];
 
         // Build Track & City
@@ -374,6 +421,16 @@ window.addEventListener('load', () => {
             for (let i = 0; i < CONFIG.AI.RACER_COUNT; i++) {
                 aiRacers.push(new AiRacer(scene, track.spline, i, CONFIG.AI.RACER_COUNT));
             }
+        } else if (mode === CONFIG.MODES.TEAMWORK_COOP) {
+            if (modeBadge) modeBadge.textContent = 'TEAMWORK SQUAD';
+            if (posOrCargoLabel) posOrCargoLabel.textContent = 'POSITION';
+            if (lapOrTargetLabel) lapOrTargetLabel.textContent = 'LAP';
+
+            // Spawn 1 Wingman AI in escort formation + 2 Rivals
+            aiRacers.push(new AiRacer(scene, track.spline, 0, 1, true)); // isWingman = true
+            aiRacers.push(new AiRacer(scene, track.spline, 1, 3, false));
+            aiRacers.push(new AiRacer(scene, track.spline, 2, 3, false));
+            hud.showStuntAlert('TEAMWORK ESCORT', 'WINGMAN ECHO-01 READY');
         } else {
             // Extraction Mode (Solo or Versus)
             if (modeBadge) modeBadge.textContent = mode === CONFIG.MODES.EXTRACTION_SOLO ? 'CARGO SOLO' : 'CARGO VERSUS';
@@ -457,14 +514,18 @@ window.addEventListener('load', () => {
         }
     });
 
+    let isContextLost = false;
+
     canvas.addEventListener('webglcontextlost', (e) => {
         e.preventDefault();
+        isContextLost = true;
         console.warn('WebGL context lost - suspending flight loop');
         window._gameState = 'PAUSED';
     });
 
     canvas.addEventListener('webglcontextrestored', () => {
         console.info('WebGL context restored - recovering scene');
+        isContextLost = false;
         renderer.setSize(window.innerWidth, window.innerHeight);
         window._gameState = 'RACING';
     });
@@ -493,12 +554,43 @@ window.addEventListener('load', () => {
         currentLap = 1;
         nextGateIndex = 1;
         raceTotalTime = 0;
+        stuntsCompletedCount = 0;
+        maxSpeedInRace = 0;
+        cameraRig.reset(playerDrone);
+        cameraRig.setEpilogueMode(false);
     };
+
+    // URL Router for /boost and /teamwork-preview
+    function checkUrlRoutes() {
+        const hash = (window.location.hash || '').toLowerCase();
+        const search = (window.location.search || '').toLowerCase();
+        if (hash.includes('teamwork-preview') || search.includes('teamwork-preview')) {
+            hangarManager.selectedMode = CONFIG.MODES.TEAMWORK_COOP;
+            document.querySelectorAll('.mode-select-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.mode === 'TEAMWORK_COOP');
+            });
+            hud.showStuntAlert('TEAMWORK PREVIEW', 'WINGMAN FORMATION ARMED');
+        } else if (hash.includes('boost') || search.includes('boost')) {
+            playerDrone.nitroAmount = playerDrone.nitroMaxCapacity || 100.0;
+            hud.showStuntAlert('BOOST OVERCHARGE', 'NITRO FUEL CELL CHARGED');
+        }
+    }
+    window.addEventListener('hashchange', checkUrlRoutes);
+    checkUrlRoutes();
 
     if (btnLaunch) btnLaunch.addEventListener('click', beginRace);
     if (btnRestart) btnRestart.addEventListener('click', () => {
         endModal.classList.add('hidden');
-        beginRace();
+        cameraRig.setEpilogueMode(false);
+        // Automatically advance to newly unlocked sector
+        const curSec = CONFIG.SECTORS.find(s => s.id === hangarManager.selectedSectorId);
+        if (curSec && curSec.id < hangarManager.profile.campaignProgress) {
+            hangarManager.selectedSectorId = curSec.id + 1;
+            hangarManager.updateSectorSelectionUI();
+        }
+        startModal.classList.remove('hidden');
+        gameState = 'START';
+        window._gameState = gameState;
     });
 
     if (btnRestartPause) btnRestartPause.addEventListener('click', () => {
@@ -524,9 +616,11 @@ window.addEventListener('load', () => {
     // 12. Simulation Loop (Zero-Allocation & Paced)
     const clock = new THREE.Clock();
     const _alignDir = new THREE.Vector3(0, 0, 1);
+    let previousNitroStage = 1;
 
     function animate() {
         requestAnimationFrame(animate);
+        if (isContextLost) return;
         const dt = Math.min(clock.getDelta(), 0.05);
 
         if (window._desktopControls) {
@@ -535,24 +629,37 @@ window.addEventListener('load', () => {
 
         if (window._gameState === 'RACING') {
             raceTotalTime += dt;
+            maxSpeedInRace = Math.max(maxSpeedInRace, playerDrone.speedKmh);
             checkDRS(dt * 1000);
 
             // Update Player Physics
             const inputState = inputManager.getState();
             playerDrone.updatePhysics(inputState, stuntFsm, dt);
 
-            // Out-of-bounds safety check & realign
-            if (playerDrone.position.y < -65 || (track && playerDrone.position.length() > 650)) {
+            // Nitro Boost audio trigger on stage transitions (/boost)
+            if (playerDrone.nitroStage !== previousNitroStage) {
+                if (playerDrone.nitroStage > 1) {
+                    soundEngine.playBoostIgnite(playerDrone.nitroStage === 3);
+                }
+                previousNitroStage = playerDrone.nitroStage;
+            }
+
+            // Out-of-bounds safety check & clean realignment (fixes camera whiplash & NaN)
+            if (isNaN(playerDrone.position.x) || playerDrone.position.y < -65 || (track && playerDrone.position.length() > 650)) {
                 hud.showStuntAlert('COURSE REALIGNMENT', 'RETURNING TO TRACK');
                 soundEngine.playNearMiss();
                 const safeGate = track.gates[Math.max(0, nextGateIndex - 1) % track.gates.length];
                 playerDrone.position.copy(safeGate.position);
                 playerDrone.quaternion.setFromUnitVectors(_alignDir, safeGate.normal);
                 playerDrone.velocity.set(0, 0, 0);
+                cameraRig.reset(playerDrone);
             }
 
-            if (hangarManager.selectedMode === CONFIG.MODES.CIRCUIT_RACE) {
-                // Circuit Mode Logic: Gates & Laps
+            const currentSector = CONFIG.SECTORS.find(s => s.id === hangarManager.selectedSectorId) || CONFIG.SECTORS[0];
+            const isTeamwork = hangarManager.selectedMode === CONFIG.MODES.TEAMWORK_COOP;
+
+            if (hangarManager.selectedMode === CONFIG.MODES.CIRCUIT_RACE || isTeamwork) {
+                // Circuit & Teamwork Squad Logic: Gates & Laps
                 const targetGate = track.gates[nextGateIndex % track.gates.length];
                 const distToGate = playerDrone.position.distanceTo(targetGate.position);
 
@@ -566,22 +673,23 @@ window.addEventListener('load', () => {
                     nextGateIndex++;
                     if (nextGateIndex % track.gates.length === 0) {
                         currentLap++;
-                        const currentSector = CONFIG.SECTORS.find(s => s.id === hangarManager.selectedSectorId) || CONFIG.SECTORS[0];
                         if (currentLap > currentSector.laps) {
                             finishRace(false);
                         }
                     }
                 }
 
-                // AI Racers & Drafting
+                // AI Racers & Drafting / Wingman Formation
                 let isPlayerDrafting = false;
                 aiRacers.forEach((ai) => {
-                    ai.update(dt);
+                    ai.update(dt, playerDrone);
                     ai.checkPlayerCollision(playerDrone, cameraRig);
 
                     if (ai.isPlayerDrafting(playerDrone)) {
                         isPlayerDrafting = true;
-                        playerDrone.nitroAmount = Math.min(CONFIG.NITRO.MAX_CAPACITY, playerDrone.nitroAmount + CONFIG.FLIGHT.DRAFTING_BOOST_RATE * dt);
+                        const rechargeRate = ai.isWingman ? (CONFIG.TEAMWORK?.BOOST_RECHARGE_RATE || 20.0) : CONFIG.FLIGHT.DRAFTING_BOOST_RATE;
+                        const maxN = playerDrone.nitroMaxCapacity || CONFIG.NITRO.MAX_CAPACITY;
+                        playerDrone.nitroAmount = Math.min(maxN, playerDrone.nitroAmount + rechargeRate * dt);
                     }
                 });
 
@@ -589,12 +697,14 @@ window.addEventListener('load', () => {
                 let rank = 1;
                 const playerProgress = (currentLap - 1) + (nextGateIndex / track.gates.length);
                 aiRacers.forEach((ai) => {
-                    const aiProgress = (ai.currentLap - 1) + ai.trackProgress;
-                    if (aiProgress > playerProgress) rank++;
+                    if (!ai.isWingman) {
+                        const aiProgress = (ai.currentLap - 1) + ai.trackProgress;
+                        if (aiProgress > playerProgress) rank++;
+                    }
                 });
 
-                // Update HUD
-                hud.update(playerDrone, currentLap, rank, CONFIG.AI.RACER_COUNT + 1, isPlayerDrafting);
+                // Update HUD with sector laps and teamwork feedback
+                hud.update(playerDrone, currentLap, rank, aiRacers.length + 1, isPlayerDrafting, currentSector.laps, isTeamwork);
             } else if (extractionEngine) {
                 // Extraction Mode Logic
                 const stats = hangarManager.getUpgradedStats();
@@ -603,7 +713,7 @@ window.addEventListener('load', () => {
 
                 if (isVersus) {
                     aiRacers.forEach((ai) => {
-                        ai.update(dt);
+                        ai.update(dt, playerDrone);
                         ai.checkPlayerCollision(playerDrone, cameraRig);
                     });
                 }
@@ -621,9 +731,12 @@ window.addEventListener('load', () => {
 
             // Audio Telemetry
             soundEngine.updateTelemetry(playerDrone.speedKmh, inputState.forward, playerDrone.nitroStage > 1, playerDrone.nitroStage === 3);
+
+            // Cleanly consume one-shot stunt triggers
+            inputManager.resetStuntFlags();
         }
 
-        // Camera Tracking & Scene Rendering
+        // Camera Tracking & Scene Rendering (guarded against WebGL context loss)
         cameraRig.update(playerDrone, dt);
         renderer.render(scene, camera);
     }
@@ -633,26 +746,123 @@ window.addEventListener('load', () => {
         releaseWakeLock();
         endModal.classList.remove('hidden');
 
-        const rewardCredits = isExtraction ? 350 : 250;
-        hangarManager.profile.credits += rewardCredits;
-        hangarManager.saveProfile();
+        const currentSector = CONFIG.SECTORS.find(s => s.id === hangarManager.selectedSectorId) || CONFIG.SECTORS[0];
+        const isFinalClimax = (currentSector.id === 4 || currentSector.isClimax === true);
 
-        const endTitle = document.getElementById('end-title');
-        const endRankDesc = document.getElementById('end-rank-desc');
-        const endLapTimes = document.getElementById('end-lap-times');
-        const endRewards = document.getElementById('end-rewards-txt');
+        // Transition camera into smooth 360-degree victory orbit
+        cameraRig.setEpilogueMode(true);
 
-        if (isExtraction) {
-            endTitle.textContent = 'SECTOR SECURED';
-            endRankDesc.textContent = `All payloads successfully extracted to Base!`;
-        } else {
-            const rankBadge = document.getElementById('position-badge').textContent;
-            endTitle.textContent = rankBadge === '1ST' ? 'CIRCUIT VICTORY' : 'CIRCUIT FINISHED';
-            endRankDesc.textContent = `Final Placement: ${rankBadge} against AI competitors`;
+        // Algorithmic Pilot Mastery Grade
+        let rankPlacement = 1;
+        if (!isExtraction) {
+            const rankBadge = document.getElementById('position-badge');
+            rankPlacement = (rankBadge && rankBadge.textContent === '1ST') ? 1 : 2;
         }
 
-        endLapTimes.textContent = `Mission Time: ${raceTotalTime.toFixed(2)}s | Top Velocity: ${Math.round(playerDrone.speedKmh)} km/h`;
-        if (endRewards) endRewards.textContent = `+${rewardCredits} CREDITS AWARDED (Current Balance: ${hangarManager.profile.credits} CR)`;
+        let pilotGrade = 'B';
+        let gradeTitle = 'B-CLASS STRIKER';
+        if (rankPlacement === 1 && stuntsCompletedCount >= 2 && maxSpeedInRace > 220) {
+            pilotGrade = 'S';
+            gradeTitle = 'S-CLASS AEGIS ACE';
+        } else if (rankPlacement === 1 || stuntsCompletedCount >= 1) {
+            pilotGrade = 'A';
+            gradeTitle = 'A-CLASS VANGUARD';
+        }
+
+        // Auditory Catharsis: Procedural Web Audio harmonic resolution
+        soundEngine.playVictoryFanfare(isFinalClimax);
+
+        // Record Sector Result in persistent campaign profile
+        const progResult = hangarManager.recordSectorResult(currentSector.id, {
+            bestTime: raceTotalTime,
+            grade: pilotGrade,
+            mode: hangarManager.selectedMode,
+            topSpeed: Math.round(maxSpeedInRace),
+            stunts: stuntsCompletedCount
+        });
+
+        if (progResult.unlockedNext) {
+            setTimeout(() => {
+                soundEngine.playSectorUnlockChime();
+            }, 1200);
+        }
+
+        // Credit Rewards Calculation
+        const baseCredits = isExtraction ? 350 : 250;
+        const climaxBonus = isFinalClimax ? 500 : 0;
+        const rewardCredits = baseCredits + climaxBonus;
+        hangarManager.profile.credits += rewardCredits;
+        hangarManager.saveProfile();
+        hangarManager.updateHangarUI();
+
+        // Populate Master Telemetry Dossier Elements
+        const endTitle = document.getElementById('end-title');
+        const endRankDesc = document.getElementById('end-rank-desc');
+        const endRewards = document.getElementById('end-rewards-txt');
+        const endUnlockNotice = document.getElementById('end-unlock-notice');
+        const dossierTime = document.getElementById('dossier-time');
+        const dossierSpeed = document.getElementById('dossier-speed');
+        const dossierStunts = document.getElementById('dossier-stunts');
+        const dossierSector = document.getElementById('dossier-sector');
+        const endPilotGrade = document.getElementById('end-pilot-grade');
+        const endPilotRatingTitle = document.getElementById('end-pilot-rating-title');
+        const endCitationBox = document.getElementById('end-citation-box');
+        const endTrophyBox = document.getElementById('end-trophy-box');
+        const btnEquipTrophy = document.getElementById('btn-equip-trophy');
+
+        if (endPilotGrade) endPilotGrade.textContent = pilotGrade;
+        if (endPilotRatingTitle) endPilotRatingTitle.textContent = gradeTitle;
+
+        if (dossierTime) dossierTime.textContent = `${raceTotalTime.toFixed(2)}s`;
+        if (dossierSpeed) dossierSpeed.textContent = `${Math.round(maxSpeedInRace)} KM/H`;
+        if (dossierStunts) dossierStunts.textContent = stuntsCompletedCount;
+        if (dossierSector) dossierSector.textContent = `0${currentSector.id} / 04`;
+
+        if (isFinalClimax) {
+            endTitle.textContent = 'OPERATION APEX COMPLETED';
+            endTitle.style.color = '#ffc400';
+            endRankDesc.textContent = 'PRIMARY ATMOSPHERIC UPLINK SECURED. 14,000,000 CITIZENS PROTECTED.';
+
+            if (endCitationBox) {
+                endCitationBox.classList.remove('hidden');
+                endCitationBox.textContent = '"Through unwavering agency and precision in the storm\'s eye, you completed the final protocol. The skies of the megacity belong to the Aegis Ace."';
+            }
+            if (endTrophyBox) endTrophyBox.classList.remove('hidden');
+            if (btnEquipTrophy) {
+                btnEquipTrophy.classList.remove('hidden');
+                btnEquipTrophy.onclick = () => {
+                    const apexSkin = CONFIG.SKINS.find(s => s.id === 'APEX_PROTO');
+                    if (apexSkin) {
+                        hangarManager.profile.selectedSkinId = apexSkin.id;
+                        hangarManager.saveProfile();
+                        playerDrone.applySkin(apexSkin);
+                    }
+                    endModal.classList.add('hidden');
+                    cameraRig.setEpilogueMode(false);
+                    hangarManager.openHangar();
+                };
+            }
+            if (endUnlockNotice) endUnlockNotice.textContent = 'CAMPAIGN MASTER STATUS ACHIEVED - APEX SOVEREIGN UNLOCKED';
+        } else {
+            endTitle.textContent = isExtraction ? 'SECTOR SECURED' : 'CIRCUIT VICTORY';
+            endTitle.style.color = '#F4A426';
+            endRankDesc.textContent = `Sector 0${currentSector.id} requirements achieved. Tactical telemetry archived.`;
+            if (endCitationBox) endCitationBox.classList.add('hidden');
+            if (endTrophyBox) endTrophyBox.classList.add('hidden');
+            if (btnEquipTrophy) btnEquipTrophy.classList.add('hidden');
+
+            if (endUnlockNotice) {
+                if (progResult.unlockedNext) {
+                    endUnlockNotice.textContent = `SECTOR 0${progResult.newProgress} UNLOCKED AND READY FOR LAUNCH`;
+                } else {
+                    endUnlockNotice.textContent = `SECTOR 0${currentSector.id} RECORD ARCHIVED`;
+                }
+            }
+        }
+
+        if (endRewards) {
+            endRewards.textContent = `+${rewardCredits} CREDITS AWARDED (Current Balance: ${hangarManager.profile.credits} CR)`;
+        }
     }
 
     animate();

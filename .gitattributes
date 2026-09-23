@@ -1,0 +1,7 @@
+# Enforce LF for shell scripts to ensure compatibility with Linux containers on Vercel
+*.sh text eol=lf
+*.json text
+*.md text
+*.js text
+*.css text
+*.html text

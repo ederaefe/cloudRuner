@@ -33,6 +33,23 @@ export class StuntFSM {
         this.stuntRollProgress = 0;
     }
 
+    setHeadingFromDirection(directionVector) {
+        if (!directionVector) return;
+        this.currentYaw = Math.atan2(directionVector.x, directionVector.z);
+        this.currentPitch = 0;
+        this.currentRoll = 0;
+        this.stuntRollProgress = 0;
+    }
+
+    syncWithQuaternion(quaternion) {
+        if (!quaternion) return;
+        _euler.setFromQuaternion(quaternion, 'YXZ');
+        this.currentYaw = _euler.y;
+        this.currentPitch = _euler.x;
+        this.currentRoll = _euler.z;
+        this.stuntRollProgress = 0;
+    }
+
     isCobraActive() {
         return this.state === STUNT_STATES.COBRA_AIRBRAKE;
     }
@@ -46,27 +63,34 @@ export class StuntFSM {
         const flightCfg = CONFIG.FLIGHT;
         const stuntCfg = CONFIG.STUNTS;
 
+        const maxNitro = drone.nitroMaxCapacity || CONFIG.NITRO.MAX_CAPACITY;
+
         // Check for Stunt transitions from Normal State
         if (this.state === STUNT_STATES.NORMAL) {
             if (inputState.stuntRollLeft) {
+                inputState.stuntRollLeft = false;
                 this.state = STUNT_STATES.SNAP_ROLL_LEFT;
                 this.stateTimer = 0;
                 this.stuntRollProgress = 0;
                 drone.group.scale.set(0.6, 0.6, 0.6); // Compress hitbox during roll
                 this.notify('SNAP ROLL LEFT', `+${stuntCfg.SNAP_ROLL_NITRO_GAIN}% NITRO`);
-                drone.nitroAmount = Math.min(CONFIG.NITRO.MAX_CAPACITY, drone.nitroAmount + stuntCfg.SNAP_ROLL_NITRO_GAIN);
+                drone.nitroAmount = Math.min(maxNitro, drone.nitroAmount + stuntCfg.SNAP_ROLL_NITRO_GAIN);
             } else if (inputState.stuntRollRight) {
+                inputState.stuntRollRight = false;
                 this.state = STUNT_STATES.SNAP_ROLL_RIGHT;
                 this.stateTimer = 0;
                 this.stuntRollProgress = 0;
                 drone.group.scale.set(0.6, 0.6, 0.6);
                 this.notify('SNAP ROLL RIGHT', `+${stuntCfg.SNAP_ROLL_NITRO_GAIN}% NITRO`);
-                drone.nitroAmount = Math.min(CONFIG.NITRO.MAX_CAPACITY, drone.nitroAmount + stuntCfg.SNAP_ROLL_NITRO_GAIN);
-            } else if (inputState.isCobraTriggered && drone.speedKmh > 110) {
-                this.state = STUNT_STATES.COBRA_AIRBRAKE;
-                this.stateTimer = 0;
-                this.notify('COBRA AIRBRAKE', '-62% SPEED DUMP');
-                drone.velocity.multiplyScalar(1.0 - stuntCfg.COBRA_SPEED_DUMP);
+                drone.nitroAmount = Math.min(maxNitro, drone.nitroAmount + stuntCfg.SNAP_ROLL_NITRO_GAIN);
+            } else if (inputState.isCobraTriggered) {
+                inputState.isCobraTriggered = false;
+                if (drone.speedKmh > 110) {
+                    this.state = STUNT_STATES.COBRA_AIRBRAKE;
+                    this.stateTimer = 0;
+                    this.notify('COBRA AIRBRAKE', '-62% SPEED DUMP');
+                    drone.velocity.multiplyScalar(1.0 - stuntCfg.COBRA_SPEED_DUMP);
+                }
             } else if (inputState.isKnifeEdgeHeld) {
                 this.state = STUNT_STATES.KNIFE_EDGE;
                 this.notify('KNIFE-EDGE ENGAGED', 'SLIT PENETRATION');
@@ -100,7 +124,7 @@ export class StuntFSM {
                 this.currentYaw -= inputState.steerYaw * flightCfg.YAW_RATE * 0.8 * dt;
 
                 // Award continuous streaming Nitro
-                drone.nitroAmount = Math.min(CONFIG.NITRO.MAX_CAPACITY, drone.nitroAmount + stuntCfg.KNIFE_EDGE_NITRO_RATE * dt);
+                drone.nitroAmount = Math.min(maxNitro, drone.nitroAmount + stuntCfg.KNIFE_EDGE_NITRO_RATE * dt);
 
                 if (!inputState.isKnifeEdgeHeld) {
                     this.state = STUNT_STATES.NORMAL;

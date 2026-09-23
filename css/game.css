@@ -380,7 +380,7 @@ body, html {
 /* Mode & Sector Selectors */
 .mode-row {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
     gap: 8px;
     margin: 12px 0;
 }
@@ -554,4 +554,208 @@ body, html {
     border-radius: 6px;
     font-family: inherit;
     font-size: 12px;
+}
+
+/* Campaign Sector Badges & Climax Styling */
+.sector-badge {
+    font-size: 9px;
+    font-weight: 900;
+    padding: 2px 7px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+
+.climax-badge {
+    background: linear-gradient(135deg, #ff2255, #990022);
+    color: #fff;
+    box-shadow: 0 0 8px rgba(255, 34, 85, 0.6);
+    animation: pulseGlow 1.8s infinite alternate;
+}
+
+.cleared-badge {
+    background: rgba(0, 255, 170, 0.2);
+    border: 1px solid #00ffaa;
+    color: #00ffaa;
+}
+
+.locked-badge {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.sector-card-btn.locked {
+    opacity: 0.6;
+    border-style: dashed;
+    cursor: not-allowed;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.sector-card-btn.climax-sector {
+    border-color: rgba(255, 34, 85, 0.5);
+    background: linear-gradient(90deg, rgba(255, 34, 85, 0.12), rgba(0, 0, 0, 0.35));
+}
+
+.sector-card-btn.climax-sector.active {
+    border-color: #ff2255;
+    box-shadow: 0 0 16px rgba(255, 34, 85, 0.35);
+}
+
+.sector-card-title {
+    font-weight: 900;
+    font-size: 13px;
+    color: #F4A426;
+    letter-spacing: 0.5px;
+}
+
+.sector-card-btn.climax-sector .sector-card-title {
+    color: #ff6688;
+}
+
+.sector-card-sub {
+    font-size: 11px;
+    color: #aaccff;
+    line-height: 1.3;
+}
+
+.sector-req-txt {
+    font-size: 10px;
+    font-weight: 800;
+    color: #ff8888;
+    margin-top: 4px;
+    letter-spacing: 0.5px;
+}
+
+.sector-record-txt {
+    font-size: 10px;
+    font-weight: 700;
+    color: #00ffff;
+    margin-top: 4px;
+}
+
+.skin-action-btn.campaign-locked {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffc400;
+    border: 1px dashed #ffc400;
+    cursor: not-allowed;
+}
+
+.skin-card.campaign-skin {
+    border-color: rgba(255, 196, 0, 0.4);
+    background: linear-gradient(180deg, rgba(255, 196, 0, 0.08), rgba(0, 0, 0, 0.4));
+}
+
+/* Shake Animation for Locked Interaction Feedback */
+@keyframes shakeAnim {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
+}
+
+.shake-anim {
+    animation: shakeAnim 0.35s ease-in-out;
+}
+
+@keyframes pulseGlow {
+    0% { opacity: 0.85; transform: scale(0.98); }
+    100% { opacity: 1.0; transform: scale(1.02); }
+}
+
+/* Master Telemetry Victory Dossier Styling */
+.dossier-container {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    border-radius: 12px;
+    padding: 14px;
+    margin: 12px 0;
+    text-align: left;
+}
+
+.dossier-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 16px;
+    font-size: 12px;
+    margin: 10px 0;
+}
+
+.dossier-row {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 3px;
+}
+
+.dossier-label {
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 700;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+}
+
+.dossier-val {
+    color: #fff;
+    font-family: monospace;
+    font-weight: 800;
+}
+
+.rank-display-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(244, 164, 38, 0.15), rgba(0, 255, 255, 0.15));
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 10px;
+    margin: 10px 0;
+}
+
+.pilot-grade-badge {
+    font-size: 38px;
+    font-weight: 900;
+    color: #ffc400;
+    text-shadow: 0 0 16px rgba(255, 196, 0, 0.8);
+    line-height: 1;
+}
+
+.pilot-grade-desc {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+.pilot-grade-title {
+    font-size: 14px;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: 0.5px;
+}
+
+.pilot-grade-sub {
+    font-size: 11px;
+    color: #aaccff;
+}
+
+.citation-banner {
+    font-style: italic;
+    font-size: 11px;
+    color: #d0e4ff;
+    background: rgba(255, 255, 255, 0.05);
+    border-left: 3px solid #ffc400;
+    padding: 8px 12px;
+    border-radius: 0 6px 6px 0;
+    margin: 10px 0;
+    line-height: 1.4;
+}
+
+.trophy-unlock-card {
+    background: linear-gradient(135deg, rgba(255, 196, 0, 0.25), rgba(0, 255, 213, 0.15));
+    border: 1px solid #ffc400;
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+    box-shadow: 0 0 20px rgba(255, 196, 0, 0.3);
 }

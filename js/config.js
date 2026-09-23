@@ -10,7 +10,8 @@ export const CONFIG = {
     MODES: {
         CIRCUIT_RACE: 'CIRCUIT_RACE',
         EXTRACTION_SOLO: 'EXTRACTION_SOLO',
-        EXTRACTION_VERSUS: 'EXTRACTION_VERSUS'
+        EXTRACTION_VERSUS: 'EXTRACTION_VERSUS',
+        TEAMWORK_COOP: 'TEAMWORK_COOP'
     },
 
     // Campaign Sectors / Levels
@@ -19,8 +20,10 @@ export const CONFIG = {
             id: 1,
             name: 'Downtown Canyons',
             subtitle: 'Daylight urban corridors with wide sky-lanes',
+            briefing: 'Establish flight telemetry and secure preliminary energy relays across low-altitude skyscrapers.',
             laps: 2,
             payloads: 4,
+            requiredSectorId: null,
             fogDensity: 0.0018,
             sunColor: 0xfff0dd,
             skyColor: 0x07111f,
@@ -31,8 +34,10 @@ export const CONFIG = {
             id: 2,
             name: 'Industrial Port & Cranes',
             subtitle: 'Overcast twilight with dense gantries and narrow chicanes',
+            briefing: 'Navigate coastal heavy-crane infrastructure under increasing wind shear to retrieve critical power cell freight.',
             laps: 3,
             payloads: 6,
+            requiredSectorId: 1,
             fogDensity: 0.0024,
             sunColor: 0xffaa77,
             skyColor: 0x0b1724,
@@ -43,13 +48,30 @@ export const CONFIG = {
             id: 3,
             name: 'Stratosphere Monoliths',
             subtitle: 'High-altitude storm run with vertical climbs and wind shear',
+            briefing: 'Ascend beyond cloud cover into high-tension storm corridors to link the sub-orbital relay nodes.',
             laps: 3,
             payloads: 8,
+            requiredSectorId: 2,
             fogDensity: 0.0030,
             sunColor: 0x88ccff,
             skyColor: 0x050c18,
             buildingSpread: 950,
             buildingHeightMax: 220
+        },
+        {
+            id: 4,
+            name: 'Operation Apex Horizon',
+            subtitle: 'Climactic storm eye run - deploy the Primary Atmospheric Uplink',
+            briefing: 'FINAL PROTOCOL: The metropolitan grid is in catastrophic cascade. Race through violent ionospheric vortexes and rival interceptors to deliver the Master Thermal Core.',
+            isClimax: true,
+            laps: 4,
+            payloads: 10,
+            requiredSectorId: 3,
+            fogDensity: 0.0035,
+            sunColor: 0xff4422,
+            skyColor: 0x14041a,
+            buildingSpread: 1100,
+            buildingHeightMax: 280
         }
     ],
 
@@ -90,6 +112,17 @@ export const CONFIG = {
             glowColor: 0x00ffff,
             unlocked: false,
             cost: 1000
+        },
+        {
+            id: 'APEX_PROTO',
+            name: 'Apex Sovereign',
+            bodyColor: 0x0a0c14,
+            accentColor: 0xffc400,
+            glowColor: 0x00ffd5,
+            unlocked: false,
+            cost: 0,
+            isCampaignExclusive: true,
+            badge: 'CAMPAIGN REWARD'
         }
     ],
 
@@ -135,37 +168,37 @@ export const CONFIG = {
 
     // Aircraft Kinematics & Aerodynamics
     FLIGHT: {
-        BASE_SPEED: 130.0,
-        MAX_CRUISE_SPEED: 180.0,
-        STAGE2_BOOST_SPEED: 240.0,
+        BASE_SPEED: 140.0,
+        MAX_CRUISE_SPEED: 200.0,
+        STAGE2_BOOST_SPEED: 250.0,
         STAGE3_BOOST_SPEED: 320.0,
-        ACCELERATION: 45.0,
-        BRAKING_DECEL: 55.0,
-        ROLL_RATE: 2.8,
-        PITCH_RATE: 2.2,
-        YAW_RATE: 1.8,
-        BANKING_TILT: 0.55,
-        PITCH_TILT: 0.35,
-        VERTICAL_THRUST: 32.0,
-        INDUCED_DRAG: 0.04,
-        DRAFTING_DISTANCE: 18.0,
-        DRAFTING_BOOST_RATE: 16.0
+        ACCELERATION: 60.0,
+        BRAKING_DECEL: 65.0,
+        ROLL_RATE: 3.2,
+        PITCH_RATE: 2.6,
+        YAW_RATE: 2.2,
+        BANKING_TILT: 0.65,
+        PITCH_TILT: 0.45,
+        VERTICAL_THRUST: 36.0,
+        INDUCED_DRAG: 0.035,
+        DRAFTING_DISTANCE: 20.0,
+        DRAFTING_BOOST_RATE: 18.0
     },
 
     // Intrinsic Aerobatic Stunt State Machine
     STUNTS: {
-        SNAP_ROLL_DURATION: 0.45,
+        SNAP_ROLL_DURATION: 0.42,
         SNAP_ROLL_NITRO_GAIN: 22.0,
         SNAP_ROLL_HITBOX_SCALE: 0.55,
         KNIFE_EDGE_MIN_BANK: 1.45,
         KNIFE_EDGE_MAX_BANK: 1.69,
-        KNIFE_EDGE_NITRO_RATE: 14.0,
-        KNIFE_EDGE_SCORE_RATE: 150,
-        COBRA_DURATION: 0.55,
+        KNIFE_EDGE_NITRO_RATE: 16.0,
+        KNIFE_EDGE_SCORE_RATE: 180,
+        COBRA_DURATION: 0.52,
         COBRA_PITCH_ANGLE: 1.35,
         COBRA_SPEED_DUMP: 0.62,
         NEAR_MISS_DISTANCE: 3.5,
-        NEAR_MISS_NITRO_GAIN: 12.0
+        NEAR_MISS_NITRO_GAIN: 14.0
     },
 
     // Nitro Overcharge Mechanics
@@ -174,7 +207,26 @@ export const CONFIG = {
         STAGE2_DRAIN_RATE: 18.0,
         STAGE3_DRAIN_RATE: 28.0,
         STAGE3_SWEET_SPOT_MIN: 70,
-        NATURAL_RECHARGE_RATE: 2.5
+        NATURAL_RECHARGE_RATE: 3.0
+    },
+
+    // Boost Enhancement Parameters (/boost)
+    BOOST: {
+        STAGE2_SPEED: 250.0,
+        STAGE3_SPEED: 320.0,
+        STAGE2_FOV: 86.0,
+        STAGE3_FOV: 102.0,
+        HYPER_OVERDRIVE_BURN: 26.0,
+        RECHARGE_RATE: 3.5,
+        SWEET_SPOT_MIN: 70.0
+    },
+
+    // Teamwork Squadron Parameters (/teamwork-preview)
+    TEAMWORK: {
+        ESCORT_DISTANCE: 14.0,
+        TETHER_DISTANCE: 25.0,
+        BOOST_RECHARGE_RATE: 20.0,
+        WINGMAN_COLOR: 0x00e5ff
     },
 
     // Extraction Cargo Mechanics
@@ -187,14 +239,14 @@ export const CONFIG = {
 
     // Camera Rig & Psychophysics
     CAMERA: {
-        BASE_FOV: 58.0,
-        STAGE2_FOV: 74.0,
-        STAGE3_FOV: 92.0,
-        BASE_DISTANCE: 7.5,
-        BASE_HEIGHT: 2.6,
-        SPRING_STIFFNESS: 8.5,
-        SPRING_DAMPING: 5.5,
-        SHAKE_INTENSITY: 0.18
+        BASE_FOV: 70.0,
+        STAGE2_FOV: 86.0,
+        STAGE3_FOV: 102.0,
+        BASE_DISTANCE: 6.4,
+        BASE_HEIGHT: 2.1,
+        SPRING_STIFFNESS: 10.0,
+        SPRING_DAMPING: 6.2,
+        SHAKE_INTENSITY: 0.22
     },
 
     // AI Rival Racers
@@ -212,7 +264,8 @@ export const CONFIG = {
         RIBBON_WIDTH: 14.0,
         TOTAL_GATES: 18,
         GATE_RADIUS: 8.5,
-        CHECKPOINT_RADIUS: 9.0
+        CHECKPOINT_RADIUS: 9.0,
+        LAPS_TO_WIN: 2
     },
 
     // Device Hardware Profiles
@@ -239,7 +292,7 @@ export const CONFIG = {
         },
         3: {
             name: 'DESKTOP_HIGH',
-            dpr: Math.min(window.devicePixelRatio || 1.5, 2.0),
+            dpr: Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1.5, 2.0),
             shadows: true,
             shadowMapSize: 2048,
             maxProps: 500,

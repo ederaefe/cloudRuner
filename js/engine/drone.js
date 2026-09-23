@@ -147,6 +147,20 @@ export class Drone {
         this.thrustGlow = new THREE.PointLight(0xE8580A, 2.0, 12);
         this.thrustGlow.position.set(0, 0, -2.2);
         this.group.add(this.thrustGlow);
+
+        // Booster exhaust flame geometry (/boost)
+        const exhaustGeo = new THREE.ConeGeometry(0.35, 2.4, 8);
+        exhaustGeo.rotateX(-Math.PI / 2);
+        exhaustGeo.translate(0, 0, -1.2);
+        const exhaustMat = new THREE.MeshBasicMaterial({
+            color: 0xE8580A,
+            transparent: true,
+            opacity: 0.0,
+            blending: THREE.AdditiveBlending
+        });
+        this.exhaustMesh = new THREE.Mesh(exhaustGeo, exhaustMat);
+        this.exhaustMesh.visible = false;
+        this.group.add(this.exhaustMesh);
     }
 
     applySkin(skin) {
@@ -165,10 +179,13 @@ export class Drone {
     updatePhysics(inputState, stuntFsm, dt) {
         const flightCfg = CONFIG.FLIGHT;
         const nitroCfg = CONFIG.NITRO;
+        const maxNitro = this.nitroMaxCapacity || nitroCfg.MAX_CAPACITY;
+        const maxCruiseSpeed = this.maxSpeedKmh || flightCfg.MAX_CRUISE_SPEED;
 
-        // Nitro management
+        // Nitro management & Hyper-Overdrive latching (/boost)
         if (inputState.isNitroHeld && this.nitroAmount > 0) {
-            if (this.nitroAmount >= nitroCfg.STAGE3_SWEET_SPOT_MIN) {
+            if (this.isHyperLocked || this.nitroAmount >= nitroCfg.STAGE3_SWEET_SPOT_MIN) {
+                this.isHyperLocked = true;
                 this.nitroStage = 3; // Hyper-Overdrive
                 this.nitroAmount = Math.max(0, this.nitroAmount - nitroCfg.STAGE3_DRAIN_RATE * dt);
             } else {
@@ -176,28 +193,35 @@ export class Drone {
                 this.nitroAmount = Math.max(0, this.nitroAmount - nitroCfg.STAGE2_DRAIN_RATE * dt);
             }
         } else {
+            this.isHyperLocked = false;
             this.nitroStage = 1;
             // Passive recharge
-            this.nitroAmount = Math.min(nitroCfg.MAX_CAPACITY, this.nitroAmount + nitroCfg.NATURAL_RECHARGE_RATE * dt);
+            this.nitroAmount = Math.min(maxNitro, this.nitroAmount + nitroCfg.NATURAL_RECHARGE_RATE * dt);
         }
 
         // Determine target cruise speed
         let targetSpeedKmh = flightCfg.BASE_SPEED;
         if (this.nitroStage === 3) targetSpeedKmh = flightCfg.STAGE3_BOOST_SPEED;
         else if (this.nitroStage === 2) targetSpeedKmh = flightCfg.STAGE2_BOOST_SPEED;
-        else if (inputState.forward > 0) targetSpeedKmh = flightCfg.MAX_CRUISE_SPEED;
+        else if (inputState.forward > 0) targetSpeedKmh = maxCruiseSpeed;
         else if (inputState.forward < 0) targetSpeedKmh = flightCfg.BASE_SPEED * 0.5;
 
         // Let Stunt FSM modulate speed and orientation
         stuntFsm.update(this, inputState, dt);
 
         if (!stuntFsm.isCobraActive()) {
-            const currentSpeedKmh = this.velocity.length() * 3.6;
             const targetSpeedMs = targetSpeedKmh / 3.6;
             const currentSpeedMs = this.velocity.length();
 
             const accelRate = (targetSpeedMs > currentSpeedMs) ? flightCfg.ACCELERATION : flightCfg.BRAKING_DECEL;
-            const newSpeedMs = THREE.MathUtils.lerp(currentSpeedMs, targetSpeedMs, Math.min(1.0, accelRate * dt / Math.max(1, currentSpeedMs)));
+            const speedStep = accelRate * dt;
+            let newSpeedMs = currentSpeedMs;
+
+            if (targetSpeedMs > currentSpeedMs) {
+                newSpeedMs = Math.min(targetSpeedMs, currentSpeedMs + speedStep);
+            } else {
+                newSpeedMs = Math.max(targetSpeedMs, currentSpeedMs - speedStep);
+            }
 
             // Forward direction vector in world space (zero-allocation)
             _fwdVector.set(0, 0, 1).applyQuaternion(this.quaternion);
@@ -220,16 +244,46 @@ export class Drone {
             r.rotation.z += (25.0 + cruiseRatio * 45.0) * dt;
         });
 
-        // Thruster glow intensity & color
+        // Thruster glow intensity & booster flame VFX (/boost)
         if (this.nitroStage === 3) {
             this.thrustGlow.color.setHex(0x00ffff);
-            this.thrustGlow.intensity = 3.5;
+            this.thrustGlow.intensity = 3.8;
+            if (this.exhaustMesh) {
+                this.exhaustMesh.visible = true;
+                this.exhaustMesh.material.color.setHex(0x00ffff);
+                this.exhaustMesh.material.opacity = 0.85 + Math.random() * 0.15;
+                this.exhaustMesh.scale.set(1.4, 1.4, 1.8 + Math.random() * 0.4);
+            }
         } else if (this.nitroStage === 2) {
             this.thrustGlow.color.setHex(0xE8580A);
-            this.thrustGlow.intensity = 2.5;
+            this.thrustGlow.intensity = 2.6;
+            if (this.exhaustMesh) {
+                this.exhaustMesh.visible = true;
+                this.exhaustMesh.material.color.setHex(0xE8580A);
+                this.exhaustMesh.material.opacity = 0.75 + Math.random() * 0.15;
+                this.exhaustMesh.scale.set(1.0, 1.0, 1.2 + Math.random() * 0.3);
+            }
         } else {
             this.thrustGlow.color.setHex(0x0E7C7B);
             this.thrustGlow.intensity = 1.0;
+            if (this.exhaustMesh) {
+                this.exhaustMesh.visible = false;
+            }
+        }
+    }
+
+    dispose() {
+        this.group.traverse(child => {
+            if (child.isMesh) {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                    else child.material.dispose();
+                }
+            }
+        });
+        if (this.scene) {
+            this.scene.remove(this.group);
         }
     }
 }

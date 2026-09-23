@@ -63,7 +63,7 @@ export class RacingHUD {
         }, 1400);
     }
 
-    update(drone, currentLap, positionRank, totalRacers, isDrafting) {
+    update(drone, currentLap, positionRank, totalRacers, isDrafting, totalLaps = null, isWingmanActive = false) {
         // Telemetry readout
         if (this.speedTxt) {
             this.speedTxt.textContent = Math.round(drone.speedKmh);
@@ -72,7 +72,8 @@ export class RacingHUD {
             this.altTxt.textContent = Math.round(drone.position.y);
         }
         if (this.lapTxt) {
-            this.lapTxt.textContent = `${currentLap} / ${CONFIG.TRACK.LAPS_TO_WIN}`;
+            const maxLaps = totalLaps || (CONFIG.TRACK?.LAPS_TO_WIN || 2);
+            this.lapTxt.textContent = `${currentLap} / ${maxLaps}`;
         }
         if (this.posTxt) {
             const suffix = positionRank === 1 ? 'ST' : (positionRank === 2 ? 'ND' : (positionRank === 3 ? 'RD' : 'TH'));
@@ -81,8 +82,9 @@ export class RacingHUD {
 
         // Nitro gauge
         if (this.nitroFill) {
-            const nitroPct = Math.round(drone.nitroAmount);
-            this.nitroFill.style.width = `${nitroPct}%`;
+            const maxNitro = drone.nitroMaxCapacity || CONFIG.NITRO.MAX_CAPACITY;
+            const nitroPct = Math.round((drone.nitroAmount / maxNitro) * 100);
+            this.nitroFill.style.width = `${Math.min(100, Math.max(0, nitroPct))}%`;
 
             this.nitroFill.classList.remove('stage2', 'stage3');
             if (drone.nitroStage === 3) {
@@ -98,6 +100,9 @@ export class RacingHUD {
                 } else if (drone.nitroStage === 2) {
                     this.nitroValTxt.textContent = 'AFTERBURNER';
                     this.nitroValTxt.style.color = '#E8580A';
+                } else if (isWingmanActive && isDrafting) {
+                    this.nitroValTxt.textContent = 'TEAMWORK TETHER';
+                    this.nitroValTxt.style.color = '#00e5ff';
                 } else if (isDrafting) {
                     this.nitroValTxt.textContent = 'SLIPSTREAM DRAFTING';
                     this.nitroValTxt.style.color = '#F4A426';
@@ -121,23 +126,23 @@ export class RacingHUD {
 
         this.slCtx.clearRect(0, 0, w, h);
 
-        const threshold = 170.0;
+        const threshold = 145.0;
         if (speedKmh < threshold) {
             this.speedLinesCanvas.style.opacity = '0';
             return;
         }
 
         const intensity = Math.min(1.0, (speedKmh - threshold) / (CONFIG.FLIGHT.STAGE3_BOOST_SPEED - threshold));
-        this.speedLinesCanvas.style.opacity = `${intensity * 0.9}`;
+        this.speedLinesCanvas.style.opacity = `${0.2 + intensity * 0.8}`;
 
-        this.slCtx.strokeStyle = (nitroStage === 3) ? 'rgba(0, 255, 255, 0.65)' : 'rgba(255, 255, 255, 0.45)';
-        this.slCtx.lineWidth = (nitroStage === 3) ? 2.5 : 1.5;
+        this.slCtx.strokeStyle = (nitroStage === 3) ? 'rgba(0, 255, 255, 0.8)' : (nitroStage === 2 ? 'rgba(244, 164, 38, 0.65)' : 'rgba(255, 255, 255, 0.35)');
+        this.slCtx.lineWidth = (nitroStage === 3) ? 2.5 : (nitroStage === 2 ? 2.0 : 1.2);
 
         for (let i = 0; i < this.particles.length; i++) {
             const p = this.particles[i];
             const dx = p.x - cx;
             const dy = p.y - cy;
-            const dist = Math.hypot(dx, dy);
+            const dist = Math.hypot(dx, dy) || 1.0;
 
             // Move outward towards periphery
             p.x += (dx / dist) * p.speed * intensity;
@@ -150,7 +155,7 @@ export class RacingHUD {
             this.slCtx.stroke();
 
             // Reset when leaving screen
-            if (p.x < 0 || p.x > w || p.y < 0 || p.y > h) {
+            if (p.x < 0 || p.x > w || p.y < 0 || p.y > h || isNaN(p.x)) {
                 p.x = cx + (Math.random() - 0.5) * (w * 0.5);
                 p.y = cy + (Math.random() - 0.5) * (h * 0.5);
             }

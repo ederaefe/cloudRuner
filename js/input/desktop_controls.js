@@ -46,11 +46,25 @@ export class DesktopControls {
         let roll = 0;
         let pitch = 0;
 
-        // Keyboard mapping
-        if (this.keys['w'] || this.keys['arrowup']) fwd += 1.0;
-        if (this.keys['s'] || this.keys['arrowdown']) fwd -= 0.8;
+        // Responsive keyboard flight mapping (Forward cruise with intuitive pitch & banking)
+        if (this.keys['w'] || this.keys['arrowup']) {
+            fwd += 1.0;
+            pitch -= 1.0; // Nose down / dive
+        }
+        if (this.keys['s'] || this.keys['arrowdown']) {
+            fwd -= 0.6;
+            pitch += 1.0; // Nose up / climb
+        }
+        if (this.keys['shift']) {
+            fwd += 0.6;
+        }
+
         if (this.keys['a'] || this.keys['arrowleft']) { yaw -= 1.0; roll -= 1.0; }
         if (this.keys['d'] || this.keys['arrowright']) { yaw += 1.0; roll += 1.0; }
+
+        // Dedicated pitch override keys (R/F or PageUp/PageDown)
+        if (this.keys['r'] || this.keys['pageup']) pitch += 1.0;
+        if (this.keys['f'] || this.keys['pagedown']) pitch -= 1.0;
 
         if (this.keys[' ']) {
             this.input.state.isNitroHeld = true;
@@ -93,6 +107,10 @@ export class DesktopControls {
                 if (gp.buttons[1]?.pressed) this.input.state.isKnifeEdgeHeld = true;
                 if (gp.buttons[2]?.pressed) this.input.state.isCobraTriggered = true;
             }
+        }
+
+        if (window._invertPitch) {
+            pitch = -pitch;
         }
 
         this.input.state.forward = fwd;

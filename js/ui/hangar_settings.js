@@ -22,6 +22,7 @@ export class HangarSettingsManager {
 
         this.initDOMElements();
         this.bindEvents();
+        this.updateSectorSelectionUI();
         this.updateHangarUI();
     }
 
@@ -30,6 +31,9 @@ export class HangarSettingsManager {
             credits: 600,
             selectedSkinId: 'SAR_ORANGE',
             unlockedSkins: ['SAR_ORANGE'],
+            campaignProgress: 1, // Highest sector unlocked (1 to 4)
+            isCampaignComplete: false,
+            sectorRecords: {}, // sectorId -> { time, rating, mode }
             upgrades: {
                 turbineSpeed: 1,
                 winchRadius: 1,
@@ -84,6 +88,7 @@ export class HangarSettingsManager {
         this.creditsDisplay = document.getElementById('hangar-credits-txt');
         this.skinCardsContainer = document.getElementById('skin-cards-list');
         this.upgradeCardsContainer = document.getElementById('upgrade-cards-list');
+        this.sectorContainer = document.getElementById('sector-selection-list');
     }
 
     bindEvents() {
@@ -103,20 +108,53 @@ export class HangarSettingsManager {
         if (btnPause) btnPause.addEventListener('click', () => this.openPause());
         if (btnResume) btnResume.addEventListener('click', () => this.closePause());
 
-        // Mode and Sector selector buttons
+        // Settings elements binding
+        const sliderVol = document.getElementById('slider-master-vol');
+        const chkHaptic = document.getElementById('chk-haptic');
+        const chkInvertPitch = document.getElementById('chk-invert-pitch');
+        const selectTier = document.getElementById('setting-graphics-tier');
+
+        // Apply loaded settings to globals
+        window._hapticEnabled = this.profile.settings?.hapticEnabled !== false;
+        window._invertPitch = this.profile.settings?.invertPitch === true;
+        if (this.sound && this.profile.settings?.masterVolume !== undefined) {
+            this.sound.setMasterVolume(this.profile.settings.masterVolume);
+        }
+
+        if (sliderVol) {
+            sliderVol.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                this.profile.settings.masterVolume = val;
+                if (this.sound) this.sound.setMasterVolume(val);
+            });
+        }
+
+        if (chkHaptic) {
+            chkHaptic.addEventListener('change', (e) => {
+                this.profile.settings.hapticEnabled = e.target.checked;
+                window._hapticEnabled = e.target.checked;
+            });
+        }
+
+        if (chkInvertPitch) {
+            chkInvertPitch.addEventListener('change', (e) => {
+                this.profile.settings.invertPitch = e.target.checked;
+                window._invertPitch = e.target.checked;
+            });
+        }
+
+        if (selectTier) {
+            selectTier.addEventListener('change', (e) => {
+                this.profile.settings.tierOverride = e.target.value;
+            });
+        }
+
+        // Mode selector buttons
         document.querySelectorAll('.mode-select-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('click', () => {
                 document.querySelectorAll('.mode-select-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 this.selectedMode = btn.dataset.mode;
-            });
-        });
-
-        document.querySelectorAll('.sector-card-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.sector-card-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                this.selectedSectorId = parseInt(btn.dataset.sector, 10);
             });
         });
 
@@ -132,6 +170,95 @@ export class HangarSettingsManager {
         });
     }
 
+    updateSectorSelectionUI() {
+        if (!this.sectorContainer) return;
+        this.sectorContainer.innerHTML = '';
+
+        CONFIG.SECTORS.forEach(sec => {
+            const isUnlocked = !sec.requiredSectorId || (this.profile.campaignProgress >= sec.id);
+            const isSelected = this.selectedSectorId === sec.id;
+            const isCleared = this.profile.campaignProgress > sec.id || (sec.id === 4 && this.profile.isCampaignComplete);
+            const record = this.profile.sectorRecords ? this.profile.sectorRecords[sec.id] : null;
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `sector-card-btn ${isSelected ? 'active' : ''} ${!isUnlocked ? 'locked' : ''} ${sec.isClimax ? 'climax-sector' : ''}`;
+            if (!btn.dataset) btn.dataset = {};
+            btn.dataset.sector = sec.id;
+
+            let badgeHtml = '';
+            if (sec.isClimax) {
+                badgeHtml = `<span class="sector-badge climax-badge">FINAL PROTOCOL</span>`;
+            } else if (isCleared) {
+                const gradeTxt = record?.grade ? ` [${record.grade}]` : '';
+                badgeHtml = `<span class="sector-badge cleared-badge">SECURED${gradeTxt}</span>`;
+            } else if (!isUnlocked) {
+                badgeHtml = `<span class="sector-badge locked-badge">LOCKED</span>`;
+            }
+
+            let lockNoticeHtml = '';
+            if (!isUnlocked) {
+                lockNoticeHtml = `<div class="sector-req-txt">REQUIRES: SECTOR 0${sec.requiredSectorId} SECURED</div>`;
+            } else if (record?.bestTime) {
+                lockNoticeHtml = `<div class="sector-record-txt">BEST TIME: ${record.bestTime.toFixed(2)}s | GRADE: ${record.grade || 'A'}</div>`;
+            }
+
+            btn.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <div class="sector-card-title">${sec.id < 10 ? '0' + sec.id : sec.id}. ${sec.name.toUpperCase()}</div>
+                    ${badgeHtml}
+                </div>
+                <div class="sector-card-sub">${sec.subtitle}</div>
+                ${lockNoticeHtml}
+            `;
+
+            btn.addEventListener('click', () => {
+                if (!isUnlocked) {
+                    if (window._hapticEnabled && navigator.vibrate) navigator.vibrate([40, 60, 40]);
+                    btn.classList.add('shake-anim');
+                    setTimeout(() => btn.classList.remove('shake-anim'), 400);
+                    return;
+                }
+                document.querySelectorAll('.sector-card-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                this.selectedSectorId = sec.id;
+            });
+
+            this.sectorContainer.appendChild(btn);
+        });
+    }
+
+    recordSectorResult(sectorId, resultData) {
+        if (!this.profile.sectorRecords) this.profile.sectorRecords = {};
+        const existing = this.profile.sectorRecords[sectorId];
+        if (!existing || (resultData.bestTime && resultData.bestTime < existing.bestTime)) {
+            this.profile.sectorRecords[sectorId] = resultData;
+        }
+
+        let unlockedNext = false;
+        if (sectorId >= this.profile.campaignProgress && this.profile.campaignProgress < CONFIG.SECTORS.length) {
+            this.profile.campaignProgress = sectorId + 1;
+            unlockedNext = true;
+        }
+
+        if (sectorId === 4) {
+            this.profile.isCampaignComplete = true;
+            if (!this.profile.unlockedSkins.includes('APEX_PROTO')) {
+                this.profile.unlockedSkins.push('APEX_PROTO');
+            }
+        }
+
+        this.saveProfile();
+        this.updateSectorSelectionUI();
+        this.updateHangarUI();
+
+        return {
+            unlockedNext,
+            newProgress: this.profile.campaignProgress,
+            isCampaignComplete: this.profile.isCampaignComplete
+        };
+    }
+
     openHangar() {
         this.updateHangarUI();
         if (this.hangarModal) this.hangarModal.classList.remove('hidden');
@@ -142,6 +269,24 @@ export class HangarSettingsManager {
     }
 
     openSettings() {
+        const sliderVol = document.getElementById('slider-master-vol');
+        const chkHaptic = document.getElementById('chk-haptic');
+        const chkInvertPitch = document.getElementById('chk-invert-pitch');
+        const selectTier = document.getElementById('setting-graphics-tier');
+
+        if (sliderVol && this.profile.settings?.masterVolume !== undefined) {
+            sliderVol.value = this.profile.settings.masterVolume;
+        }
+        if (chkHaptic && this.profile.settings?.hapticEnabled !== undefined) {
+            chkHaptic.checked = this.profile.settings.hapticEnabled;
+        }
+        if (chkInvertPitch && this.profile.settings?.invertPitch !== undefined) {
+            chkInvertPitch.checked = this.profile.settings.invertPitch;
+        }
+        if (selectTier && this.profile.settings?.tierOverride) {
+            selectTier.value = this.profile.settings.tierOverride;
+        }
+
         if (this.settingsModal) this.settingsModal.classList.remove('hidden');
     }
 
@@ -172,13 +317,24 @@ export class HangarSettingsManager {
                 const isUnlocked = this.profile.unlockedSkins.includes(skin.id);
                 const isSelected = this.profile.selectedSkinId === skin.id;
 
+                let btnLabel = '';
+                if (isSelected) {
+                    btnLabel = 'EQUIPPED';
+                } else if (isUnlocked) {
+                    btnLabel = 'EQUIP';
+                } else if (skin.isCampaignExclusive) {
+                    btnLabel = 'APEX TROPHY';
+                } else {
+                    btnLabel = `${skin.cost} CR`;
+                }
+
                 const card = document.createElement('div');
-                card.className = `skin-card ${isSelected ? 'selected' : ''}`;
+                card.className = `skin-card ${isSelected ? 'selected' : ''} ${skin.isCampaignExclusive ? 'campaign-skin' : ''}`;
                 card.innerHTML = `
                     <div class="skin-color-preview" style="background: #${skin.accentColor.toString(16).padStart(6, '0')};"></div>
-                    <div class="skin-name">${skin.name}</div>
-                    <button class="skin-action-btn ${isUnlocked ? 'unlocked' : 'locked'}">
-                        ${isSelected ? 'EQUIPPED' : (isUnlocked ? 'EQUIP' : `${skin.cost} CR`)}
+                    <div class="skin-name">${skin.name}${skin.isCampaignExclusive ? ' <span style="color:#ffc400; font-size:10px;">[TROPHY]</span>' : ''}</div>
+                    <button class="skin-action-btn ${isUnlocked ? 'unlocked' : (skin.isCampaignExclusive ? 'campaign-locked' : 'locked')}">
+                        ${btnLabel}
                     </button>
                 `;
 
@@ -190,6 +346,10 @@ export class HangarSettingsManager {
                         this.saveProfile();
                         this.updateHangarUI();
                         if (this.onSkinChanged) this.onSkinChanged(skin);
+                    } else if (skin.isCampaignExclusive) {
+                        if (window._hapticEnabled && navigator.vibrate) navigator.vibrate([30, 40, 30]);
+                        card.classList.add('shake-anim');
+                        setTimeout(() => card.classList.remove('shake-anim'), 400);
                     } else if (this.profile.credits >= skin.cost) {
                         this.profile.credits -= skin.cost;
                         this.profile.unlockedSkins.push(skin.id);

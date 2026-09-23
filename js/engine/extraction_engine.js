@@ -89,10 +89,24 @@ export class ExtractionEngine {
             opacity: 0.8
         });
 
-        // Pick building tops for payload spawns
-        const shuffled = [...buildingAABBs].sort(() => 0.5 - Math.random());
+        // Pick building tops for payload spawns with empty list fail-safe
+        const hasBuildings = buildingAABBs && buildingAABBs.length > 0;
+        const shuffled = hasBuildings ? [...buildingAABBs].sort(() => 0.5 - Math.random()) : [];
+
         for (let i = 0; i < count; i++) {
-            const b = shuffled[i % shuffled.length];
+            let spawnX = (i % 3 - 1) * 75;
+            let spawnZ = (Math.floor(i / 3) - 1) * 75;
+            let spawnY = 35.0;
+
+            if (hasBuildings) {
+                const b = shuffled[i % shuffled.length];
+                if (b && b.min && b.max) {
+                    spawnX = (b.min.x + b.max.x) / 2;
+                    spawnZ = (b.min.z + b.max.z) / 2;
+                    spawnY = b.max.y + 1.2;
+                }
+            }
+
             const pGroup = new THREE.Group();
 
             const boxMesh = new THREE.Mesh(boxGeo, boxMat);
@@ -102,10 +116,6 @@ export class ExtractionEngine {
             const pyrMesh = new THREE.Mesh(pyrGeo, pyrMat);
             pyrMesh.position.y = 8;
             pGroup.add(pyrMesh);
-
-            const spawnX = (b.min.x + b.max.x) / 2;
-            const spawnZ = (b.min.z + b.max.z) / 2;
-            const spawnY = b.max.y + 1.2;
 
             pGroup.position.set(spawnX, spawnY, spawnZ);
             this.scene.add(pGroup);
@@ -137,16 +147,24 @@ export class ExtractionEngine {
                     }
                 }
 
-                // 2. Versus AI drone collection check
-                if (isVersusAi && aiRacers) {
+                // 2. AI collection check (Versus Rival or Teamwork Wingman)
+                if (aiRacers) {
                     aiRacers.forEach(ai => {
                         const distToAi = ai.drone.position.distanceTo(p.position);
                         if (distToAi < 8.0) {
                             p.active = false;
                             p.group.visible = false;
-                            this.aiDeliveredCount++;
-                            if (this.onDelivered) {
-                                this.onDelivered('RIVAL DELIVERED CARGO', this.deliveredCount, this.aiDeliveredCount, this.totalCount);
+                            if (ai.isWingman) {
+                                this.deliveredCount++;
+                                if (this.sound) this.sound.playGateChime();
+                                if (this.onDelivered) {
+                                    this.onDelivered('WINGMAN EXTRACTED CARGO', this.deliveredCount, this.aiDeliveredCount, this.totalCount);
+                                }
+                            } else if (isVersusAi) {
+                                this.aiDeliveredCount++;
+                                if (this.onDelivered) {
+                                    this.onDelivered('RIVAL DELIVERED CARGO', this.deliveredCount, this.aiDeliveredCount, this.totalCount);
+                                }
                             }
                         }
                     });
@@ -172,7 +190,7 @@ export class ExtractionEngine {
             } else {
                 const progress = this.dropTimer / dropDuration;
                 if (this.carriedBox) {
-                    this.carriedBox.position.y = -1.5 - (progress * 12.0);
+                    this.carriedBox.position.y = -1.8 - (progress * 12.0);
                 }
             }
         }
@@ -188,9 +206,9 @@ export class ExtractionEngine {
             const boxGeo = new THREE.BoxGeometry(2.2, 1.8, 2.2);
             const boxMat = new THREE.MeshStandardMaterial({ color: 0xbd8a3a, roughness: 0.5 });
             this.carriedBox = new THREE.Mesh(boxGeo, boxMat);
-            this.carriedBox.position.set(0, -1.8, 0);
             drone.group.add(this.carriedBox);
         }
+        this.carriedBox.position.set(0, -1.8, 0);
         this.carriedBox.visible = true;
 
         if (this.sound) this.sound.playGateChime();
@@ -210,6 +228,7 @@ export class ExtractionEngine {
         this.payloadOnHook = null;
         if (this.carriedBox) {
             this.carriedBox.visible = false;
+            this.carriedBox.position.set(0, -1.8, 0); // Cleanly reset offset for subsequent cargo
         }
 
         this.deliveredCount++;
@@ -223,19 +242,40 @@ export class ExtractionEngine {
     dispose() {
         this.payloads.forEach(p => {
             this.scene.remove(p.group);
-            p.box.geometry.dispose();
-            p.pyramid.geometry.dispose();
+            if (p.box) {
+                p.box.geometry.dispose();
+                if (p.box.material) p.box.material.dispose();
+            }
+            if (p.pyramid) {
+                p.pyramid.geometry.dispose();
+                if (p.pyramid.material) p.pyramid.material.dispose();
+            }
         });
         this.payloads = [];
 
         if (this.basePlatform) {
+            this.basePlatform.traverse(child => {
+                if (child.isMesh) {
+                    if (child.geometry) child.geometry.dispose();
+                    if (child.material) child.material.dispose();
+                }
+            });
             this.scene.remove(this.basePlatform);
             this.basePlatform = null;
         }
 
+        if (this.winchGroup) {
+            this.scene.remove(this.winchGroup);
+            if (this.cableMesh) {
+                if (this.cableMesh.geometry) this.cableMesh.geometry.dispose();
+                if (this.cableMesh.material) this.cableMesh.material.dispose();
+            }
+        }
+
         if (this.carriedBox) {
             if (this.carriedBox.parent) this.carriedBox.parent.remove(this.carriedBox);
-            this.carriedBox.geometry.dispose();
+            if (this.carriedBox.geometry) this.carriedBox.geometry.dispose();
+            if (this.carriedBox.material) this.carriedBox.material.dispose();
             this.carriedBox = null;
         }
     }

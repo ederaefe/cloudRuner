@@ -29,6 +29,7 @@ export class TouchControls {
     }
 
     vibrate(pattern = 15) {
+        if (window._hapticEnabled === false) return;
         if ('vibrate' in navigator) {
             try {
                 navigator.vibrate(pattern);
@@ -39,17 +40,21 @@ export class TouchControls {
     }
 
     bindStickEvents() {
+        if (!this.stickZone) return;
+
         this.stickZone.addEventListener('pointerdown', (e) => {
             e.preventDefault();
             e.stopPropagation();
             if (this.stickPointerId === null) {
                 this.stickPointerId = e.pointerId;
-                this.stickZone.setPointerCapture(e.pointerId);
+                try {
+                    this.stickZone.setPointerCapture(e.pointerId);
+                } catch (err) {}
 
                 const rect = this.stickZone.getBoundingClientRect();
                 this.stickCenterX = rect.left + rect.width / 2;
                 this.stickCenterY = rect.top + rect.height / 2;
-                this.stickRadius = rect.width / 2;
+                this.stickRadius = rect.width / 2 || 65;
 
                 this.updateStick(e.clientX, e.clientY);
                 this.vibrate(10);
@@ -64,20 +69,28 @@ export class TouchControls {
         });
 
         const releaseStick = (e) => {
-            if (this.stickPointerId === e.pointerId) {
+            if (this.stickPointerId === e.pointerId || e.type === 'lostpointercapture') {
                 e.preventDefault();
-                this.stickPointerId = null;
-                if (this.stickZone.hasPointerCapture(e.pointerId)) {
-                    this.stickZone.releasePointerCapture(e.pointerId);
+                if (this.stickPointerId !== null) {
+                    try {
+                        if (this.stickZone.hasPointerCapture(this.stickPointerId)) {
+                            this.stickZone.releasePointerCapture(this.stickPointerId);
+                        }
+                    } catch (err) {}
                 }
-                this.stickKnob.style.transform = 'translate(-50%, -50%)';
+                this.stickPointerId = null;
+                if (this.stickKnob) {
+                    this.stickKnob.style.transform = 'translate(-50%, -50%)';
+                }
                 this.input.state.steerYaw = 0;
                 this.input.state.forward = 0;
+                this.input.state.roll = 0;
             }
         };
 
         this.stickZone.addEventListener('pointerup', releaseStick);
         this.stickZone.addEventListener('pointercancel', releaseStick);
+        this.stickZone.addEventListener('lostpointercapture', releaseStick);
     }
 
     updateStick(clientX, clientY) {
@@ -85,15 +98,18 @@ export class TouchControls {
         let dy = clientY - this.stickCenterY;
         const dist = Math.hypot(dx, dy);
 
-        if (dist > this.stickRadius) {
+        if (dist > this.stickRadius && dist > 0) {
             dx = (dx / dist) * this.stickRadius;
             dy = (dy / dist) * this.stickRadius;
         }
 
-        this.stickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        if (this.stickKnob) {
+            this.stickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        }
 
-        const nx = dx / this.stickRadius;
-        const ny = dy / this.stickRadius;
+        const radius = this.stickRadius || 65;
+        const nx = dx / radius;
+        const ny = dy / radius;
 
         // Steering: X controls Yaw and Roll; Y controls forward thrust / brake
         this.input.state.steerYaw = nx;
@@ -110,22 +126,37 @@ export class TouchControls {
 
         const bindHold = (btn, onDown, onUp) => {
             if (!btn) return;
+            let activePointerId = null;
+
             btn.addEventListener('pointerdown', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                btn.setPointerCapture(e.pointerId);
+                activePointerId = e.pointerId;
+                try {
+                    btn.setPointerCapture(e.pointerId);
+                } catch (err) {}
                 onDown();
                 this.vibrate(18);
             });
+
             const release = (e) => {
-                e.preventDefault();
-                if (btn.hasPointerCapture(e.pointerId)) {
-                    btn.releasePointerCapture(e.pointerId);
+                if (activePointerId === null || activePointerId === e.pointerId || e.type === 'lostpointercapture') {
+                    e.preventDefault();
+                    if (activePointerId !== null) {
+                        try {
+                            if (btn.hasPointerCapture(activePointerId)) {
+                                btn.releasePointerCapture(activePointerId);
+                            }
+                        } catch (err) {}
+                    }
+                    activePointerId = null;
+                    onUp();
                 }
-                onUp();
             };
+
             btn.addEventListener('pointerup', release);
             btn.addEventListener('pointercancel', release);
+            btn.addEventListener('lostpointercapture', release);
         };
 
         if (btnBoost) {

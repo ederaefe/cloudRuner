@@ -32,6 +32,7 @@
 1. **Circuit Grand Prix**: Pure adrenaline high-speed checkpoint racing against 3 autonomous AI rivals across multi-lap 3D spline circuits with drafting and Nitro overcharge.
 2. **Tactical Cargo Extraction (Solo)**: Race against the clock to navigate tight skyscraper corridors, magnetically latch rooftop payload crates with your drone's ventral winch, and extract them back to the base drop zone.
 3. **Tactical Cargo Extraction (Versus AI)**: Competitive cargo recovery. Race head-to-head against rival AI drones to locate, extract, and secure payloads first.
+4. **Teamwork Squadron (`#teamwork-preview`)**: Tactical co-op flight escorting with autonomous AI Wingman "ECHO-01". Maintain tight formation within 25m to activate the Slipstream Tether for continuous boost replenishment and cooperative cargo retrieval. Quick overcharge via `#boost`.
 
 ### Campaign Sectors
 * **Sector 01: Downtown Canyons**: Daylight urban grid featuring wide sky-lanes and gentle altitude transitions.

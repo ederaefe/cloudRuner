@@ -26,10 +26,11 @@ export class SoundEngine {
         if (this.ctx) return;
         try {
             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
             this.ctx = new AudioContextClass();
 
             this.masterGain = this.ctx.createGain();
-            this.masterGain.gain.setValueAtTime(0.7, this.ctx.currentTime);
+            this.masterGain.gain.setValueAtTime(0.8, this.ctx.currentTime);
             this.masterGain.connect(this.ctx.destination);
 
             this.setupTurbine();
@@ -41,9 +42,40 @@ export class SoundEngine {
     }
 
     resume() {
-        if (this.ctx && this.ctx.state === 'suspended') {
-            this.ctx.resume();
+        if (!this.ctx) {
+            this.init();
         }
+        if (this.ctx && this.ctx.state !== 'running') {
+            try {
+                const res = this.ctx.resume();
+                if (res && typeof res.catch === 'function') {
+                    res.catch(() => {});
+                }
+            } catch (e) {
+                // Ignore silent browser autoplay restriction
+            }
+        }
+    }
+
+    setMasterVolume(val) {
+        if (!this.ctx || !this.masterGain) return;
+        const clamped = Math.max(0, Math.min(1, Number(val) || 0));
+        try {
+            this.masterGain.gain.setValueAtTime(clamped, this.ctx.currentTime);
+        } catch (e) {}
+    }
+
+    unlockAudio() {
+        const unlock = () => {
+            this.init();
+            this.resume();
+            ['touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(evt => {
+                window.removeEventListener(evt, unlock, true);
+            });
+        };
+        ['touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(evt => {
+            window.addEventListener(evt, unlock, { once: true, capture: true });
+        });
     }
 
     setupTurbine() {
@@ -180,5 +212,160 @@ export class SoundEngine {
         gain.connect(this.masterGain);
         osc.start(now);
         osc.stop(now + 0.3);
+    }
+
+    playBoostIgnite(isStage3 = false) {
+        if (!this.enabled || !this.ctx) return;
+        const now = this.ctx.currentTime;
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+
+        osc.type = isStage3 ? 'sawtooth' : 'triangle';
+        const startFreq = isStage3 ? 600 : 380;
+        const peakFreq = isStage3 ? 1200 : 720;
+        osc.frequency.setValueAtTime(startFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(peakFreq, now + 0.12);
+        osc.frequency.exponentialRampToValueAtTime(200, now + 0.45);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(isStage3 ? 2800 : 1600, now);
+
+        gain.gain.setValueAtTime(isStage3 ? 0.38 : 0.24, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+
+        osc.start(now);
+        osc.stop(now + 0.5);
+    }
+
+    playCountdownPip(isFinal = false) {
+        if (!this.enabled || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = isFinal ? 'sawtooth' : 'sine';
+        const startFreq = isFinal ? 880 : 440;
+        const endFreq = isFinal ? 1320 : 550;
+        osc.frequency.setValueAtTime(startFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(endFreq, now + (isFinal ? 0.25 : 0.12));
+
+        gain.gain.setValueAtTime(isFinal ? 0.35 : 0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + (isFinal ? 0.45 : 0.22));
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + (isFinal ? 0.45 : 0.22));
+    }
+
+    playLaunchSpool() {
+        if (!this.enabled || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.exponentialRampToValueAtTime(640, now + 1.2);
+
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.linearRampToValueAtTime(0.28, now + 0.8);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 1.4);
+    }
+
+    playSectorUnlockChime() {
+        if (!this.enabled || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+
+        notes.forEach((freq, idx) => {
+            const noteTime = now + idx * 0.08;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, noteTime);
+
+            gain.gain.setValueAtTime(0.2, noteTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, noteTime + 0.45);
+
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+
+            osc.start(noteTime);
+            osc.stop(noteTime + 0.45);
+        });
+    }
+
+    playVictoryFanfare(isFinalCampaignClimax = false) {
+        if (!this.enabled || !this.ctx) return;
+        const now = this.ctx.currentTime;
+
+        // Gracefully dampen background engine spool to emphasize the musical resolution
+        if (this.engineGain) {
+            this.engineGain.gain.setTargetAtTime(0.01, now, 0.2);
+        }
+        if (this.windGain) {
+            this.windGain.gain.setTargetAtTime(0.01, now, 0.2);
+        }
+
+        // Chord progression: Root -> Subdominant -> Dominant -> Tonic Octave
+        // Rich synth voices using detuned dual oscillators (sawtooth filtered + triangle sub)
+        const chords = isFinalCampaignClimax
+            ? [
+                { time: 0.0, freqs: [220.00, 277.18, 329.63], duration: 0.8 }, // A maj
+                { time: 0.8, freqs: [246.94, 293.66, 369.99], duration: 0.8 }, // B min
+                { time: 1.6, freqs: [293.66, 369.99, 440.00], duration: 1.0 }, // D maj
+                { time: 2.6, freqs: [329.63, 415.30, 493.88], duration: 1.2 }, // E maj (Dominant)
+                { time: 3.8, freqs: [440.00, 554.37, 659.25, 880.00], duration: 3.2 } // A maj Triumph Octave
+              ]
+            : [
+                { time: 0.0, freqs: [261.63, 329.63, 392.00], duration: 0.6 }, // C maj
+                { time: 0.5, freqs: [349.23, 440.00, 523.25], duration: 0.6 }, // F maj
+                { time: 1.0, freqs: [392.00, 493.88, 587.33], duration: 0.8 }, // G maj
+                { time: 1.7, freqs: [523.25, 659.25, 783.99], duration: 1.8 }  // C maj Octave
+              ];
+
+        chords.forEach(chord => {
+            const chordStartTime = now + chord.time;
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(800, chordStartTime);
+            filter.frequency.exponentialRampToValueAtTime(3200, chordStartTime + 0.15);
+            filter.frequency.exponentialRampToValueAtTime(600, chordStartTime + chord.duration);
+            filter.connect(this.masterGain);
+
+            chord.freqs.forEach(freq => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = isFinalCampaignClimax ? 'sawtooth' : 'triangle';
+                osc.frequency.setValueAtTime(freq, chordStartTime);
+
+                // Subtle organic pitch detuning
+                osc.detune.setValueAtTime((Math.random() - 0.5) * 8, chordStartTime);
+
+                gain.gain.setValueAtTime(0.001, chordStartTime);
+                gain.gain.linearRampToValueAtTime(0.18 / chord.freqs.length, chordStartTime + 0.06);
+                gain.gain.exponentialRampToValueAtTime(0.001, chordStartTime + chord.duration);
+
+                osc.connect(gain);
+                gain.connect(filter);
+
+                osc.start(chordStartTime);
+                osc.stop(chordStartTime + chord.duration);
+            });
+        });
     }
 }

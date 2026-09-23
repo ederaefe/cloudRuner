@@ -7,6 +7,10 @@ Procedural CatmullRom ribbon, holographic hexagonal gates, and industrial props
 
 import { CONFIG } from '../config.js';
 
+// Pre-allocated static vectors for track calculations
+const _up = new THREE.Vector3(0, 1, 0);
+const _normal = new THREE.Vector3();
+
 export class TrackBuilder {
     constructor(scene, tier, sector = null) {
         this.scene = scene;
@@ -17,10 +21,12 @@ export class TrackBuilder {
         this.instancedProps = [];
         this.trackObjects = [];
         this.buildingAABBs = [];
+        this.launchPad = null;
 
         this.buildTrackSpline();
         this.createTrackRibbon();
         this.createHolographicGates();
+        this.createLaunchPad();
         this.populateInstancedEnvironment();
     }
 
@@ -57,12 +63,11 @@ export class TrackBuilder {
             const t = i / segments;
             const pt = this.spline.getPointAt(t);
             const tangent = this.spline.getTangentAt(t).normalize();
-            const up = new THREE.Vector3(0, 1, 0);
-            const normal = new THREE.Vector3().crossVectors(tangent, up).normalize();
+            _normal.crossVectors(tangent, _up).normalize();
 
             // Left and right track edge coordinates
-            const pL = pt.clone().addScaledVector(normal, -width / 2);
-            const pR = pt.clone().addScaledVector(normal, width / 2);
+            const pL = pt.clone().addScaledVector(_normal, -width / 2);
+            const pR = pt.clone().addScaledVector(_normal, width / 2);
 
             positions.push(pL.x, pL.y, pL.z);
             positions.push(pR.x, pR.y, pR.z);
@@ -97,15 +102,17 @@ export class TrackBuilder {
             const t = i / segments;
             const pt = this.spline.getPointAt(t);
             const tangent = this.spline.getTangentAt(t).normalize();
-            const normal = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0, 1, 0)).normalize();
-            edgePtsL.push(pt.clone().addScaledVector(normal, -width / 2));
-            edgePtsR.push(pt.clone().addScaledVector(normal, width / 2));
+            _normal.crossVectors(tangent, _up).normalize();
+            edgePtsL.push(pt.clone().addScaledVector(_normal, -width / 2));
+            edgePtsR.push(pt.clone().addScaledVector(_normal, width / 2));
         }
 
         const edgeLineL = new THREE.Line(new THREE.BufferGeometry().setFromPoints(edgePtsL), lineMat);
         const edgeLineR = new THREE.Line(new THREE.BufferGeometry().setFromPoints(edgePtsR), lineMat);
         this.scene.add(edgeLineL);
         this.scene.add(edgeLineR);
+
+        this.trackObjects.push(trackMesh, edgeLineL, edgeLineR);
     }
 
     createHolographicGates() {
@@ -147,8 +154,50 @@ export class TrackBuilder {
         }
     }
 
+    createLaunchPad() {
+        const padGroup = new THREE.Group();
+        const startPoint = this.spline.getPointAt(0);
+
+        // Heavy hexagonal launch platform
+        const platformGeo = new THREE.CylinderGeometry(14, 16, 1.6, 6);
+        const platformMat = new THREE.MeshStandardMaterial({
+            color: 0x111c2b,
+            roughness: 0.6,
+            metalness: 0.4
+        });
+        const platform = new THREE.Mesh(platformGeo, platformMat);
+        platform.position.set(startPoint.x, startPoint.y - 1.2, startPoint.z);
+        platform.receiveShadow = this.tier.shadows;
+        padGroup.add(platform);
+
+        // Glowing border ring
+        const ringGeo = new THREE.RingGeometry(11.5, 13.5, 6);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: 0x0E7C7B,
+            side: THREE.DoubleSide
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(startPoint.x, startPoint.y - 0.38, startPoint.z);
+        padGroup.add(ring);
+
+        // Center amber chevron / target decal
+        const decalGeo = new THREE.RingGeometry(2.5, 4.5, 32);
+        const decalMat = new THREE.MeshBasicMaterial({
+            color: 0xE8580A,
+            side: THREE.DoubleSide
+        });
+        const decal = new THREE.Mesh(decalGeo, decalMat);
+        decal.rotation.x = -Math.PI / 2;
+        decal.position.set(startPoint.x, startPoint.y - 0.36, startPoint.z);
+        padGroup.add(decal);
+
+        this.scene.add(padGroup);
+        this.launchPad = padGroup;
+    }
+
     populateInstancedEnvironment() {
-        // High-density instanced industrial skyscraper monoliths and crane gantries
+        // High-density instanced industrial skyscraper monoliths with safety corridor clearance
         const count = this.tier.maxProps;
         const boxGeo = new THREE.BoxGeometry(1, 1, 1);
         boxGeo.translate(0, 0.5, 0);
@@ -167,15 +216,58 @@ export class TrackBuilder {
         const spread = this.sector.buildingSpread || 700;
         const maxHeight = this.sector.buildingHeightMax || 140;
 
+        // Pre-sample spline points to guarantee zero collision with flight path
+        const sampleCount = 64;
+        const splineSamples = [];
+        for (let s = 0; s < sampleCount; s++) {
+            splineSamples.push(this.spline.getPointAt(s / sampleCount));
+        }
+
         for (let i = 0; i < count; i++) {
-            let bx = (Math.random() - 0.5) * spread;
-            let bz = (Math.random() - 0.5) * spread;
-            let by = -20;
+            let bx = 0, bz = 0, bw = 0, bd = 0, bh = 0;
+            let valid = false;
+            let attempts = 0;
 
-            const bw = 18 + Math.random() * 28;
-            const bd = 18 + Math.random() * 28;
-            const bh = 50 + Math.random() * maxHeight;
+            while (!valid && attempts < 20) {
+                attempts++;
+                bx = (Math.random() - 0.5) * spread;
+                bz = (Math.random() - 0.5) * spread;
+                bw = 18 + Math.random() * 28;
+                bd = 18 + Math.random() * 28;
+                bh = 50 + Math.random() * maxHeight;
 
+                // Ensure building does not clip through the track corridor or checkpoint gates
+                let tooClose = false;
+                const minClearance = 32 + Math.max(bw, bd) * 0.5;
+                const minClearanceSq = minClearance * minClearance;
+
+                for (let s = 0; s < sampleCount; s++) {
+                    const sp = splineSamples[s];
+                    const dx = bx - sp.x;
+                    const dz = bz - sp.z;
+                    if (dx * dx + dz * dz < minClearanceSq) {
+                        tooClose = true;
+                        break;
+                    }
+                }
+
+                // Check distance to launch pad
+                if (bx * bx + bz * bz < 42 * 42) {
+                    tooClose = true;
+                }
+
+                if (!tooClose) {
+                    valid = true;
+                }
+            }
+
+            if (!valid) {
+                // If max attempts reached, push building to safe outer perimeter
+                bx += (bx >= 0 ? 55 : -55);
+                bz += (bz >= 0 ? 55 : -55);
+            }
+
+            const by = -20;
             dummy.position.set(bx, by, bz);
             dummy.scale.set(bw, bh, bd);
             dummy.updateMatrix();
@@ -194,21 +286,44 @@ export class TrackBuilder {
     }
 
     dispose() {
+        if (this.launchPad) {
+            this.scene.remove(this.launchPad);
+            this.launchPad.traverse(c => {
+                if (c.geometry) c.geometry.dispose();
+                if (c.material) {
+                    if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+                    else c.material.dispose();
+                }
+            });
+            this.launchPad = null;
+        }
+
         this.gates.forEach(g => {
-            this.scene.remove(g.mesh);
-            g.mesh.geometry.dispose();
+            if (g.mesh) {
+                this.scene.remove(g.mesh);
+                if (g.mesh.geometry) g.mesh.geometry.dispose();
+                if (g.mesh.material) g.mesh.material.dispose();
+            }
         });
         this.gates = [];
 
         this.instancedProps.forEach(ip => {
             this.scene.remove(ip);
-            ip.geometry.dispose();
+            if (ip.geometry) ip.geometry.dispose();
+            if (ip.material) {
+                if (Array.isArray(ip.material)) ip.material.forEach(m => m.dispose());
+                else ip.material.dispose();
+            }
         });
         this.instancedProps = [];
 
         this.trackObjects.forEach(to => {
             this.scene.remove(to);
             if (to.geometry) to.geometry.dispose();
+            if (to.material) {
+                if (Array.isArray(to.material)) to.material.forEach(m => m.dispose());
+                else to.material.dispose();
+            }
         });
         this.trackObjects = [];
     }
