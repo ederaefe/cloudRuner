@@ -16,6 +16,23 @@
 </head>
 <body>
 
+<!-- Arcade Preloader Screen -->
+<div id="preload-screen">
+    <div class="preload-card">
+        <div class="preload-title">BARCH AERO-CANYON</div>
+        <div class="preload-subtitle">HIGH-VELOCITY INDUSTRIAL VTOL RACING</div>
+        <div class="preload-spinner"></div>
+        <div class="preload-meter-track">
+            <div id="preload-bar-fill" class="preload-meter-fill"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; width:100%; margin-top:10px; font-size:12px; font-weight:800;">
+            <span id="preload-status-txt" style="color:#aaccff;">CALIBRATING ENGINE...</span>
+            <span id="preload-percent-txt" style="color:#00ffff;">0%</span>
+        </div>
+        <button id="btn-preload-start" class="cta-button hidden" style="margin-top:20px; font-size:16px; background:linear-gradient(135deg, var(--primary-teal), #075251);">INITIALIZE FLIGHT SYSTEMS</button>
+    </div>
+</div>
+
 <!-- WebGL Viewport -->
 <canvas id="viewport-canvas"></canvas>
 
@@ -45,6 +62,7 @@
             <span id="lap-or-target-label" class="telemetry-label">LAP</span>
             <div id="hud-lap" class="telemetry-value">1 / 2</div>
         </div>
+        <button id="btn-toggle-sidebar" class="hud-quick-btn" title="Toggle Customizations Sidebar (TAB)">CUSTOMIZE [TAB]</button>
         <button id="btn-pause-game" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:6px 12px; font-weight:800; font-family:inherit; cursor:pointer;">PAUSE</button>
         <button id="btn-audio-toggle" style="background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:8px; padding:6px 10px; font-weight:800; font-family:inherit; cursor:pointer;">AUDIO: OFF</button>
     </div>
@@ -107,8 +125,9 @@
             <!-- Dynamically populated from CONFIG.SECTORS by HangarSettingsManager -->
         </div>
 
-        <div style="display:flex; gap:10px; margin: 14px 0 10px 0;">
-            <button id="btn-open-hangar" class="cta-button" style="background:rgba(255,255,255,0.12); flex:1;">HANGAR / LOADOUT</button>
+        <div style="display:flex; gap:8px; margin: 14px 0 10px 0;">
+            <button id="btn-open-sidebar-menu" class="cta-button" style="background:rgba(0,255,255,0.18); border:1px solid #00ffff; color:#00ffff; flex:1;">CUSTOMIZE [TAB]</button>
+            <button id="btn-open-help" class="cta-button" style="background:rgba(255,255,255,0.12); flex:1;">CONTROLS</button>
             <button id="btn-open-settings" class="cta-button" style="background:rgba(255,255,255,0.12); flex:1;">SETTINGS</button>
         </div>
 
@@ -183,6 +202,7 @@
         <h1 style="color:#F4A426;">MISSION PAUSED</h1>
         <div style="display:flex; flex-direction:column; gap:12px; margin:20px 0;">
             <button id="btn-resume-game" class="cta-button">RESUME FLIGHT</button>
+            <button id="btn-help-from-pause" class="cta-button" style="background:rgba(255,255,255,0.12);">FLIGHT ACADEMY</button>
             <button id="btn-restart-from-pause" class="cta-button" style="background:rgba(255,255,255,0.12);">RESTART MISSION</button>
             <button id="btn-menu-from-pause" class="cta-button" style="background:rgba(255,255,255,0.12);">MAIN MENU</button>
         </div>
@@ -245,6 +265,164 @@
     </div>
 </div>
 
+<!-- Customizations Sidebar Drawer -->
+<div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+<aside id="customization-sidebar" class="sidebar-drawer">
+    <div class="sidebar-header">
+        <div>
+            <div class="sidebar-brand">TACTICAL HANGAR</div>
+            <div id="sidebar-rank-txt" style="font-size:11px; color:#00ffff; font-weight:800;">SECTOR 01</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <span id="sidebar-credits-txt" class="sidebar-credits-badge">600 CR</span>
+            <button id="btn-close-sidebar" class="sidebar-close-btn">&times;</button>
+        </div>
+    </div>
+
+    <!-- Tab navigation -->
+    <div class="sidebar-nav-tabs">
+        <button class="sidebar-nav-btn active" data-tab="hangar">SKINS</button>
+        <button class="sidebar-nav-btn" data-tab="upgrades">UPGRADES</button>
+        <button class="sidebar-nav-btn" data-tab="sectors">SECTORS</button>
+        <button class="sidebar-nav-btn" data-tab="modes">MODES</button>
+    </div>
+
+    <!-- Tab panels -->
+    <div class="sidebar-content-area">
+        <div id="sidebar-tab-hangar" class="sidebar-tab-panel active">
+            <div id="sidebar-skins-list" class="sidebar-cards-grid"></div>
+        </div>
+        <div id="sidebar-tab-upgrades" class="sidebar-tab-panel">
+            <div id="sidebar-upgrades-list" class="sidebar-cards-grid"></div>
+        </div>
+        <div id="sidebar-tab-sectors" class="sidebar-tab-panel">
+            <div id="sidebar-sectors-list" class="sidebar-cards-grid"></div>
+        </div>
+        <div id="sidebar-tab-modes" class="sidebar-tab-panel">
+            <div id="sidebar-modes-list" class="sidebar-cards-grid"></div>
+        </div>
+    </div>
+
+    <div class="sidebar-footer">
+        <button id="sidebar-btn-academy" class="cta-button" style="background:rgba(255,255,255,0.12); font-size:13px;">FLIGHT ACADEMY & CONTROLS</button>
+    </div>
+</aside>
+
+<!-- Flight Academy & Controls Guide Modal -->
+<div id="help-modal" class="overlay-screen hidden">
+    <div class="glass-modal" style="max-width: 620px; max-height: 90vh; overflow-y: auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h1 style="color:#00ffff; font-size:22px; text-shadow:0 0 12px rgba(0,255,255,0.6);">FLIGHT ACADEMY & CONTROLS</h1>
+            <button id="btn-close-help" class="sidebar-close-btn">&times;</button>
+        </div>
+
+        <div class="help-tabs-row">
+            <button class="help-tab-btn active" data-tab="desktop">KEYBOARD</button>
+            <button class="help-tab-btn" data-tab="touch">TOUCH</button>
+            <button class="help-tab-btn" data-tab="gamepad">GAMEPAD</button>
+            <button class="help-tab-btn" data-tab="stunts">STUNTS & OPS</button>
+        </div>
+
+        <div id="help-tab-desktop" class="help-tab-content active">
+            <div class="controls-card">
+                <div><strong>THROTTLE & PITCH</strong><br><span style="font-size:11px; color:#88aacc;">Control forward thrust and vertical climbing/diving</span></div>
+                <div><span class="keycap">W</span> Dive / Forward | <span class="keycap">S</span> Climb / Flare</div>
+            </div>
+            <div class="controls-card">
+                <div><strong>BANKING & STEER</strong><br><span style="font-size:11px; color:#88aacc;">High-G aerodynamic roll and lateral canyon maneuvering</span></div>
+                <div><span class="keycap">A</span> Steer Left | <span class="keycap">D</span> Steer Right</div>
+            </div>
+            <div class="controls-card">
+                <div><strong>NITRO AFTERBURNER</strong><br><span style="font-size:11px; color:#88aacc;">Stage 2 Boost (250 km/h) & Stage 3 Hyper-Overdrive (320 km/h)</span></div>
+                <div><span class="keycap">SPACE</span> Boost</div>
+            </div>
+            <div class="controls-card">
+                <div><strong>SNAP AILERON ROLLS</strong><br><span style="font-size:11px; color:#88aacc;">360 corkscrew, shrinks hitbox 45%, grants +22% instant Nitro</span></div>
+                <div><span class="keycap">Q</span> Roll Left | <span class="keycap">E</span> Roll Right</div>
+            </div>
+            <div class="controls-card">
+                <div><strong>KNIFE-EDGE BANK</strong><br><span style="font-size:11px; color:#88aacc;">Hold 90 bank to slice through narrow vertical building slits</span></div>
+                <div><span class="keycap">C</span> (Hold) Knife-Edge</div>
+            </div>
+            <div class="controls-card">
+                <div><strong>PUGACHEV'S COBRA</strong><br><span style="font-size:11px; color:#88aacc;">Sudden 80 high-drag flare dumping 62% speed for hairpin turns</span></div>
+                <div><span class="keycap">X</span> Cobra Airbrake</div>
+            </div>
+            <div class="controls-card">
+                <div><strong>CUSTOMIZATIONS & PAUSE</strong><br><span style="font-size:11px; color:#88aacc;">Quick access to all hangar skins, upgrades, and pause</span></div>
+                <div><span class="keycap">TAB</span> Customizations | <span class="keycap">ESC</span> Pause</div>
+            </div>
+        </div>
+
+        <div id="help-tab-touch" class="help-tab-content">
+            <div class="controls-card">
+                <div><strong>VIRTUAL FLIGHT STICK (LEFT SCREEN)</strong><br><span style="font-size:11px; color:#88aacc;">Drag anywhere on the left side of the screen to steer, pitch, and control thrust.</span></div>
+                <div style="font-size:12px; color:#00ffff; font-weight:800;">DYNAMIC JOYSTICK</div>
+            </div>
+            <div class="controls-card">
+                <div><strong>TACTICAL ACTION PADS (RIGHT SCREEN)</strong><br><span style="font-size:11px; color:#88aacc;">Dedicated instant-response buttons for rolls, knife-edge, cobra, and nitro boost.</span></div>
+                <div style="font-size:12px; color:#F4A426; font-weight:800;">ACTION BUTTONS</div>
+            </div>
+            <div class="controls-card">
+                <div><strong>HAPTIC FEEDBACK</strong><br><span style="font-size:11px; color:#88aacc;">Tactile vibration feedback triggers on gate passes, near-misses, impacts, and stunts.</span></div>
+                <div style="font-size:12px; color:#00ff88; font-weight:800;">ACTIVE VIBRATION</div>
+            </div>
+        </div>
+
+        <div id="help-tab-gamepad" class="help-tab-content">
+            <div class="controls-card">
+                <div><strong>LEFT ANALOG STICK</strong><br><span style="font-size:11px; color:#88aacc;">Dual-axis flight kinematics: Pitch Up/Down and Roll/Yaw Steer</span></div>
+                <span class="keycap">L-STICK</span>
+            </div>
+            <div class="controls-card">
+                <div><strong>TRIGGERS & THROTTLE</strong><br><span style="font-size:11px; color:#88aacc;">Right Trigger = Turbine Acceleration; Left Trigger = Airbrake / Reverse</span></div>
+                <div><span class="keycap">RT / R2</span> Throttle | <span class="keycap">LT / L2</span> Brake</div>
+            </div>
+            <div class="controls-card">
+                <div><strong>AFTERBURNER & NITRO</strong><br><span style="font-size:11px; color:#88aacc;">Engage triple-stage nitro boost and hyper-overdrive</span></div>
+                <span class="keycap">A / Cross</span>
+            </div>
+            <div class="controls-card">
+                <div><strong>AEROBATIC STUNTS</strong><br><span style="font-size:11px; color:#88aacc;">Bumpers for Rolls, X/Square for Knife-Edge, B/Circle for Cobra Airbrake</span></div>
+                <div><span class="keycap">LB/RB</span> Rolls | <span class="keycap">X</span> Knife | <span class="keycap">B</span> Cobra</div>
+            </div>
+        </div>
+
+        <div id="help-tab-stunts" class="help-tab-content">
+            <div class="stunt-guide-card">
+                <div class="stunt-guide-title">TRIPLE-STAGE NITRO OVERCHARGE</div>
+                <div class="stunt-guide-desc">Stage 1 is standard cruise (140-200 km/h). Holding Boost engages Stage 2 Afterburner (250 km/h). When your nitro gauge enters the flashing yellow threshold (&gt;70%), tap Boost again to latch Stage 3 Hyper-Overdrive (320 km/h) with maximum FOV elasticity and radial speed warp!</div>
+            </div>
+            <div class="stunt-guide-card">
+                <div class="stunt-guide-title">SNAP AILERON ROLLS (+22% NITRO)</div>
+                <div class="stunt-guide-desc">Execute a 360 corkscrew by pressing Q or E. The drone's collision volume compresses by 45%, allowing you to slip through narrow gaps between skyscrapers and instantly replenishing +22% Nitro.</div>
+            </div>
+            <div class="stunt-guide-card">
+                <div class="stunt-guide-title">KNIFE-EDGE FLIGHT (CONTINUOUS SCORE & NITRO)</div>
+                <div class="stunt-guide-desc">Hold C to bank 90 degrees with automatic counter-rudder compensation. Slice through vertical skyscraper canyons and crane legs to stream continuous bonus score multipliers and continuous Nitro recharge.</div>
+            </div>
+            <div class="stunt-guide-card">
+                <div class="stunt-guide-title">PUGACHEV'S COBRA AIRBRAKE (62% SPEED DUMP)</div>
+                <div class="stunt-guide-desc">Press X to perform an authentic aerodynamic post-stall pitch flare. Your wing planform acts as a massive high-drag airbrake, dumping 62% forward speed in 0.5 seconds to negotiate sharp hairpin entries without crashing into barriers.</div>
+            </div>
+            <div class="stunt-guide-card">
+                <div class="stunt-guide-title">NEAR-MISS FACADE BUZZING</div>
+                <div class="stunt-guide-desc">Skim building facades, crane gantries, or rival drones within 3.5 meters at speeds above 100 km/h. Triggers a directional sonic air-crack, camera buffeting, and immediate +14% Nitro surge.</div>
+            </div>
+            <div class="stunt-guide-card">
+                <div class="stunt-guide-title">AI WINGMAN ESCORT (TEAMWORK SQUAD)</div>
+                <div class="stunt-guide-desc">In Teamwork Squad mode, AI Wingman ECHO-01 flies formation escort with you. Stay within the 25-meter energy tether beam to receive continuous high-rate Nitro replenishment.</div>
+            </div>
+            <div class="stunt-guide-card">
+                <div class="stunt-guide-title">CARGO EXTRACTION OPS</div>
+                <div class="stunt-guide-desc">In Cargo Extraction modes, hover over rooftop payload crates to latch the magnetic winch cable. Carry the crate back to base helipads and descend below 36 meters to score points before time expires.</div>
+            </div>
+        </div>
+
+        <button id="btn-close-help-footer" class="cta-button" style="margin-top:16px;">RETURN TO FLIGHT</button>
+    </div>
+</div>
+
 <!-- Main Game Application Bootstrap -->
 <script type="module">
 import { Coordinator } from './js/coordinator.js';
@@ -262,6 +440,9 @@ import { ExtractionEngine } from './js/engine/extraction_engine.js';
 import { HangarSettingsManager } from './js/ui/hangar_settings.js';
 import { RacingHUD } from './js/ui/hud.js';
 import { ParticleSystem } from './js/engine/particle_system.js';
+import { PreloadScreen } from './js/ui/preload_screen.js';
+import { CustomizationSidebar } from './js/ui/sidebar.js';
+import { ControlsGuide } from './js/ui/controls_guide.js';
 
 window.addEventListener('load', () => {
     // 1. Hardware Profiler & Coordinator
@@ -278,23 +459,22 @@ window.addEventListener('load', () => {
     soundEngine.unlockAudio();
     const inputManager = new InputManager();
 
+    const desktopControls = new DesktopControls(inputManager);
+    desktopControls.init();
+    window._desktopControls = desktopControls;
+
     if (coordinator.profile.isTouch) {
         const touchControls = new TouchControls(inputManager);
         touchControls.init();
-    } else {
-        const desktopControls = new DesktopControls(inputManager);
-        desktopControls.init();
-        window._desktopControls = desktopControls;
     }
 
     const audioBtn = document.getElementById('btn-audio-toggle');
     if (audioBtn) {
         audioBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            soundEngine.init();
-            soundEngine.resume();
-            audioBtn.textContent = soundEngine.enabled ? 'AUDIO: ON' : 'AUDIO: OFF';
-            audioBtn.style.color = soundEngine.enabled ? '#00ffff' : '#ffffff';
+            const isEnabled = soundEngine.toggle();
+            audioBtn.textContent = isEnabled ? 'AUDIO: ON' : 'AUDIO: OFF';
+            audioBtn.style.color = isEnabled ? '#00ffff' : '#ffffff';
         });
     }
 
@@ -367,7 +547,38 @@ window.addEventListener('load', () => {
     playerDrone.applySkin(initialSkin);
     playerDrone.applyUpgrades(hangarManager.getUpgradedStats());
 
-    // 7. Track & Extraction Mode Systems
+    // 7. Controls Guide & Customizations Sidebar
+    const controlsGuide = new ControlsGuide();
+    const btnOpenHelp = document.getElementById('btn-open-help');
+    const btnHelpPause = document.getElementById('btn-help-from-pause');
+    const btnCloseHelpFooter = document.getElementById('btn-close-help-footer');
+    if (btnOpenHelp) btnOpenHelp.addEventListener('click', () => controlsGuide.open());
+    if (btnHelpPause) btnHelpPause.addEventListener('click', () => controlsGuide.open());
+    if (btnCloseHelpFooter) btnCloseHelpFooter.addEventListener('click', () => controlsGuide.close());
+
+    const customizationSidebar = new CustomizationSidebar(
+        hangarManager,
+        controlsGuide,
+        (skin) => {
+            playerDrone.applySkin(skin);
+        },
+        () => {},
+        () => {}
+    );
+
+    const btnOpenSidebarMenu = document.getElementById('btn-open-sidebar-menu');
+    if (btnOpenSidebarMenu) btnOpenSidebarMenu.addEventListener('click', () => customizationSidebar.open());
+
+    // 8. Arcade Preloader Boot Sequence
+    const startModal = document.getElementById('start-modal');
+    startModal.classList.add('hidden'); // Initially hidden while preloader runs
+
+    const preloadScreen = new PreloadScreen(soundEngine, () => {
+        startModal.classList.remove('hidden');
+    });
+    preloadScreen.runBootSequence(coordinator, renderer, scene, camera);
+
+    // 9. Track & Extraction Mode Systems
     let track = null;
     let extractionEngine = null;
     let aiRacers = [];
@@ -404,6 +615,7 @@ window.addEventListener('load', () => {
         const startTangent = track.spline.getTangentAt(0).normalize();
         playerDrone.position.copy(startPos);
         playerDrone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), startTangent);
+        stuntFsm.syncWithQuaternion(playerDrone.quaternion);
 
         // Mode specific setup
         const modeBadge = document.getElementById('hud-mode-badge');
@@ -493,6 +705,9 @@ window.addEventListener('load', () => {
     }
 
     // 9. Lifecycle & Context Recovery
+    let isContextLost = false;
+    let stateBeforeContextLoss = 'START';
+
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
             if (window._gameState === 'RACING') {
@@ -503,8 +718,18 @@ window.addEventListener('load', () => {
             }
             releaseWakeLock();
         } else {
-            if (soundEngine.ctx && soundEngine.ctx.state === 'suspended' && window._gameState === 'RACING') {
-                soundEngine.ctx.resume();
+            if (soundEngine.ctx && (soundEngine.ctx.state === 'suspended' || soundEngine.ctx.state === 'interrupted') && window._gameState === 'RACING') {
+                soundEngine.resume();
+                // Safari fallback: arm one-time user-gesture unlock if resume is blocked
+                const resumeOnGesture = () => {
+                    soundEngine.resume();
+                    ['touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(evt => {
+                        window.removeEventListener(evt, resumeOnGesture, true);
+                    });
+                };
+                ['touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(evt => {
+                    window.addEventListener(evt, resumeOnGesture, { once: true, capture: true });
+                });
             }
             if (window._gameState === 'RACING') {
                 requestWakeLock();
@@ -512,11 +737,10 @@ window.addEventListener('load', () => {
         }
     });
 
-    let isContextLost = false;
-
     canvas.addEventListener('webglcontextlost', (e) => {
         e.preventDefault();
         isContextLost = true;
+        stateBeforeContextLoss = window._gameState || 'START';
         console.warn('WebGL context lost - suspending flight loop');
         window._gameState = 'PAUSED';
     });
@@ -525,11 +749,20 @@ window.addEventListener('load', () => {
         console.info('WebGL context restored - recovering scene');
         isContextLost = false;
         renderer.setSize(window.innerWidth, window.innerHeight);
-        window._gameState = 'RACING';
+        // Mark all materials in the scene for shader recompilation
+        scene.traverse((obj) => {
+            if (obj.material) {
+                if (Array.isArray(obj.material)) {
+                    obj.material.forEach(m => { m.needsUpdate = true; });
+                } else {
+                    obj.material.needsUpdate = true;
+                }
+            }
+        });
+        window._gameState = stateBeforeContextLoss;
     });
 
     // 10. Modal Buttons & Race Lifecycle
-    const startModal = document.getElementById('start-modal');
     const endModal = document.getElementById('end-modal');
     const btnLaunch = document.getElementById('btn-launch-race');
     const btnRestart = document.getElementById('btn-restart-race');
@@ -562,13 +795,14 @@ window.addEventListener('load', () => {
     function checkUrlRoutes() {
         const hash = (window.location.hash || '').toLowerCase();
         const search = (window.location.search || '').toLowerCase();
-        if (hash.includes('teamwork-preview') || search.includes('teamwork-preview')) {
+        const pathname = (window.location.pathname || '').toLowerCase();
+        if (pathname.includes('teamwork-preview') || hash.includes('teamwork-preview') || search.includes('teamwork-preview')) {
             hangarManager.selectedMode = CONFIG.MODES.TEAMWORK_COOP;
             document.querySelectorAll('.mode-select-btn').forEach(b => {
                 b.classList.toggle('active', b.dataset.mode === 'TEAMWORK_COOP');
             });
             hud.showStuntAlert('TEAMWORK PREVIEW', 'WINGMAN FORMATION ARMED');
-        } else if (hash.includes('boost') || search.includes('boost')) {
+        } else if (pathname.includes('boost') || hash.includes('boost') || search.includes('boost')) {
             playerDrone.nitroAmount = playerDrone.nitroMaxCapacity || 100.0;
             hud.showStuntAlert('BOOST OVERCHARGE', 'NITRO FUEL CELL CHARGED');
         }
@@ -614,6 +848,7 @@ window.addEventListener('load', () => {
     // 12. Simulation Loop (Zero-Allocation & Paced)
     const clock = new THREE.Clock();
     const _alignDir = new THREE.Vector3(0, 0, 1);
+    const _cameraForward = new THREE.Vector3();
     let previousNitroStage = 1;
 
     function animate() {
@@ -642,14 +877,33 @@ window.addEventListener('load', () => {
                 previousNitroStage = playerDrone.nitroStage;
             }
 
+            // Building collision deflection & near-miss facade buzzing
+            if (track && typeof track.checkBuildingCollision === 'function') {
+                track.checkBuildingCollision(playerDrone, cameraRig, soundEngine, hud, dt);
+            }
+
             // Out-of-bounds safety check & clean realignment (fixes camera whiplash & NaN)
-            if (isNaN(playerDrone.position.x) || playerDrone.position.y < -65 || (track && playerDrone.position.length() > 650)) {
+            const pos = playerDrone.position;
+            const vel = playerDrone.velocity;
+            const isInvalidPos = !Number.isFinite(pos.x) || !Number.isFinite(pos.y) || !Number.isFinite(pos.z) ||
+                                 !Number.isFinite(vel.x) || !Number.isFinite(vel.y) || !Number.isFinite(vel.z);
+            const isOutOfBounds = pos.y < -65 || pos.y > 380 || (track && pos.length() > 680);
+
+            if (isInvalidPos || isOutOfBounds) {
                 hud.showStuntAlert('COURSE REALIGNMENT', 'RETURNING TO TRACK');
                 soundEngine.playNearMiss();
-                const safeGate = track.gates[Math.max(0, nextGateIndex - 1) % track.gates.length];
-                playerDrone.position.copy(safeGate.position);
-                playerDrone.quaternion.setFromUnitVectors(_alignDir, safeGate.normal);
+                const safeGate = (track && track.gates && track.gates.length > 0)
+                    ? track.gates[Math.max(0, nextGateIndex - 1) % track.gates.length]
+                    : null;
+                if (safeGate) {
+                    playerDrone.position.copy(safeGate.position);
+                    playerDrone.quaternion.setFromUnitVectors(_alignDir, safeGate.normal);
+                } else {
+                    playerDrone.position.set(0, 15, 0);
+                    playerDrone.quaternion.identity();
+                }
                 playerDrone.velocity.set(0, 0, 0);
+                stuntFsm.syncWithQuaternion(playerDrone.quaternion);
                 cameraRig.reset(playerDrone);
             }
 
@@ -731,10 +985,10 @@ window.addEventListener('load', () => {
             // Update particle system
             playerDrone.updateParticles(dt);
             
-            // Emit speed streak particles from camera perspective
+            // Emit speed streak particles from camera perspective (zero-allocation)
             if (playerDrone.particleSystem && playerDrone.speedKmh > 140) {
-                const cameraForward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-                playerDrone.particleSystem.emitSpeedStreak(camera.position, cameraForward, playerDrone.speedKmh);
+                _cameraForward.set(0, 0, -1).applyQuaternion(camera.quaternion);
+                playerDrone.particleSystem.emitSpeedStreak(camera.position, _cameraForward, playerDrone.speedKmh);
             }
 
             // Cleanly consume one-shot stunt triggers

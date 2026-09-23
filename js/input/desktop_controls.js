@@ -38,6 +38,20 @@ export class DesktopControls {
                 this.gamepadIndex = null;
             }
         });
+
+        window.addEventListener('blur', () => this.resetKeys());
+    }
+
+    resetKeys() {
+        this.keys = {};
+        if (this.input && this.input.state) {
+            this.input.state.isNitroHeld = false;
+            this.input.state.isKnifeEdgeHeld = false;
+            this.input.state.forward = 0;
+            this.input.state.steerYaw = 0;
+            this.input.state.roll = 0;
+            this.input.state.pitch = 0;
+        }
     }
 
     update() {

@@ -10,6 +10,7 @@ import { CONFIG } from '../config.js';
 // Pre-allocated static vectors for track calculations
 const _up = new THREE.Vector3(0, 1, 0);
 const _normal = new THREE.Vector3();
+const _colNormal = new THREE.Vector3();
 
 export class TrackBuilder {
     constructor(scene, tier, sector = null) {
@@ -20,8 +21,10 @@ export class TrackBuilder {
         this.gates = [];
         this.instancedProps = [];
         this.trackObjects = [];
+        this.skyBridges = [];
         this.buildingAABBs = [];
         this.launchPad = null;
+        this.lastNearMissTime = 0;
 
         this.buildTrackSpline();
         this.createTrackRibbon();
@@ -197,15 +200,15 @@ export class TrackBuilder {
     }
 
     populateInstancedEnvironment() {
-        // High-density instanced industrial skyscraper monoliths with safety corridor clearance
         const count = this.tier.maxProps;
         const boxGeo = new THREE.BoxGeometry(1, 1, 1);
         boxGeo.translate(0, 0.5, 0);
 
+        // Vibrant PBR building material with support for per-instance colors
         const buildingMat = new THREE.MeshStandardMaterial({
-            color: 0x09121d,
-            roughness: 0.8,
-            metalness: 0.2
+            color: 0xffffff,
+            roughness: 0.55,
+            metalness: 0.35
         });
 
         const instancedCity = new THREE.InstancedMesh(boxGeo, buildingMat, count);
@@ -216,32 +219,99 @@ export class TrackBuilder {
         const spread = this.sector.buildingSpread || 700;
         const maxHeight = this.sector.buildingHeightMax || 140;
 
-        // Pre-sample spline points to guarantee zero collision with flight path
-        const sampleCount = 64;
+        // Sector-coordinated color palettes
+        const defaultPalette = [0x0F8B8D, 0x1E3D59, 0xEC9A29, 0x17B978, 0x2B4162, 0xFF6E40, 0x38A3A5, 0x57CC99];
+        const palette = (this.sector.buildingColors && this.sector.buildingColors.length > 0)
+            ? this.sector.buildingColors
+            : defaultPalette;
+
+        // Pre-sample spline points for corridor framing and safety envelopes
+        const sampleCount = 96;
         const splineSamples = [];
+        const splineNormals = [];
         for (let s = 0; s < sampleCount; s++) {
-            splineSamples.push(this.spline.getPointAt(s / sampleCount));
+            const t = s / sampleCount;
+            const pt = this.spline.getPointAt(t);
+            const tan = this.spline.getTangentAt(t).normalize();
+            const norm = new THREE.Vector3().crossVectors(tan, _up).normalize();
+            splineSamples.push(pt);
+            splineNormals.push(norm);
         }
 
-        for (let i = 0; i < count; i++) {
+        const canyonCount = Math.floor(count * 0.65);
+        const outerCount = count - canyonCount;
+        const tempColor = new THREE.Color();
+
+        // 1. Canyon-Aligned Flankers (Architecturally Coordinated Along Spline)
+        for (let i = 0; i < canyonCount; i++) {
+            const sampleIdx = Math.floor((i / canyonCount) * sampleCount) % sampleCount;
+            const sp = splineSamples[sampleIdx];
+            const norm = splineNormals[sampleIdx];
+            const side = (i % 2 === 0) ? 1 : -1;
+
+            // Safe corridor setback with controlled variation for near-miss opportunities
+            const trackWidth = CONFIG.TRACK.RIBBON_WIDTH || 12;
+            const corridorSetback = (trackWidth * 0.5) + 22 + ((i * 7) % 24);
+            const lateralJitter = ((i * 13) % 15) - 7.5;
+
+            const bw = 22 + ((i * 11) % 26);
+            const bd = 22 + ((i * 17) % 26);
+            const bh = 55 + ((i * 23) % Math.max(30, maxHeight - 30));
+
+            const bx = sp.x + (norm.x * corridorSetback * side) + (norm.z * lateralJitter);
+            const bz = sp.z + (norm.z * corridorSetback * side) - (norm.x * lateralJitter);
+            const by = -20;
+
+            dummy.position.set(bx, by, bz);
+            dummy.scale.set(bw, bh, bd);
+            if (dummy.rotation && typeof dummy.rotation.set === 'function') {
+                dummy.rotation.set(0, (i * 0.2), 0);
+            } else if (dummy.rotation) {
+                dummy.rotation.y = (i * 0.2);
+            }
+            dummy.updateMatrix();
+
+            instancedCity.setMatrixAt(i, dummy.matrix);
+
+            // Per-instance coordinated color
+            const colorHex = palette[i % palette.length];
+            tempColor.setHex(colorHex);
+            if (typeof instancedCity.setColorAt === 'function') {
+                instancedCity.setColorAt(i, tempColor);
+            }
+
+            this.buildingAABBs.push({
+                min: new THREE.Vector3(bx - bw / 2, by, bz - bd / 2),
+                max: new THREE.Vector3(bx + bw / 2, by + bh, bz + bd / 2),
+                topCenter: new THREE.Vector3(bx, by + bh, bz),
+                width: bw,
+                depth: bd,
+                height: bh
+            });
+        }
+
+        // 2. Outer Urban Skyline Clusters (Horizon Monoliths)
+        for (let i = 0; i < outerCount; i++) {
+            const instIdx = canyonCount + i;
             let bx = 0, bz = 0, bw = 0, bd = 0, bh = 0;
             let valid = false;
             let attempts = 0;
 
-            while (!valid && attempts < 20) {
+            while (!valid && attempts < 25) {
                 attempts++;
-                bx = (Math.random() - 0.5) * spread;
-                bz = (Math.random() - 0.5) * spread;
-                bw = 18 + Math.random() * 28;
-                bd = 18 + Math.random() * 28;
-                bh = 50 + Math.random() * maxHeight;
+                const angle = (i / outerCount) * Math.PI * 2 + (attempts * 0.1);
+                const radius = 180 + Math.random() * (spread * 0.5);
+                bx = Math.cos(angle) * radius;
+                bz = Math.sin(angle) * radius;
+                bw = 26 + Math.random() * 34;
+                bd = 26 + Math.random() * 34;
+                bh = 70 + Math.random() * maxHeight;
 
-                // Ensure building does not clip through the track corridor or checkpoint gates
                 let tooClose = false;
-                const minClearance = 32 + Math.max(bw, bd) * 0.5;
+                const minClearance = 36 + Math.max(bw, bd) * 0.5;
                 const minClearanceSq = minClearance * minClearance;
 
-                for (let s = 0; s < sampleCount; s++) {
+                for (let s = 0; s < sampleCount; s += 2) {
                     const sp = splineSamples[s];
                     const dx = bx - sp.x;
                     const dz = bz - sp.z;
@@ -251,8 +321,7 @@ export class TrackBuilder {
                     }
                 }
 
-                // Check distance to launch pad
-                if (bx * bx + bz * bz < 42 * 42) {
+                if (bx * bx + bz * bz < 45 * 45) {
                     tooClose = true;
                 }
 
@@ -262,27 +331,275 @@ export class TrackBuilder {
             }
 
             if (!valid) {
-                // If max attempts reached, push building to safe outer perimeter
-                bx += (bx >= 0 ? 55 : -55);
-                bz += (bz >= 0 ? 55 : -55);
+                bx += (bx >= 0 ? 80 : -80);
+                bz += (bz >= 0 ? 80 : -80);
             }
 
             const by = -20;
             dummy.position.set(bx, by, bz);
             dummy.scale.set(bw, bh, bd);
+            if (dummy.rotation && typeof dummy.rotation.set === 'function') {
+                dummy.rotation.set(0, (i * 0.45), 0);
+            } else if (dummy.rotation) {
+                dummy.rotation.y = (i * 0.45);
+            }
             dummy.updateMatrix();
 
-            instancedCity.setMatrixAt(i, dummy.matrix);
+            instancedCity.setMatrixAt(instIdx, dummy.matrix);
+
+            const colorHex = palette[(canyonCount + i) % palette.length];
+            tempColor.setHex(colorHex);
+            if (typeof instancedCity.setColorAt === 'function') {
+                instancedCity.setColorAt(instIdx, tempColor);
+            }
 
             this.buildingAABBs.push({
                 min: new THREE.Vector3(bx - bw / 2, by, bz - bd / 2),
-                max: new THREE.Vector3(bx + bw / 2, by + bh, bz + bd / 2)
+                max: new THREE.Vector3(bx + bw / 2, by + bh, bz + bd / 2),
+                topCenter: new THREE.Vector3(bx, by + bh, bz),
+                width: bw,
+                depth: bd,
+                height: bh
             });
         }
 
         instancedCity.instanceMatrix.needsUpdate = true;
+        if (instancedCity.instanceColor) {
+            instancedCity.instanceColor.needsUpdate = true;
+        }
         this.scene.add(instancedCity);
         this.instancedProps.push(instancedCity);
+
+        // 3. Instanced Rooftop Architectural Helipads & Communication Spires
+        this.createRooftopDetails();
+    }
+
+    createRooftopDetails() {
+        if (!this.buildingAABBs || this.buildingAABBs.length === 0) return;
+
+        // Select every 3rd building with sufficient roof width for helipads
+        const helipadCandidates = this.buildingAABBs.filter((b, idx) => idx % 3 === 0 && b.width >= 24 && b.depth >= 24);
+        if (helipadCandidates.length > 0) {
+            const padCount = helipadCandidates.length;
+            const padGeo = new THREE.CylinderGeometry(5.5, 6.0, 0.6, 16);
+            const padMat = new THREE.MeshStandardMaterial({
+                color: 0x1f2937,
+                roughness: 0.7,
+                metalness: 0.3
+            });
+            const instancedPads = new THREE.InstancedMesh(padGeo, padMat, padCount);
+            instancedPads.receiveShadow = this.tier.shadows;
+
+            const dummy = new THREE.Object3D();
+            for (let i = 0; i < padCount; i++) {
+                const b = helipadCandidates[i];
+                dummy.position.set(b.topCenter.x, b.topCenter.y + 0.3, b.topCenter.z);
+                if (dummy.rotation && typeof dummy.rotation.set === 'function') dummy.rotation.set(0, 0, 0);
+                dummy.scale.set(1, 1, 1);
+                dummy.updateMatrix();
+                instancedPads.setMatrixAt(i, dummy.matrix);
+            }
+            instancedPads.instanceMatrix.needsUpdate = true;
+            this.scene.add(instancedPads);
+            this.instancedProps.push(instancedPads);
+
+            // Glowing rooftop ring target
+            const ringGeo = new THREE.RingGeometry(3.5, 4.8, 16);
+            const trimColor = this.sector.trimColor || 0x00ffff;
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: trimColor,
+                side: THREE.DoubleSide
+            });
+            const instancedRings = new THREE.InstancedMesh(ringGeo, ringMat, padCount);
+            for (let i = 0; i < padCount; i++) {
+                const b = helipadCandidates[i];
+                dummy.position.set(b.topCenter.x, b.topCenter.y + 0.62, b.topCenter.z);
+                if (dummy.rotation && typeof dummy.rotation.set === 'function') {
+                    dummy.rotation.set(-Math.PI / 2, 0, 0);
+                } else if (dummy.rotation) {
+                    dummy.rotation.x = -Math.PI / 2;
+                }
+                dummy.scale.set(1, 1, 1);
+                dummy.updateMatrix();
+                instancedRings.setMatrixAt(i, dummy.matrix);
+            }
+            instancedRings.instanceMatrix.needsUpdate = true;
+            this.scene.add(instancedRings);
+            this.instancedProps.push(instancedRings);
+        }
+
+        // Rooftop Communication Spires with Aviation Warning Beacons on tall towers
+        const spireCandidates = this.buildingAABBs.filter((b, idx) => idx % 4 === 1 && b.height > 85);
+        if (spireCandidates.length > 0) {
+            const spireCount = spireCandidates.length;
+            const spireGeo = new THREE.CylinderGeometry(0.25, 0.6, 16, 6);
+            spireGeo.translate(0, 8, 0);
+            const spireMat = new THREE.MeshStandardMaterial({
+                color: 0x4b5563,
+                metalness: 0.8,
+                roughness: 0.2
+            });
+            const instancedSpires = new THREE.InstancedMesh(spireGeo, spireMat, spireCount);
+            
+            const beaconGeo = new THREE.SphereGeometry(0.8, 8, 8);
+            const beaconMat = new THREE.MeshBasicMaterial({
+                color: (this.sector.beaconColors && this.sector.beaconColors[0]) || 0xff0055
+            });
+            const instancedBeacons = new THREE.InstancedMesh(beaconGeo, beaconMat, spireCount);
+
+            const dummy = new THREE.Object3D();
+            for (let i = 0; i < spireCount; i++) {
+                const b = spireCandidates[i];
+                dummy.position.set(b.topCenter.x, b.topCenter.y, b.topCenter.z);
+                if (dummy.rotation && typeof dummy.rotation.set === 'function') dummy.rotation.set(0, 0, 0);
+                dummy.scale.set(1, 1, 1);
+                dummy.updateMatrix();
+                instancedSpires.setMatrixAt(i, dummy.matrix);
+
+                dummy.position.set(b.topCenter.x, b.topCenter.y + 16, b.topCenter.z);
+                dummy.updateMatrix();
+                instancedBeacons.setMatrixAt(i, dummy.matrix);
+            }
+            instancedSpires.instanceMatrix.needsUpdate = true;
+            instancedBeacons.instanceMatrix.needsUpdate = true;
+
+            this.scene.add(instancedSpires);
+            this.scene.add(instancedBeacons);
+            this.instancedProps.push(instancedSpires, instancedBeacons);
+        }
+
+        // Sky-Bridges spanning across canyon walls
+        this.createSkyBridges();
+    }
+
+    createSkyBridges() {
+        if (!this.spline) return;
+        const bridgeFractions = [0.25, 0.62, 0.88];
+        const bridgeGeo = new THREE.BoxGeometry(42, 3.5, 8);
+        const bridgeMat = new THREE.MeshStandardMaterial({
+            color: 0x1a2332,
+            roughness: 0.5,
+            metalness: 0.5
+        });
+
+        const trimGeo = new THREE.BoxGeometry(42.2, 0.6, 8.2);
+        const trimMat = new THREE.MeshBasicMaterial({
+            color: this.sector.trimColor || 0x00ffff
+        });
+
+        bridgeFractions.forEach((f) => {
+            const pt = this.spline.getPointAt(f);
+            const tan = this.spline.getTangentAt(f).normalize();
+            const norm = new THREE.Vector3().crossVectors(tan, _up).normalize();
+
+            const bridgeGroup = new THREE.Group();
+            const mainMesh = new THREE.Mesh(bridgeGeo, bridgeMat);
+            const trimMesh = new THREE.Mesh(trimGeo, trimMat);
+            trimMesh.position.y = 1.8;
+
+            bridgeGroup.add(mainMesh);
+            bridgeGroup.add(trimMesh);
+
+            // Elevated over track
+            bridgeGroup.position.set(pt.x, pt.y + 26, pt.z);
+            bridgeGroup.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), norm);
+
+            this.scene.add(bridgeGroup);
+            this.skyBridges.push(bridgeGroup);
+        });
+    }
+
+    checkBuildingCollision(drone, cameraRig = null, soundEngine = null, hud = null, dt = 0.016) {
+        if (!drone || !this.buildingAABBs || this.buildingAABBs.length === 0) return false;
+
+        const px = drone.position.x;
+        const py = drone.position.y;
+        const pz = drone.position.z;
+        const droneRadius = 2.2;
+        const droneRadiusSq = droneRadius * droneRadius;
+        const nearMissDistSq = (droneRadius + 3.8) * (droneRadius + 3.8);
+
+        let collided = false;
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+
+        for (let i = 0; i < this.buildingAABBs.length; i++) {
+            const b = this.buildingAABBs[i];
+
+            // Fast axis-aligned bounding volume pruning
+            if (py > b.max.y + 4.0 || py < b.min.y - 2.0) continue;
+            const halfW = (b.max.x - b.min.x) * 0.5;
+            const halfD = (b.max.z - b.min.z) * 0.5;
+            const midX = (b.min.x + b.max.x) * 0.5;
+            const midZ = (b.min.z + b.max.z) * 0.5;
+            if (Math.abs(px - midX) > halfW + 6.0) continue;
+            if (Math.abs(pz - midZ) > halfD + 6.0) continue;
+
+            // Find closest point on AABB to drone center
+            const cx = Math.max(b.min.x, Math.min(px, b.max.x));
+            const cy = Math.max(b.min.y, Math.min(py, b.max.y));
+            const cz = Math.max(b.min.z, Math.min(pz, b.max.z));
+
+            const dx = px - cx;
+            const dy = py - cy;
+            const dz = pz - cz;
+            const distSq = dx * dx + dy * dy + dz * dz;
+
+            // 1. Direct penetration / collision check
+            if (distSq < droneRadiusSq) {
+                collided = true;
+                const dist = Math.sqrt(distSq);
+
+                if (dist > 0.001) {
+                    _colNormal.set(dx / dist, dy / dist, dz / dist);
+                } else {
+                    // Deep penetration fallback: push along smallest overlap axis
+                    const overlapX1 = px - b.min.x;
+                    const overlapX2 = b.max.x - px;
+                    const overlapZ1 = pz - b.min.z;
+                    const overlapZ2 = b.max.z - pz;
+                    const minOverlap = Math.min(overlapX1, overlapX2, overlapZ1, overlapZ2);
+                    if (minOverlap === overlapX1) _colNormal.set(-1, 0, 0);
+                    else if (minOverlap === overlapX2) _colNormal.set(1, 0, 0);
+                    else if (minOverlap === overlapZ1) _colNormal.set(0, 0, -1);
+                    else _colNormal.set(0, 0, 1);
+                }
+
+                // Push drone outside the building boundary
+                const pushDist = (droneRadius - dist) + 0.2;
+                drone.position.addScaledVector(_colNormal, pushDist);
+
+                // Deflect and dampen velocity (elastic bounce with hull energy absorption)
+                if (drone.velocity) {
+                    const dot = drone.velocity.dot(_colNormal);
+                    if (dot < 0) {
+                        drone.velocity.addScaledVector(_colNormal, -1.5 * dot);
+                    }
+                    drone.velocity.multiplyScalar(0.72);
+                }
+
+                if (cameraRig && typeof cameraRig.triggerShake === 'function') cameraRig.triggerShake(0.38);
+                if (drone.emitCollisionParticles && typeof drone.emitCollisionParticles === 'function') drone.emitCollisionParticles(_colNormal);
+                if (soundEngine && typeof soundEngine.playNearMiss === 'function') soundEngine.playNearMiss();
+                if (hud && typeof hud.showStuntAlert === 'function' && (now - this.lastNearMissTime > 600)) {
+                    hud.showStuntAlert('IMPACT DEFLECTION', 'SHIELD COMPENSATED');
+                    this.lastNearMissTime = now;
+                }
+                break;
+            }
+            // 2. High-speed near-miss facade buzzing
+            else if (distSq < nearMissDistSq && drone.speedKmh > 150) {
+                if (now - this.lastNearMissTime > 500) {
+                    this.lastNearMissTime = now;
+                    if (cameraRig && typeof cameraRig.triggerShake === 'function') cameraRig.triggerShake(0.12);
+                    if (soundEngine && typeof soundEngine.playNearMiss === 'function') soundEngine.playNearMiss();
+                    const maxN = drone.nitroMaxCapacity || (CONFIG.NITRO?.MAX_CAPACITY || 100);
+                    drone.nitroAmount = Math.min(maxN, drone.nitroAmount + 6.0);
+                    if (hud && typeof hud.showStuntAlert === 'function') hud.showStuntAlert('FACADE BUZZ', '+6% NITRO RECHARGE');
+                }
+            }
+        }
+
+        return collided;
     }
 
     dispose() {
@@ -317,6 +634,18 @@ export class TrackBuilder {
         });
         this.instancedProps = [];
 
+        this.skyBridges.forEach(sb => {
+            this.scene.remove(sb);
+            sb.traverse(c => {
+                if (c.geometry) c.geometry.dispose();
+                if (c.material) {
+                    if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+                    else c.material.dispose();
+                }
+            });
+        });
+        this.skyBridges = [];
+
         this.trackObjects.forEach(to => {
             this.scene.remove(to);
             if (to.geometry) to.geometry.dispose();
@@ -326,5 +655,6 @@ export class TrackBuilder {
             }
         });
         this.trackObjects = [];
+        this.buildingAABBs = [];
     }
 }

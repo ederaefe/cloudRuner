@@ -77,11 +77,9 @@ export class ParticleSystem {
                     vType = type;
                     vColor = color;
                     
-                    // Animate particles based on velocity
-                    vec3 animatedPos = position + velocity * life;
-                    
-                    vec4 mvPosition = modelViewMatrix * vec4(animatedPos, 1.0);
-                    gl_PointSize = size * life * pixelRatio * (300.0 / -mvPosition.z);
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                    float pz = max(0.5, -mvPosition.z);
+                    gl_PointSize = clamp(size * max(0.0, life) * pixelRatio * (300.0 / pz), 1.0, 64.0);
                     gl_Position = projectionMatrix * mvPosition;
                 }
             `,
@@ -183,6 +181,13 @@ export class ParticleSystem {
         this.lifeArray[index] = lifetime;
         this.typeArray[index] = type;
         
+        this.attributePosition.needsUpdate = true;
+        this.attributeColor.needsUpdate = true;
+        this.attributeSize.needsUpdate = true;
+        this.attributeLife.needsUpdate = true;
+        this.attributeVelocity.needsUpdate = true;
+        this.attributeType.needsUpdate = true;
+
         this.activeCount = Math.max(this.activeCount, index + 1);
     }
     
@@ -265,27 +270,29 @@ export class ParticleSystem {
     }
     
     update(dt) {
-        // Update particle lifetimes
+        // Update particle lifetimes and advance positions along velocity
         let hasActive = false;
         for (let i = 0; i < this.maxParticles; i++) {
             if (this.lifeArray[i] > 0.0) {
                 this.lifeArray[i] -= dt;
+                const i3 = i * 3;
+                this.positionArray[i3] += this.velocityArray[i3] * dt;
+                this.positionArray[i3 + 1] += this.velocityArray[i3 + 1] * dt;
+                this.positionArray[i3 + 2] += this.velocityArray[i3 + 2] * dt;
                 hasActive = true;
             }
         }
         
-        // Update geometry attributes
+        // Update only active changing attributes (position and life)
         if (hasActive) {
             this.attributePosition.needsUpdate = true;
-            this.attributeColor.needsUpdate = true;
-            this.attributeSize.needsUpdate = true;
             this.attributeLife.needsUpdate = true;
-            this.attributeVelocity.needsUpdate = true;
-            this.attributeType.needsUpdate = true;
         }
         
-        // Update shader time uniform
-        this.particleSystem.material.uniforms.time.value += dt;
+        // Update shader time uniform safely
+        if (this.particleSystem && this.particleSystem.material && this.particleSystem.material.uniforms && this.particleSystem.material.uniforms.time) {
+            this.particleSystem.material.uniforms.time.value += dt;
+        }
     }
     
     dispose() {

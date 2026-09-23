@@ -45,7 +45,7 @@ export class SoundEngine {
         if (!this.ctx) {
             this.init();
         }
-        if (this.ctx && this.ctx.state !== 'running') {
+        if (this.ctx && (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted')) {
             try {
                 const res = this.ctx.resume();
                 if (res && typeof res.catch === 'function') {
@@ -55,6 +55,24 @@ export class SoundEngine {
                 // Ignore silent browser autoplay restriction
             }
         }
+    }
+
+    toggle() {
+        if (!this.ctx) {
+            this.init();
+            this.resume();
+            return this.enabled;
+        }
+        this.enabled = !this.enabled;
+        if (this.masterGain && this.ctx) {
+            try {
+                this.masterGain.gain.setValueAtTime(this.enabled ? 0.8 : 0.0, this.ctx.currentTime);
+            } catch (e) {}
+        }
+        if (this.enabled) {
+            this.resume();
+        }
+        return this.enabled;
     }
 
     setMasterVolume(val) {
@@ -69,6 +87,16 @@ export class SoundEngine {
         const unlock = () => {
             this.init();
             this.resume();
+            if (this.ctx) {
+                try {
+                    // 1-sample silent buffer guarantees iOS Web Audio unlocking
+                    const buffer = this.ctx.createBuffer(1, 1, 22050);
+                    const source = this.ctx.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(this.ctx.destination);
+                    source.start(0);
+                } catch (e) {}
+            }
             ['touchstart', 'touchend', 'pointerdown', 'keydown'].forEach(evt => {
                 window.removeEventListener(evt, unlock, true);
             });
@@ -134,7 +162,15 @@ export class SoundEngine {
     }
 
     updateTelemetry(speedKmh, throttleRatio, isNitroActive, isStage3) {
-        if (!this.enabled || !this.ctx) return;
+        if (!this.enabled || !this.ctx) {
+            if (this.engineGain && this.ctx) {
+                try { this.engineGain.gain.setValueAtTime(0, this.ctx.currentTime); } catch (e) {}
+            }
+            if (this.windGain && this.ctx) {
+                try { this.windGain.gain.setValueAtTime(0, this.ctx.currentTime); } catch (e) {}
+            }
+            return;
+        }
         const now = this.ctx.currentTime;
 
         // Modulate turbine pitch with speed and throttle

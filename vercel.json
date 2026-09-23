@@ -1,6 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
+  "rewrites": [
+    { "source": "/boost", "destination": "/index.html" },
+    { "source": "/teamwork-preview", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/service-worker.js",

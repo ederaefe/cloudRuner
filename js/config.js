@@ -28,7 +28,11 @@ export const CONFIG = {
             sunColor: 0xfff0dd,
             skyColor: 0x07111f,
             buildingSpread: 650,
-            buildingHeightMax: 130
+            buildingHeightMax: 130,
+            buildingColors: [0x0F8B8D, 0x1E3D59, 0xEC9A29, 0x17B978, 0x2B4162, 0xFF6E40, 0x38A3A5, 0x57CC99],
+            beaconColors: [0x00ffff, 0xff0055, 0xffaa00],
+            trimColor: 0x00ffff,
+            windowGlow: 0xfff3b0
         },
         {
             id: 2,
@@ -42,7 +46,11 @@ export const CONFIG = {
             sunColor: 0xffaa77,
             skyColor: 0x0b1724,
             buildingSpread: 800,
-            buildingHeightMax: 170
+            buildingHeightMax: 170,
+            buildingColors: [0xDDA15E, 0xBC6C25, 0x3A506B, 0xE76F51, 0x264653, 0xF4A261, 0xE63946, 0x457B9D],
+            beaconColors: [0xffaa00, 0xff3300, 0x00e5ff],
+            trimColor: 0xffa500,
+            windowGlow: 0xffd166
         },
         {
             id: 3,
@@ -56,7 +64,11 @@ export const CONFIG = {
             sunColor: 0x88ccff,
             skyColor: 0x050c18,
             buildingSpread: 950,
-            buildingHeightMax: 220
+            buildingHeightMax: 220,
+            buildingColors: [0x240046, 0x3C096C, 0x5A189A, 0x7B2CBF, 0x9D4EDD, 0x00F5D4, 0x7209B7, 0x4361EE],
+            beaconColors: [0xff00ff, 0x00ffff, 0x7000ff],
+            trimColor: 0xff00aa,
+            windowGlow: 0x00ffff
         },
         {
             id: 4,
@@ -71,7 +83,11 @@ export const CONFIG = {
             sunColor: 0xff4422,
             skyColor: 0x14041a,
             buildingSpread: 1100,
-            buildingHeightMax: 280
+            buildingHeightMax: 280,
+            buildingColors: [0x621708, 0x941B0C, 0xBC3908, 0xF6AA1C, 0xD4A373, 0x3F0008, 0xE63946, 0xFB8500],
+            beaconColors: [0xff0033, 0xffbb00, 0xff0077],
+            trimColor: 0xffc400,
+            windowGlow: 0xffd000
         }
     ],
 
@@ -172,29 +188,29 @@ export const CONFIG = {
         MAX_CRUISE_SPEED: 200.0,
         STAGE2_BOOST_SPEED: 250.0,
         STAGE3_BOOST_SPEED: 320.0,
-        ACCELERATION: 60.0,
-        BRAKING_DECEL: 65.0,
-        ROLL_RATE: 3.2,
-        PITCH_RATE: 2.6,
-        YAW_RATE: 2.2,
-        BANKING_TILT: 0.65,
-        PITCH_TILT: 0.45,
-        VERTICAL_THRUST: 36.0,
-        INDUCED_DRAG: 0.035,
-        DRAFTING_DISTANCE: 20.0,
-        DRAFTING_BOOST_RATE: 18.0
+        ACCELERATION: 65.0,
+        BRAKING_DECEL: 70.0,
+        ROLL_RATE: 3.5,
+        PITCH_RATE: 2.8,
+        YAW_RATE: 2.4,
+        BANKING_TILT: 0.72,
+        PITCH_TILT: 0.48,
+        VERTICAL_THRUST: 38.0,
+        INDUCED_DRAG: 0.032,
+        DRAFTING_DISTANCE: 22.0,
+        DRAFTING_BOOST_RATE: 20.0
     },
 
     // Intrinsic Aerobatic Stunt State Machine
     STUNTS: {
-        SNAP_ROLL_DURATION: 0.42,
+        SNAP_ROLL_DURATION: 0.40,
         SNAP_ROLL_NITRO_GAIN: 22.0,
         SNAP_ROLL_HITBOX_SCALE: 0.55,
         KNIFE_EDGE_MIN_BANK: 1.45,
         KNIFE_EDGE_MAX_BANK: 1.69,
         KNIFE_EDGE_NITRO_RATE: 16.0,
         KNIFE_EDGE_SCORE_RATE: 180,
-        COBRA_DURATION: 0.52,
+        COBRA_DURATION: 0.50,
         COBRA_PITCH_ANGLE: 1.35,
         COBRA_SPEED_DUMP: 0.62,
         NEAR_MISS_DISTANCE: 3.5,
@@ -207,15 +223,15 @@ export const CONFIG = {
         STAGE2_DRAIN_RATE: 18.0,
         STAGE3_DRAIN_RATE: 28.0,
         STAGE3_SWEET_SPOT_MIN: 70,
-        NATURAL_RECHARGE_RATE: 3.0
+        NATURAL_RECHARGE_RATE: 3.2
     },
 
     // Boost Enhancement Parameters (/boost)
     BOOST: {
         STAGE2_SPEED: 250.0,
         STAGE3_SPEED: 320.0,
-        STAGE2_FOV: 86.0,
-        STAGE3_FOV: 102.0,
+        STAGE2_FOV: 88.0,
+        STAGE3_FOV: 104.0,
         HYPER_OVERDRIVE_BURN: 26.0,
         RECHARGE_RATE: 3.5,
         SWEET_SPOT_MIN: 70.0
@@ -240,13 +256,13 @@ export const CONFIG = {
     // Camera Rig & Psychophysics
     CAMERA: {
         BASE_FOV: 70.0,
-        STAGE2_FOV: 86.0,
-        STAGE3_FOV: 102.0,
+        STAGE2_FOV: 88.0,
+        STAGE3_FOV: 104.0,
         BASE_DISTANCE: 6.4,
         BASE_HEIGHT: 2.1,
-        SPRING_STIFFNESS: 10.0,
-        SPRING_DAMPING: 6.2,
-        SHAKE_INTENSITY: 0.22
+        SPRING_STIFFNESS: 10.5,
+        SPRING_DAMPING: 6.0,
+        SHAKE_INTENSITY: 0.24
     },
 
     // AI Rival Racers

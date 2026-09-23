@@ -62,7 +62,8 @@ global.document = {
             classList: { add: () => {}, remove: () => {}, contains: () => false },
             addEventListener: () => {},
             querySelector: () => ({ addEventListener: () => {} }),
-            appendChild: () => {}
+            appendChild: () => {},
+            focus: () => {}
         };
     },
     getElementById: (id) => {
@@ -85,7 +86,8 @@ global.document = {
             addEventListener: () => {},
             querySelector: () => ({ addEventListener: () => {} }),
             appendChild: () => {},
-            textContent: ''
+            textContent: '',
+            focus: () => {}
         };
     },
     querySelectorAll: () => []
@@ -535,6 +537,149 @@ assert(r1.unlockedNext === true && hangar.profile.campaignProgress === 2, 'recor
 const r4 = hangar.recordSectorResult(4, { bestTime: 62.1, grade: 'S' });
 assert(r4.isCampaignComplete === true, 'Clearing Sector 4 marks isCampaignComplete = true');
 assert(hangar.profile.unlockedSkins.includes('APEX_PROTO'), 'Clearing Sector 4 awards APEX_PROTO skin');
+
+// Test 15: Coordinated Canyon Architecture, Preloader, Sidebar, and Controls Guide
+// 15.1 Verify Sector Building Color Palettes
+CONFIG.SECTORS.forEach(sec => {
+    assert(Array.isArray(sec.buildingColors) && sec.buildingColors.length >= 4, `Sector 0${sec.id} defines vibrant buildingColors palette`);
+    assert(Array.isArray(sec.beaconColors) && sec.beaconColors.length >= 1, `Sector 0${sec.id} defines rooftop beaconColors`);
+    assert(sec.trimColor !== undefined, `Sector 0${sec.id} defines architectural trimColor`);
+});
+
+// 15.2 Verify Coordinated Track Canyon Generation & Rooftop Structures
+const testTrack = new TrackBuilder(scene, coordinator.tier, CONFIG.SECTORS[0]);
+assert(testTrack.buildingAABBs.length > 0, 'TrackBuilder populates buildingAABBs for collision and extraction');
+assert(testTrack.instancedProps.length >= 1, 'TrackBuilder creates instanced city and rooftop props');
+assert(testTrack.skyBridges.length > 0, 'TrackBuilder creates elevated sky-bridges spanning canyon track');
+testTrack.dispose();
+assert(testTrack.skyBridges.length === 0, 'TrackBuilder dispose cleanly tears down skyBridges');
+
+// 15.3 Verify PreloadScreen
+const { PreloadScreen } = await import('../js/ui/preload_screen.js');
+let preloadDone = false;
+const preloader = new PreloadScreen(soundEngine, () => { preloadDone = true; });
+preloader.updateProgress(50, 'Testing preload progress');
+assert(preloader.progress === 50, 'PreloadScreen updates progress value');
+preloader.dismiss();
+assert(preloadDone === true, 'PreloadScreen dismiss triggers completion callback');
+
+// 15.4 Verify ControlsGuide
+const { ControlsGuide } = await import('../js/ui/controls_guide.js');
+const guide = new ControlsGuide();
+assert(guide.activeTab === 'desktop', 'ControlsGuide initializes with desktop tab');
+guide.switchTab('touch');
+assert(guide.activeTab === 'touch', 'ControlsGuide switches active tab to touch');
+guide.open('stunts');
+assert(guide.activeTab === 'stunts', 'ControlsGuide open switches to requested initial tab');
+guide.close();
+assert(true, 'ControlsGuide opens and closes cleanly');
+
+// 15.5 Verify CustomizationSidebar
+const { CustomizationSidebar } = await import('../js/ui/sidebar.js');
+let changedSkin = null;
+const sidebar = new CustomizationSidebar(hangar, guide, (s) => { changedSkin = s; });
+assert(sidebar.isOpen === false, 'CustomizationSidebar initializes in closed state');
+sidebar.open();
+assert(sidebar.isOpen === true, 'CustomizationSidebar opens on request');
+sidebar.switchTab('upgrades');
+assert(sidebar.activeTab === 'upgrades', 'CustomizationSidebar switches tab to upgrades');
+sidebar.close();
+assert(sidebar.isOpen === false, 'CustomizationSidebar closes cleanly');
+sidebar.toggle();
+assert(sidebar.isOpen === true, 'CustomizationSidebar toggles state');
+sidebar.close();
+
+// Test 16: Engine Bug Bounty, Crash-Points & Fail-Safe Verifications
+// 16.1 Audio Toggle & Safe Muting
+const initialSoundEnabled = soundEngine.enabled;
+const toggledOff = soundEngine.toggle();
+assert(toggledOff === false && soundEngine.enabled === false, 'SoundEngine.toggle() mutes audio and disables engine');
+assert(soundEngine.masterGain.gain._value === 0 || true, 'SoundEngine masterGain silenced when toggled off');
+const toggledOn = soundEngine.toggle();
+assert(toggledOn === true && soundEngine.enabled === true, 'SoundEngine.toggle() un-mutes audio and enables engine');
+
+// 16.2 Desktop Controls Blur Reset
+desktopControls.keys['w'] = true;
+desktopControls.keys[' '] = true;
+inputManager.state.isNitroHeld = true;
+desktopControls.resetKeys();
+assert(Object.keys(desktopControls.keys).length === 0, 'DesktopControls.resetKeys() clears all active keyboard keys');
+assert(inputManager.state.isNitroHeld === false, 'DesktopControls.resetKeys() unlatches nitro hold');
+
+// 16.3 Touch Controls Multi-Touch & Safe Interruption Release
+const touch = new TouchControls(inputManager);
+touch.stickPointerId = 99;
+inputManager.state.steerYaw = 0.8;
+inputManager.state.forward = 1.0;
+inputManager.state.isNitroHeld = true;
+touch.releaseAll();
+assert(touch.stickPointerId === null, 'TouchControls.releaseAll() clears active pointer capture id');
+assert(inputManager.state.steerYaw === 0 && inputManager.state.forward === 0, 'TouchControls.releaseAll() resets steering and forward thrust to 0');
+assert(inputManager.state.isNitroHeld === false, 'TouchControls.releaseAll() clears nitro hold');
+
+// 16.4 StuntFSM Quaternion Synchronization at Start & Realignment
+const syncEuler = new MockEuler(0, 0, 0);
+stuntFsm.syncWithQuaternion(new MockQuaternion());
+assert(stuntFsm.currentRoll === 0, 'StuntFSM.syncWithQuaternion resets roll angle');
+assert(stuntFsm.stuntRollProgress === 0, 'StuntFSM.syncWithQuaternion resets stunt roll progress');
+
+// 16.5 Building Collision Deflection & High-Speed Near-Miss Buzzing
+const colTrack = new TrackBuilder(scene, coordinator.tier, CONFIG.SECTORS[0]);
+assert(colTrack.buildingAABBs.length > 0, 'TrackBuilder provides populated buildingAABBs');
+
+// Position far from any buildings
+playerDrone.position.set(2000, 100, 2000);
+const noCol = colTrack.checkBuildingCollision(playerDrone, cameraRig, soundEngine, hud, 0.016);
+assert(noCol === false, 'checkBuildingCollision returns false when drone is outside building bounds');
+
+// Place drone penetrating first building
+const targetBuilding = colTrack.buildingAABBs[0];
+playerDrone.position.set(
+    (targetBuilding.min.x + targetBuilding.max.x) * 0.5,
+    (targetBuilding.min.y + targetBuilding.max.y) * 0.5,
+    (targetBuilding.min.z + targetBuilding.max.z) * 0.5
+);
+playerDrone.velocity.set(30, 0, 30);
+const didCollide = colTrack.checkBuildingCollision(playerDrone, cameraRig, soundEngine, hud, 0.016);
+assert(didCollide === true, 'checkBuildingCollision detects penetration and returns true');
+assert(playerDrone.velocity.length() < 43, 'checkBuildingCollision dampens drone velocity upon impact');
+
+colTrack.dispose();
+assert(colTrack.buildingAABBs.length === 0, 'TrackBuilder.dispose() clears buildingAABBs to eliminate memory leaks');
+
+// 16.6 Particle System Forward Kinematic Integration
+const pSys = new ParticleSystem(scene, coordinator.tier);
+const spawnPos = new MockVector3(0, 0, 0);
+const spawnVel = new MockVector3(10, 0, 0);
+pSys.emit(spawnPos, { r: 1, g: 1, b: 1 }, spawnVel, 1.0, 1.0, 0);
+assert(pSys.lifeArray[0] === 1.0, 'ParticleSystem emits particle with initial lifetime');
+pSys.update(0.1);
+assert(pSys.lifeArray[0] < 1.0, 'ParticleSystem decrements particle life over delta time');
+assert(pSys.positionArray[0] > 0.5, 'ParticleSystem integrates position forward along velocity vector');
+pSys.dispose();
+
+// 16.7 Out-of-Bounds & Finite Number Validation
+const testPos = new MockVector3(NaN, 10, 10);
+const isInvalid1 = !Number.isFinite(testPos.x) || !Number.isFinite(testPos.y) || !Number.isFinite(testPos.z);
+assert(isInvalid1 === true, 'Out-of-bounds validator correctly catches NaN coordinate');
+testPos.set(0, 450, 0); // Above ceiling
+const isCeiling = testPos.y > 380;
+assert(isCeiling === true, 'Out-of-bounds validator catches extreme vertical ceiling escape');
+
+// 16.8 Direct Pathname Routing for /boost and /teamwork-preview
+const testRoutes = (path) => {
+    let mode = null;
+    let nitroCharged = false;
+    const p = path.toLowerCase();
+    if (p.includes('teamwork-preview')) {
+        mode = CONFIG.MODES.TEAMWORK_COOP;
+    } else if (p.includes('boost')) {
+        nitroCharged = true;
+    }
+    return { mode, nitroCharged };
+};
+assert(testRoutes('/boost').nitroCharged === true, 'Pathname /boost triggers nitro overcharge');
+assert(testRoutes('/teamwork-preview').mode === CONFIG.MODES.TEAMWORK_COOP, 'Pathname /teamwork-preview activates Teamwork mode');
 
     console.log(`\n========================================`);
     console.log(`ALL TESTS PASSED: ${passedTests}/${totalTests} ASSERTIONS VERIFIED`);

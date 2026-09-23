@@ -24,8 +24,29 @@ export class TouchControls {
         if (!this.container) return;
         this.container.style.display = 'block';
 
+        // Suppress browser context menu on touch controls (prevents long-press freezes)
+        this.container.addEventListener('contextmenu', (e) => e.preventDefault());
+
         this.bindStickEvents();
         this.bindActionButtons();
+
+        // Fail-safe release on blur or touch interruption
+        window.addEventListener('blur', () => this.releaseAll());
+        window.addEventListener('touchcancel', () => this.releaseAll());
+    }
+
+    releaseAll() {
+        if (this.stickPointerId !== null) {
+            this.stickPointerId = null;
+            if (this.stickKnob) {
+                this.stickKnob.style.transform = 'translate(-50%, -50%)';
+            }
+            this.input.state.steerYaw = 0;
+            this.input.state.forward = 0;
+            this.input.state.roll = 0;
+        }
+        this.input.state.isNitroHeld = false;
+        this.input.state.isKnifeEdgeHeld = false;
     }
 
     vibrate(pattern = 15) {
@@ -61,23 +82,21 @@ export class TouchControls {
             }
         });
 
-        this.stickZone.addEventListener('pointermove', (e) => {
+        const onPointerMove = (e) => {
             if (this.stickPointerId === e.pointerId) {
                 e.preventDefault();
                 this.updateStick(e.clientX, e.clientY);
             }
-        });
+        };
 
         const releaseStick = (e) => {
-            if (this.stickPointerId === e.pointerId || e.type === 'lostpointercapture') {
+            if (this.stickPointerId !== null && (this.stickPointerId === e.pointerId || e.type === 'lostpointercapture' || e.type === 'pointercancel')) {
                 e.preventDefault();
-                if (this.stickPointerId !== null) {
-                    try {
-                        if (this.stickZone.hasPointerCapture(this.stickPointerId)) {
-                            this.stickZone.releasePointerCapture(this.stickPointerId);
-                        }
-                    } catch (err) {}
-                }
+                try {
+                    if (this.stickZone.hasPointerCapture(this.stickPointerId)) {
+                        this.stickZone.releasePointerCapture(this.stickPointerId);
+                    }
+                } catch (err) {}
                 this.stickPointerId = null;
                 if (this.stickKnob) {
                     this.stickKnob.style.transform = 'translate(-50%, -50%)';
@@ -88,9 +107,14 @@ export class TouchControls {
             }
         };
 
+        this.stickZone.addEventListener('pointermove', onPointerMove);
+        window.addEventListener('pointermove', onPointerMove);
+
         this.stickZone.addEventListener('pointerup', releaseStick);
         this.stickZone.addEventListener('pointercancel', releaseStick);
         this.stickZone.addEventListener('lostpointercapture', releaseStick);
+        window.addEventListener('pointerup', releaseStick);
+        window.addEventListener('pointercancel', releaseStick);
     }
 
     updateStick(clientX, clientY) {
@@ -140,15 +164,13 @@ export class TouchControls {
             });
 
             const release = (e) => {
-                if (activePointerId === null || activePointerId === e.pointerId || e.type === 'lostpointercapture') {
+                if (activePointerId !== null && (activePointerId === e.pointerId || e.type === 'lostpointercapture' || e.type === 'pointercancel')) {
                     e.preventDefault();
-                    if (activePointerId !== null) {
-                        try {
-                            if (btn.hasPointerCapture(activePointerId)) {
-                                btn.releasePointerCapture(activePointerId);
-                            }
-                        } catch (err) {}
-                    }
+                    try {
+                        if (btn.hasPointerCapture(activePointerId)) {
+                            btn.releasePointerCapture(activePointerId);
+                        }
+                    } catch (err) {}
                     activePointerId = null;
                     onUp();
                 }
@@ -157,6 +179,8 @@ export class TouchControls {
             btn.addEventListener('pointerup', release);
             btn.addEventListener('pointercancel', release);
             btn.addEventListener('lostpointercapture', release);
+            window.addEventListener('pointerup', release);
+            window.addEventListener('pointercancel', release);
         };
 
         if (btnBoost) {

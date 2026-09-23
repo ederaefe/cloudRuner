@@ -102,3 +102,30 @@ This enables zero-latency P2P mesh synchronization via WebRTC DataChannels (`Pee
 * **Zero-Allocation Particle Updates**: All vector math uses pre-allocated module scratchpad vectors (`_tempVector`, `_exhaustPos`, `_exhaustDir`), guaranteeing zero runtime garbage collector spikes during intense dogfighting and overdrive flight.
 * **Offline PWA & Test Verification**: Added `particle_system.js` to `service-worker.js` pre-cache manifest and expanded automated test coverage in `scripts/test_engine.mjs` to 72 assertions.
 
+### Completed: Arcade Velocity, Coordinated Canyons, Preload Screen & Customization Sidebar
+* **Arcade Velocity & Dynamic Camera Rig**: Amplified camera FOV elasticity (70° up to 104° during Stage 3 Hyper-Overdrive) and high-G banking roll tilt (0.72 rad) in `CONFIG.FLIGHT` and `CONFIG.CAMERA`, delivering the punchy, responsive handling characteristic of arcade kart and canyon racers like *Beach Buggy Racing*.
+* **Track-Aligned Coordinated Canyon Architecture (`js/engine/track_builder.js`)**: Replaced uncoordinated random cuboid scattering with a dual-hierarchy city synthesis algorithm:
+  * *Inner Canyon Flankers*: 65% of monoliths placed with calculated setbacks (track width + 22m to 46m) along 3D CatmullRom spline normals, creating thrilling skyscraper corridors and intentional near-miss opportunities without runway clipping.
+  * *Outer Skyline Clusters*: 35% placed along radial perimeters to generate deep horizon silhouettes.
+  * *Multi-Color PBR & Per-Instance Palettes*: Utilized `THREE.InstancedMesh.setColorAt()` with sector-specific color schemes (Downtown coastal turquoise/coral/gold, Industrial hazard yellow/rust/cobalt, Stratosphere neon magenta/indigo, Apex volcanic crimson/solar gold).
+  * *Rooftop Architectural Life*: Added instanced rooftop helipads with glowing target landing rings, tall communication spires with pulsing aviation warning beacon lights, and elevated sky-bridges spanning canyon track sections.
+* **Arcade Preloader Screen (`js/ui/preload_screen.js`)**: Eliminates blank canvas flashes and sudden pop-in by orchestrating a 5-phase startup sequence:
+  * Probes hardware profile & GPU tier.
+  * Verifies typography and interface textures via `document.fonts.ready`.
+  * Pre-compiles WebGL shader programs and instanced geometries via `renderer.compile(scene, camera)` to eliminate first-frame hitches.
+  * Primes Web Audio API synthesizer buffers and loads persistent `localStorage` profile.
+  * Seamless 1-tap audio unlock transition into the hangar briefing menu.
+* **All-In-One Togglable Customizations Sidebar (`js/ui/sidebar.js`)**: Responsive slide-out glassmorphic drawer toggleable via `TAB` key or floating HUD button:
+  * *Airframe Liveries Hub*: Real-time 3D drone skin switching and credit purchasing.
+  * *Tactical Upgrades Hub*: Live progress bars and 1-tap upgrades for Turbine Velocity, Winch Latch, Hull Armor, and Nitro Fuel Cells.
+  * *Sector & Level Selector*: Direct sector switcher showing clearance status, sector lap records, and mission briefing.
+  * *Mission Mode Switcher*: Instant toggle between Circuit Grand Prix, Cargo Solo, Cargo Versus, and Teamwork Squad.
+  * *Pilot Career Telemetry*: Real-time display of player rank, career stunts, top speed, and credits balance.
+* **Dedicated Flight Academy & Interactive Controls Guide (`js/ui/controls_guide.js`)**: Comprehensive multi-tab handbook explaining:
+  * *Desktop Controls*: Stylized tactile keycaps (`[W]`/`[S]`, `[A]`/`[D]`, `[SPACE]`, `[Q]`/`[E]`, `[C]`, `[X]`, `[TAB]`, `[ESC]`).
+  * *Mobile Touch Controls*: Dynamic left virtual thumbstick and right aerobatic action pads.
+  * *Gamepad & HOTAS*: Full controller mapping for analog sticks, triggers, bumpers, and face buttons.
+  * *Aerobatic Stunt Aerodynamics*: In-depth tactical guide detailing Triple-Stage Nitro Overcharge sweet spots (>70%), Snap Aileron Roll hitbox compression (+22% Nitro), Knife-Edge slit slicing, Pugachev's Cobra airbrake flare (dumping 62% speed for hairpins), Near-Miss facade buzzing, AI Wingman energy tethering, and Magnetic Cargo Winch retrieval.
+* **Offline PWA & Test Verification**: Upgraded Service Worker cache to `barch-aero-v3`, pre-caching all new UI modules. Expanded `scripts/test_engine.mjs` to 102 automated assertions verifying all visual palettes, preloader transitions, sidebar state toggling, and controls guide lifecycle.
+
+
