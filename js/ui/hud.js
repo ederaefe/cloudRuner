@@ -34,6 +34,20 @@ export class RacingHUD {
         // Task 35: Contextual Non-Blocking Notification Toast Stack
         this.toastStack = document.getElementById('hud-toast-stack');
         this.activeToasts = [];
+
+        // Flight Assist HUD Buttons & Touch Indicators
+        this.btnHudAuto = document.getElementById('btn-hud-auto');
+        this.hudAutoLabel = document.getElementById('hud-auto-label');
+        this.btnHudAlt = document.getElementById('btn-hud-alt');
+        this.hudAltLabel = document.getElementById('hud-alt-hold-label');
+        this.btnHudStop = document.getElementById('btn-hud-stop');
+        this.btnHudAssist = document.getElementById('btn-hud-assist');
+        this.hudAssistLabel = document.getElementById('hud-assist-label');
+
+        this.btnTouchAuto = document.getElementById('btn-touch-auto');
+        this.btnTouchAlt = document.getElementById('btn-touch-alt');
+        this.btnTouchStop = document.getElementById('btn-touch-stop');
+        this.btnTouchAssist = document.getElementById('btn-touch-assist');
     }
 
     showToast(message, type = 'info', duration = 2200) {
@@ -207,6 +221,48 @@ export class RacingHUD {
         // Task 50: Minimalist Top-Edge Compass Ribbon Update
         if (this.compassCanvas) {
             this.updateCompass(drone);
+        }
+
+        // Flight Assist HUD & Touch Sync
+        const st = inputState || (window._inputManager ? window._inputManager.state : null);
+        if (st) {
+            if (this.btnHudAuto) {
+                this.btnHudAuto.classList.toggle('active', !!st.autopilotEnabled);
+            }
+            if (this.hudAutoLabel) {
+                this.hudAutoLabel.textContent = st.autopilotEnabled ? 'AUTOPILOT: ON [O]' : 'AUTOPILOT [O]';
+            }
+            if (this.btnTouchAuto) {
+                this.btnTouchAuto.classList.toggle('active', !!st.autopilotEnabled);
+            }
+
+            if (this.btnHudAlt) {
+                this.btnHudAlt.classList.toggle('active', !!st.altitudeHoldEnabled);
+            }
+            if (this.hudAltLabel) {
+                const alt = Math.round(st.targetAltitude || (drone?.position?.y || 15));
+                this.hudAltLabel.textContent = st.altitudeHoldEnabled ? `ALT HOLD: ${alt}M [H]` : 'ALT HOLD: OFF [H]';
+            }
+            if (this.btnTouchAlt) {
+                this.btnTouchAlt.classList.toggle('active', !!st.altitudeHoldEnabled);
+            }
+
+            if (this.btnHudStop) {
+                this.btnHudStop.classList.toggle('active', !!st.hoverStopActive);
+            }
+            if (this.btnTouchStop) {
+                this.btnTouchStop.classList.toggle('active', !!st.hoverStopActive);
+            }
+
+            if (this.btnHudAssist) {
+                this.btnHudAssist.classList.toggle('active', !!st.flyAssistEnabled);
+            }
+            if (this.hudAssistLabel) {
+                this.hudAssistLabel.textContent = st.flyAssistEnabled ? 'ASSIST: ON [J]' : 'ASSIST: OFF [J]';
+            }
+            if (this.btnTouchAssist) {
+                this.btnTouchAssist.classList.toggle('active', !!st.flyAssistEnabled);
+            }
         }
     }
 }
