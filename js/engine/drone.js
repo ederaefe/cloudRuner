@@ -31,6 +31,7 @@ export class Drone {
         // Articulated components
         this.tiltNacelles = [];
         this.rotorDiscs = [];
+        this.rotorMaterials = [];
         this.navStrobes = [];
         this.exhaustParticles = [];
         this.landingGear = [];
@@ -131,6 +132,7 @@ export class Drone {
             rotorMesh.rotation.x = -Math.PI / 2;
             nacGroup.add(rotorMesh);
             this.rotorDiscs.push(rotorMesh);
+            this.rotorMaterials.push(rotorMesh.material);
 
             this.group.add(nacGroup);
             this.tiltNacelles.push(nacGroup);
@@ -309,14 +311,40 @@ export class Drone {
 
         // Rotor animation and tilt-nacelle transition (0 rad in cruise, PI/2 in hover)
         const cruiseRatio = Math.min(1.0, this.speedKmh / flightCfg.BASE_SPEED);
-        const nacelleAngle = THREE.MathUtils.lerp(Math.PI / 2.5, 0.0, cruiseRatio);
+        this.targetNacelleAngle = THREE.MathUtils.lerp(Math.PI / 2.5, 0.0, cruiseRatio);
+        
+        // Smooth nacelle transition
+        this.currentNacelleAngle = THREE.MathUtils.lerp(this.currentNacelleAngle, this.targetNacelleAngle, dt * 8.0);
 
         this.tiltNacelles.forEach(n => {
-            n.rotation.x = nacelleAngle;
+            n.rotation.x = this.currentNacelleAngle;
         });
 
-        this.rotorDiscs.forEach(r => {
+        // Rotor blur effect at high speeds
+        this.rotorBlurIntensity = THREE.MathUtils.lerp(this.rotorBlurIntensity, cruiseRatio, dt * 5.0);
+        this.rotorDiscs.forEach((r, i) => {
             r.rotation.z += (25.0 + cruiseRatio * 45.0) * dt;
+            // Blur effect by scaling opacity based on speed
+            if (this.rotorMaterials[i]) {
+                this.rotorMaterials[i].opacity = 0.35 + this.rotorBlurIntensity * 0.25;
+            }
+        });
+
+        // Landing gear animation (retract at high speed)
+        const shouldRetractGear = this.speedKmh > 80;
+        const gearTransitionSpeed = 3.0;
+        
+        if (shouldRetractGear && this.landingGearExtended) {
+            this.landingGearExtended = false;
+        } else if (!shouldRetractGear && !this.landingGearExtended) {
+            this.landingGearExtended = true;
+        }
+
+        this.landingGear.forEach(gear => {
+            const targetScale = this.landingGearExtended ? 1.0 : 0.0;
+            const s = THREE.MathUtils.lerp(gear.scale.x, targetScale, dt * gearTransitionSpeed);
+            gear.scale.set(s, s, s);
+            gear.visible = gear.scale.x > 0.01;
         });
 
         // Thruster glow intensity & booster flame VFX (/boost)

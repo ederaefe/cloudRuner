@@ -15,6 +15,8 @@ const _springForce = new THREE.Vector3();
 const _dampingForce = new THREE.Vector3();
 const _forwardLook = new THREE.Vector3();
 const _shakeOffset = new THREE.Vector3();
+const _acceleration = new THREE.Vector3();
+const _previousVelocity = new THREE.Vector3();
 
 export class CameraRig {
     constructor(camera) {
@@ -25,8 +27,14 @@ export class CameraRig {
 
         this.shakeAmount = 0.0;
         this.targetFov = CONFIG.CAMERA.BASE_FOV;
+        this.currentFov = CONFIG.CAMERA.BASE_FOV;
         this.isEpilogue = false;
         this.epilogueAngle = 0;
+        
+        // Enhanced camera behavior
+        this.forwardLean = 0.0;
+        this.verticalBob = 0.0;
+        this.bobPhase = 0.0;
     }
 
     setEpilogueMode(active) {
@@ -117,8 +125,9 @@ export class CameraRig {
             this.targetFov = camCfg.BASE_FOV;
         }
 
-        // Apply smooth FOV elasticity
-        this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, this.targetFov, dt * 6.0);
+        // Smooth FOV elasticity without redundant projection matrix computation
+        this.currentFov = THREE.MathUtils.lerp(this.currentFov, this.targetFov, dt * 5.0);
+        this.camera.fov = this.currentFov;
         this.camera.updateProjectionMatrix();
 
         // Target position in world space (zero-allocation)
