@@ -631,28 +631,24 @@ window.addEventListener('load', () => {
     const camera = new THREE.PerspectiveCamera(CONFIG.CAMERA.BASE_FOV, window.innerWidth / window.innerHeight, 0.1, 6500);
     const cameraRig = new CameraRig(camera);
 
-    // 4. Lighting Rig
-    const ambientLight = new THREE.AmbientLight(0x556677, 1.2);
-    scene.add(ambientLight);
+    // 4. Photometric Dynamic Lighting Rig (Sun + Dynamic Sky/Ground Hemisphere Bounce)
+    const hemisphereLight = new THREE.HemisphereLight(0x3B82F6, 0xD97746, 0.95);
+    scene.add(hemisphereLight);
 
-    const sun = new THREE.DirectionalLight(0xfff0dd, 2.2);
-    sun.position.set(120, 220, 100);
+    const sun = new THREE.DirectionalLight(0xFFFDF5, 2.2);
+    sun.position.set(120, 320, 100);
     if (tier.shadows) {
         sun.castShadow = true;
         sun.shadow.mapSize.width = tier.shadowMapSize;
         sun.shadow.mapSize.height = tier.shadowMapSize;
         sun.shadow.camera.near = 10;
-        sun.shadow.camera.far = 600;
-        sun.shadow.camera.left = -200;
-        sun.shadow.camera.right = 200;
-        sun.shadow.camera.top = 200;
-        sun.shadow.camera.bottom = -200;
+        sun.shadow.camera.far = 800;
+        sun.shadow.camera.left = -280;
+        sun.shadow.camera.right = 280;
+        sun.shadow.camera.top = 280;
+        sun.shadow.camera.bottom = -280;
     }
     scene.add(sun);
-
-    const cyanRim = new THREE.DirectionalLight(0x0E7C7B, 1.4);
-    cyanRim.position.set(-100, -50, -80);
-    scene.add(cyanRim);
 
     // 5. Instantiate Player Drone, Ghost Path & HUD
     const playerDrone = new Drone(scene, false, null, tier);
@@ -848,8 +844,8 @@ window.addEventListener('load', () => {
             sourceSunCol.copy(sun.color);
             targetSunCol.setHex(preset.sunColor);
 
-            sourceAmbCol.copy(ambientLight.color);
-            targetAmbCol.setHex(preset.ambientColor);
+            sourceAmbCol.copy(hemisphereLight.color);
+            targetAmbCol.setHex(preset.skyZenith || preset.ambientColor);
 
             sourceFogCol.copy(scene.fog.color);
             targetFogCol.setHex(preset.horizonColor);
@@ -857,7 +853,7 @@ window.addEventListener('load', () => {
             sourceSunInt = sun.intensity;
             targetSunInt = preset.lightIntensity;
 
-            sourceAmbInt = ambientLight.intensity;
+            sourceAmbInt = hemisphereLight.intensity;
             targetAmbInt = preset.ambientIntensity;
 
             sourceFogDens = currentTimeFogDensity;
@@ -888,8 +884,8 @@ window.addEventListener('load', () => {
         sun.color.copy(sourceSunCol).lerp(targetSunCol, s);
         sun.intensity = sourceSunInt + (targetSunInt - sourceSunInt) * s;
 
-        ambientLight.color.copy(sourceAmbCol).lerp(targetAmbCol, s);
-        ambientLight.intensity = sourceAmbInt + (targetAmbInt - sourceAmbInt) * s;
+        hemisphereLight.color.copy(sourceAmbCol).lerp(targetAmbCol, s);
+        hemisphereLight.intensity = sourceAmbInt + (targetAmbInt - sourceAmbInt) * s;
 
         scene.fog.color.copy(sourceFogCol).lerp(targetFogCol, s);
         currentTimeFogDensity = sourceFogDens + (targetFogDens - sourceFogDens) * s;
