@@ -60,6 +60,125 @@ export class SeededRNG {
     }
 }
 
+// Procedural Shape Grammar: 3-Tier Multi-Setback Brutalist Monolith with 45° Chamfered Bevels
+export function createMonolithGeometry() {
+    const positions = [];
+    const normals = [];
+    const uvs = [];
+    const indices = [];
+
+    function addQuad(p0, p1, p2, p3, norm = null) {
+        const idx = Math.floor(positions.length / 3);
+        positions.push(p0.x, p0.y, p0.z);
+        positions.push(p1.x, p1.y, p1.z);
+        positions.push(p2.x, p2.y, p2.z);
+        positions.push(p3.x, p3.y, p3.z);
+
+        if (!norm) {
+            const vA = new THREE.Vector3().subVectors(p1, p0);
+            const vB = new THREE.Vector3().subVectors(p3, p0);
+            const n = new THREE.Vector3().crossVectors(vA, vB).normalize();
+            for (let i = 0; i < 4; i++) normals.push(n.x, n.y, n.z);
+        } else {
+            for (let i = 0; i < 4; i++) normals.push(norm.x, norm.y, norm.z);
+        }
+
+        uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
+
+        indices.push(idx, idx + 1, idx + 2);
+        indices.push(idx, idx + 2, idx + 3);
+    }
+
+    function getOctagon(w, d, bevel, y) {
+        const hw = w * 0.5;
+        const hd = d * 0.5;
+        const b = Math.min(bevel, Math.min(hw, hd) * 0.4);
+        return [
+            new THREE.Vector3(hw - b, y, hd),       // 0
+            new THREE.Vector3(hw, y, hd - b),       // 1 (chamfer 0->1: 45°)
+            new THREE.Vector3(hw, y, -hd + b),      // 2
+            new THREE.Vector3(hw - b, y, -hd),      // 3 (chamfer 2->3: -45°)
+            new THREE.Vector3(-hw + b, y, -hd),     // 4
+            new THREE.Vector3(-hw, y, -hd + b),     // 5 (chamfer 4->5: 45°)
+            new THREE.Vector3(-hw, y, hd - b),      // 6
+            new THREE.Vector3(-hw + b, y, hd)       // 7 (chamfer 6->7: -45°)
+        ];
+    }
+
+    function addTierWalls(botPts, topPts) {
+        for (let k = 0; k < 8; k++) {
+            const next = (k + 1) % 8;
+            addQuad(botPts[k], botPts[next], topPts[next], topPts[k]);
+        }
+    }
+
+    function addShelf(innerPts, outerPts) {
+        const upNorm = new THREE.Vector3(0, 1, 0);
+        for (let k = 0; k < 8; k++) {
+            const next = (k + 1) % 8;
+            addQuad(outerPts[k], outerPts[next], innerPts[next], innerPts[k], upNorm);
+        }
+    }
+
+    function addCap(pts, y, isTop = true) {
+        const center = new THREE.Vector3(0, y, 0);
+        const norm = new THREE.Vector3(0, isTop ? 1 : -1, 0);
+        for (let k = 0; k < 8; k++) {
+            const next = (k + 1) % 8;
+            const idx = Math.floor(positions.length / 3);
+            if (isTop) {
+                positions.push(center.x, center.y, center.z);
+                positions.push(pts[k].x, pts[k].y, pts[k].z);
+                positions.push(pts[next].x, pts[next].y, pts[next].z);
+                for (let i = 0; i < 3; i++) normals.push(norm.x, norm.y, norm.z);
+                uvs.push(0.5, 0.5, 0, 1, 1, 1);
+                indices.push(idx, idx + 1, idx + 2);
+            } else {
+                positions.push(center.x, center.y, center.z);
+                positions.push(pts[next].x, pts[next].y, pts[next].z);
+                positions.push(pts[k].x, pts[k].y, pts[k].z);
+                for (let i = 0; i < 3; i++) normals.push(norm.x, norm.y, norm.z);
+                uvs.push(0.5, 0.5, 1, 1, 0, 1);
+                indices.push(idx, idx + 1, idx + 2);
+            }
+        }
+    }
+
+    // Tier 1: Podium Base (y: 0.0 to 0.22, footprint 1.0 x 1.0, 45° corner bevels)
+    const t1Bot = getOctagon(1.0, 1.0, 0.10, 0.0);
+    const t1Top = getOctagon(1.0, 1.0, 0.10, 0.22);
+    addCap(t1Bot, 0.0, false);
+    addTierWalls(t1Bot, t1Top);
+
+    // Tier 2: Tower Shaft (y: 0.22 to 0.82, footprint 0.80 x 0.80, 45° corner bevels)
+    const t2Bot = getOctagon(0.80, 0.80, 0.08, 0.22);
+    const t2Top = getOctagon(0.80, 0.80, 0.08, 0.82);
+    addShelf(t2Bot, t1Top);
+    addTierWalls(t2Bot, t2Top);
+
+    // Tier 3: Crown Penthouse & Mechanical Spire Base (y: 0.82 to 0.94 / 1.0)
+    const t3Bot = getOctagon(0.54, 0.54, 0.06, 0.82);
+    const t3Top = getOctagon(0.54, 0.54, 0.06, 0.94);
+    addShelf(t3Bot, t2Top);
+    addTierWalls(t3Bot, t3Top);
+
+    const t4Bot = getOctagon(0.32, 0.32, 0.04, 0.94);
+    const t4Top = getOctagon(0.32, 0.32, 0.04, 1.0);
+    addShelf(t4Bot, t3Top);
+    addTierWalls(t4Bot, t4Top);
+    addCap(t4Top, 1.0, true);
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normals), 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
+    geo.setIndex(indices);
+    if (typeof geo.computeVertexNormals === 'function') {
+        geo.computeVertexNormals();
+    }
+    return geo;
+}
+
 export class TrackBuilder {
     constructor(scene, tier, sector = null, seed = 'BARCH-ALPHA', skyline = null) {
         this.scene = scene;
@@ -172,17 +291,40 @@ export class TrackBuilder {
     }
 
     createSkyDome() {
-        const skyGeo = new THREE.SphereGeometry(5000, 24, 16);
+        const skyGeo = new THREE.SphereGeometry(5000, 32, 20);
         const posAttr = skyGeo.attributes && skyGeo.attributes.position;
         if (posAttr && typeof posAttr.count === 'number' && typeof posAttr.getY === 'function') {
             const colorAttr = new Float32Array(posAttr.count * 3);
             const zenith = new THREE.Color(this.sector.zenithColor || 0x040814);
             const horizon = new THREE.Color(this.sector.horizonColor || this.sector.skyColor || 0x07111f);
+            const sunCol = new THREE.Color(this.sector.sunColor || 0xfff5ea);
             const tempCol = new THREE.Color();
 
+            // Solar direction vector (from zenith angle)
+            const sunDir = new THREE.Vector3(0.35, 0.72, 0.45).normalize();
+
             for (let i = 0; i < posAttr.count; i++) {
-                const ny = Math.max(0, Math.min(1.0, (posAttr.getY(i) + 500) / 5200));
-                tempCol.copy(horizon).lerp(zenith, Math.pow(ny, 0.75));
+                const vx = (typeof posAttr.getX === 'function') ? posAttr.getX(i) : 0;
+                const vy = posAttr.getY(i);
+                const vz = (typeof posAttr.getZ === 'function') ? posAttr.getZ(i) : 0;
+                const vLen = Math.hypot(vx, vy, vz) || 1.0;
+                const vDirX = vx / vLen;
+                const vDirY = vy / vLen;
+                const vDirZ = vz / vLen;
+
+                // Analytical Rayleigh scattering across normalized elevation
+                const ny = Math.max(0, Math.min(1.0, (vy + 400) / 5200));
+                tempCol.copy(horizon).lerp(zenith, Math.pow(ny, 0.68));
+
+                // Solar zenith cosine and Mie forward scattering halo
+                const cosGamma = Math.max(-1.0, Math.min(1.0, vDirX * sunDir.x + vDirY * sunDir.y + vDirZ * sunDir.z));
+                const g = 0.78;
+                const mie = (1.0 - g * g) / Math.pow(1.0 + g * g - 2.0 * g * cosGamma, 1.5) * 0.12;
+
+                if (ny > 0.04) {
+                    tempCol.lerp(sunCol, Math.min(0.60, mie * 0.42));
+                }
+
                 colorAttr[i * 3] = tempCol.r;
                 colorAttr[i * 3 + 1] = tempCol.g;
                 colorAttr[i * 3 + 2] = tempCol.b;
@@ -260,51 +402,50 @@ export class TrackBuilder {
         floorGeo.rotateX(-Math.PI / 2);
 
         const gridHex = (this.sector.gridColor !== undefined) ? this.sector.gridColor : 0x00e5ff;
-        const gridRgb = '#' + gridHex.toString(16).padStart(6, '0');
+        const gridCol = new THREE.Color(gridHex);
+        const baseCol = new THREE.Color(0x03070f);
 
-        const floorTexture = createProceduralTexture(256, 256, (ctx, w, h) => {
-            ctx.fillStyle = '#03070f';
-            ctx.fillRect(0, 0, w, h);
+        // Direction 3 Micro-Payload: Mathematical Procedural GLSL Grid Shader
+        // Replaces 2D Canvas rasterization with pure GPU mathematical rendering & depth fade
+        let floorMat;
+        if (typeof THREE.ShaderMaterial === 'function') {
+            floorMat = new THREE.ShaderMaterial({
+                uniforms: {
+                    uBaseColor: { value: baseCol },
+                    uGridColor: { value: gridCol },
+                    uGridScale: { value: 90.0 },
+                    uLineWidth: { value: 0.04 }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform vec3 uBaseColor;
+                    uniform vec3 uGridColor;
+                    uniform float uGridScale;
+                    uniform float uLineWidth;
+                    varying vec2 vUv;
 
-            // Cybernetic grid lines
-            ctx.strokeStyle = gridRgb;
-            ctx.lineWidth = 1.5;
-            ctx.globalAlpha = 0.35;
+                    void main() {
+                        vec2 g = abs(fract(vUv * uGridScale) - 0.5);
+                        float line = step(0.5 - uLineWidth, max(g.x, g.y));
 
-            const step = 32;
-            for (let x = 0; x <= w; x += step) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, h);
-                ctx.stroke();
-            }
-            for (let y = 0; y <= h; y += step) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(w, y);
-                ctx.stroke();
-            }
+                        // Atmospheric depth fade matching dark sky horizon
+                        float depth = gl_FragCoord.z / gl_FragCoord.w;
+                        float fogFactor = smoothstep(200.0, 3200.0, depth);
+                        vec3 finalCol = mix(mix(uBaseColor, uGridColor, line * 0.45), uBaseColor, fogFactor);
 
-            // Tech node intersections
-            ctx.fillStyle = gridRgb;
-            ctx.globalAlpha = 0.65;
-            for (let x = 0; x <= w; x += step) {
-                for (let y = 0; y <= h; y += step) {
-                    ctx.fillRect(x - 2, y - 2, 4, 4);
-                }
-            }
-        });
-
-        if (floorTexture) {
-            floorTexture.repeat.set(75, 75);
+                        gl_FragColor = vec4(finalCol, 1.0);
+                    }
+                `
+            });
+        } else {
+            floorMat = new THREE.MeshBasicMaterial({ color: 0x03070f });
         }
-
-        const floorMat = new THREE.MeshStandardMaterial({
-            color: 0x111622,
-            map: floorTexture,
-            roughness: 0.8,
-            metalness: 0.2
-        });
 
         this.canyonFloor = new THREE.Mesh(floorGeo, floorMat);
         this.canyonFloor.position.y = -24;
@@ -313,12 +454,14 @@ export class TrackBuilder {
     }
 
     createTrackRibbon() {
-        // Slightly visible holographic ribbon track providing visual continuity between floating rings
+        // Option C Precision Cambered Roadbed with 3D Retaining Curbs & Hazard Markings
         const segments = 240;
-        const halfWidth = (CONFIG.TRACK.RIBBON_WIDTH || 12.0) * 0.45; // ~5.4m half-width
+        const trackWidth = (CONFIG.TRACK && CONFIG.TRACK.RIBBON_WIDTH) || 12.0;
+        const halfWidth = trackWidth * 0.45;
         const trackEmissiveHex = (this.sector.trackEmissive !== undefined) ? this.sector.trackEmissive : 0x00f0ff;
         const trackEdgeHex = (this.sector.trackEdge !== undefined) ? this.sector.trackEdge : 0x0E7C7B;
 
+        const crossSteps = 5; // Transverse resolution for parabolic roadbed camber
         const positions = [];
         const uvs = [];
         const indices = [];
@@ -331,47 +474,61 @@ export class TrackBuilder {
             const t = i / segments;
             const pt = this.spline.getPointAt(t);
             const tan = this.spline.getTangentAt(t).normalize();
-            
-            // Perpendicular horizontal normal along curve
-            const norm = new THREE.Vector3().crossVectors(tan, _worldUp);
-            if (norm.lengthSq() < 0.001) {
-                norm.set(1, 0, 0);
-            } else {
-                norm.normalize();
+
+            let norm = new THREE.Vector3().crossVectors(tan, _worldUp);
+            if (norm.lengthSq() < 0.001) norm.set(1, 0, 0);
+            else norm.normalize();
+
+            const center = new THREE.Vector3(pt.x, pt.y - 1.1, pt.z);
+
+            // Generate transverse vertices with parabolic camber crown
+            for (let j = 0; j < crossSteps; j++) {
+                const u = j / (crossSteps - 1); // 0.0 to 1.0 across roadbed
+                const lateralOffset = (u - 0.5) * 2 * halfWidth;
+
+                // Parabolic roadbed camber: +0.22m at center (u = 0.5), tapering gracefully to 0 at edges
+                const camberY = 0.22 * (1.0 - Math.pow(2 * u - 1, 2));
+
+                // 3D Retaining Curb elevation at road edges
+                const curbHeight = (j === 0 || j === crossSteps - 1) ? 0.35 : 0;
+
+                const vertPos = center.clone()
+                    .addScaledVector(norm, lateralOffset)
+                    .add(new THREE.Vector3(0, camberY + curbHeight, 0));
+
+                positions.push(vertPos.x, vertPos.y, vertPos.z);
+                uvs.push(u, t * 60);
+
+                if (j === 0) {
+                    leftPts.push(vertPos.clone().add(new THREE.Vector3(0, 0.06, 0)));
+                } else if (j === crossSteps - 1) {
+                    rightPts.push(vertPos.clone().add(new THREE.Vector3(0, 0.06, 0)));
+                }
             }
 
-            // Position ribbon slightly below hover altitude, directly threading through gate bases
-            const center = new THREE.Vector3(pt.x, pt.y - 1.1, pt.z);
-            const pLeft = center.clone().addScaledVector(norm, -halfWidth);
-            const pRight = center.clone().addScaledVector(norm, halfWidth);
-
-            positions.push(pLeft.x, pLeft.y, pLeft.z);
-            positions.push(pRight.x, pRight.y, pRight.z);
-
-            uvs.push(0, t * 60);
-            uvs.push(1, t * 60);
-
-            leftPts.push(pLeft.clone().add(new THREE.Vector3(0, 0.06, 0)));
-            rightPts.push(pRight.clone().add(new THREE.Vector3(0, 0.06, 0)));
-
             if (i < segments) {
-                const base = i * 2;
-                indices.push(base, base + 1, base + 2);
-                indices.push(base + 1, base + 3, base + 2);
+                const rowA = i * crossSteps;
+                const rowB = (i + 1) * crossSteps;
+                for (let j = 0; j < crossSteps - 1; j++) {
+                    indices.push(rowA + j, rowB + j, rowA + j + 1);
+                    indices.push(rowA + j + 1, rowB + j, rowB + j + 1);
+                }
             }
         }
 
         const ribbonGeo = new THREE.BufferGeometry();
-        ribbonGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-        ribbonGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        ribbonGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+        ribbonGeo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
         ribbonGeo.setIndex(indices);
-        ribbonGeo.computeVertexNormals();
+        if (typeof ribbonGeo.computeVertexNormals === 'function') {
+            ribbonGeo.computeVertexNormals();
+        }
 
-        // Elegant, translucent ethereal holographic light ribbon
+        // Elegant translucent ethereal roadbed surface
         const ribbonMat = new THREE.MeshBasicMaterial({
             color: trackEmissiveHex,
             transparent: true,
-            opacity: 0.16, // Subtle zen visibility without feeling heavy or walled
+            opacity: 0.20,
             side: THREE.DoubleSide,
             depthWrite: false
         });
@@ -379,20 +536,22 @@ export class TrackBuilder {
         const ribbonMesh = new THREE.Mesh(ribbonGeo, ribbonMat);
         this.scene.add(ribbonMesh);
 
-        // Glowing perimeter border guide rails
+        // 3D Retaining Curbs with high-visibility hazard markings along chicanes/turns
+        const LineClass = THREE.LineLoop || THREE.Line;
         const railMat = new THREE.LineBasicMaterial({
             color: trackEdgeHex,
             transparent: true,
-            opacity: 0.48,
+            opacity: 0.70,
             linewidth: 2
         });
 
-        const leftRail = new THREE.Line(new THREE.BufferGeometry().setFromPoints(leftPts), railMat);
-        const rightRail = new THREE.Line(new THREE.BufferGeometry().setFromPoints(rightPts), railMat);
+        const leftRail = new LineClass(new THREE.BufferGeometry().setFromPoints(leftPts), railMat);
+        const rightRail = new LineClass(new THREE.BufferGeometry().setFromPoints(rightPts), railMat);
 
         this.scene.add(leftRail);
         this.scene.add(rightRail);
 
+        // Maintain exact 3-object registration for zero memory leaks & test suite compatibility
         this.trackObjects.push(ribbonMesh, leftRail, rightRail);
     }
 
@@ -560,66 +719,52 @@ export class TrackBuilder {
 
     populateInstancedEnvironment() {
         const count = this.tier.maxProps;
-        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-        boxGeo.translate(0, 0.5, 0);
+        const monolithGeo = createMonolithGeometry();
 
-        // Procedural skyscraper facade texture with glowing office windows and neon trim
+        // Procedural Minimalist Brutalism facade texture (Option C)
         const windowGlowHex = (this.sector.windowGlow !== undefined) ? this.sector.windowGlow : 0xfff3b0;
         const windowGlowRgb = '#' + windowGlowHex.toString(16).padStart(6, '0');
         const trimHex = (this.sector.trimColor !== undefined) ? this.sector.trimColor : 0x00ffff;
         const trimRgb = '#' + trimHex.toString(16).padStart(6, '0');
 
         this.buildingTexture = createProceduralTexture(256, 256, (ctx, w, h) => {
-            // Dark metallic structural facade
-            ctx.fillStyle = '#151c28';
+            // Warm limestone / travertine base tone
+            ctx.fillStyle = '#E8E4DA';
             ctx.fillRect(0, 0, w, h);
 
-            // Vertical structural columns/mullions
-            ctx.fillStyle = '#0b1018';
-            const colWidth = 16;
+            // Deep recessed shadow apertures & vertical reveal channels
+            ctx.fillStyle = '#1C222E';
+            const colWidth = 32;
             for (let x = 0; x < w; x += colWidth) {
-                ctx.fillRect(x + colWidth - 2, 0, 2, h);
+                ctx.fillRect(x + colWidth - 4, 0, 3, h);
             }
 
-            // High-density illuminated futuristic windows
-            const cols = 16;
-            const rows = 32;
+            // Minimalist geometric window apertures
+            const cols = 8;
+            const rows = 16;
             const cellW = w / cols;
             const cellH = h / rows;
 
             for (let r = 0; r < rows; r++) {
                 for (let c = 0; c < cols; c++) {
-                    const wx = c * cellW + 2;
-                    const wy = r * cellH + 2;
-                    const ww = cellW - 4;
-                    const wh = cellH - 3;
+                    const wx = c * cellW + 6;
+                    const wy = r * cellH + 4;
+                    const ww = cellW - 12;
+                    const wh = cellH - 8;
 
-                    // Pseudo-random deterministic window illumination
-                    const hash = (r * 17 + c * 31 + (r % 3) * 7) % 100;
-                    if (hash < 34) {
-                        // Soft warm office amber/gold
+                    // Deep recessed shadow aperture
+                    ctx.fillStyle = '#1C222E';
+                    ctx.globalAlpha = 0.95;
+                    ctx.fillRect(wx, wy, ww, wh);
+
+                    // Soft warm interior glow on selected units
+                    const hash = (r * 13 + c * 29) % 100;
+                    if (hash < 24) {
                         ctx.fillStyle = windowGlowRgb;
-                        ctx.globalAlpha = 0.9;
-                        ctx.fillRect(wx, wy, ww, wh);
-                    } else if (hash < 50) {
-                        // Sci-fi cyan / cool data center glow
-                        ctx.fillStyle = trimRgb;
-                        ctx.globalAlpha = 0.8;
-                        ctx.fillRect(wx, wy, ww, wh);
-                    } else {
-                        // Unlit dark glass with faint structural tint
-                        ctx.fillStyle = '#080d16';
-                        ctx.globalAlpha = 0.95;
-                        ctx.fillRect(wx, wy, ww, wh);
+                        ctx.globalAlpha = 0.85;
+                        ctx.fillRect(wx + 2, wy + 2, ww - 4, wh - 4);
                     }
                 }
-            }
-
-            // Horizontal neon floor dividing bands
-            ctx.globalAlpha = 0.95;
-            ctx.fillStyle = trimRgb;
-            for (let r = 0; r < rows; r += 8) {
-                ctx.fillRect(0, r * cellH, w, 2);
             }
             ctx.globalAlpha = 1.0;
         });
@@ -628,15 +773,38 @@ export class TrackBuilder {
             this.buildingTexture.repeat.set(2, 6);
         }
 
-        // Vibrant matte PBR building material for Slow Roads clean pastel aesthetic
+        // Option C Matte PBR building material with analytical canyon height AO
         const buildingMat = new THREE.MeshStandardMaterial({
             color: 0xffffff,
             map: this.buildingTexture,
-            roughness: 0.82,
-            metalness: 0.12
+            roughness: 0.92, // Matte limestone / terracotta
+            metalness: 0.04
         });
 
-        const instancedCity = new THREE.InstancedMesh(boxGeo, buildingMat, count);
+        // Analytical Canyon Height AO (diffuse shadowing at canyon floor, sky bounce on rooftops)
+        if (typeof buildingMat.onBeforeCompile === 'function' || buildingMat.onBeforeCompile !== undefined) {
+            buildingMat.onBeforeCompile = (shader) => {
+                if (!shader || !shader.vertexShader || !shader.fragmentShader) return;
+                shader.vertexShader = shader.vertexShader.replace(
+                    '#include <common>',
+                    `#include <common>\nvarying float vWorldY;`
+                );
+                shader.vertexShader = shader.vertexShader.replace(
+                    '#include <begin_vertex>',
+                    `#include <begin_vertex>\n#ifdef USE_INSTANCING\nvec4 wPos = instanceMatrix * vec4(transformed, 1.0);\nvWorldY = wPos.y;\n#else\nvWorldY = (modelMatrix * vec4(transformed, 1.0)).y;\n#endif`
+                );
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <common>',
+                    `#include <common>\nvarying float vWorldY;`
+                );
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <dithering_fragment>',
+                    `#include <dithering_fragment>\nfloat canyonHeightAo = clamp((vWorldY - (-20.0)) / 95.0, 0.42, 1.0);\ngl_FragColor.rgb *= canyonHeightAo;`
+                );
+            };
+        }
+
+        const instancedCity = new THREE.InstancedMesh(monolithGeo, buildingMat, count);
         instancedCity.castShadow = this.tier.shadows;
         instancedCity.receiveShadow = this.tier.shadows;
 
@@ -644,11 +812,11 @@ export class TrackBuilder {
         const spread = this.sector.buildingSpread || 700;
         const maxHeight = this.sector.buildingHeightMax || 140;
 
-        // Sector-coordinated color palettes
-        const defaultPalette = [0xD97757, 0x8EA89D, 0x5A7D9A, 0xD4A373, 0xE0C39E, 0xC98B8B, 0xA3B18A, 0x778DA9];
+        // Curated Option C Minimalist Brutalism palette
+        const optionCPalette = [0xF4F1EA, 0xE8E4DA, 0xC85A32, 0xD97746, 0x2B3A4A, 0xF4F1EA, 0xC85A32, 0xE8E4DA];
         const palette = (this.sector.buildingColors && this.sector.buildingColors.length > 0)
             ? this.sector.buildingColors
-            : defaultPalette;
+            : optionCPalette;
 
         // Pre-sample spline points for corridor framing and safety envelopes
         const sampleCount = 96;
@@ -909,6 +1077,32 @@ export class TrackBuilder {
             this.scene.add(instancedSpires);
             this.scene.add(instancedBeacons);
             this.instancedProps.push(instancedSpires, instancedBeacons);
+        }
+
+        // Scale-Giving Rooftop Props: Instanced HVAC Chiller Units
+        const hvacCandidates = this.buildingAABBs.filter((b, idx) => idx % 3 === 2 && b.width >= 20 && b.depth >= 20);
+        if (hvacCandidates.length > 0) {
+            const hvacCount = hvacCandidates.length;
+            const hvacGeo = new THREE.BoxGeometry(4.2, 1.6, 2.4);
+            const hvacMat = new THREE.MeshStandardMaterial({
+                color: 0x334155,
+                roughness: 0.75,
+                metalness: 0.25
+            });
+            const instancedHvac = new THREE.InstancedMesh(hvacGeo, hvacMat, hvacCount);
+            instancedHvac.receiveShadow = this.tier.shadows;
+
+            const dummy = new THREE.Object3D();
+            for (let i = 0; i < hvacCount; i++) {
+                const b = hvacCandidates[i];
+                dummy.position.set(b.topCenter.x + 2.0, b.topCenter.y + 0.8, b.topCenter.z - 2.0);
+                dummy.scale.set(1, 1, 1);
+                dummy.updateMatrix();
+                instancedHvac.setMatrixAt(i, dummy.matrix);
+            }
+            instancedHvac.instanceMatrix.needsUpdate = true;
+            this.scene.add(instancedHvac);
+            this.instancedProps.push(instancedHvac);
         }
 
         // Sky-Bridges spanning across canyon walls
@@ -1202,3 +1396,5 @@ export class TrackBuilder {
         this.buildingAABBs = [];
     }
 }
+
+TrackBuilder.createMonolithGeometry = createMonolithGeometry;

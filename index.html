@@ -41,18 +41,19 @@
 <!-- WebGL Viewport -->
 <canvas id="viewport-canvas"></canvas>
 
-<!-- Top Tactical Flight Telemetry -->
+<!-- Top Floating Flight Telemetry (True Slow Roads Option C) -->
 <div id="top-hud">
-    <div class="hud-panel">
-        <div class="telemetry-item">
-            <span class="telemetry-label">AIRSPEED</span>
-            <div><span id="hud-speed" class="telemetry-value">0</span><span class="telemetry-unit">KM/H</span></div>
-        </div>
-        <div class="telemetry-item">
+    <div class="hud-panel hud-panel-left">
+        <div class="telemetry-item" id="hud-alt-group">
             <span class="telemetry-label">ALTITUDE</span>
             <div><span id="hud-alt" class="telemetry-value">0</span><span class="telemetry-unit">M</span></div>
+            <span id="hud-alt-sector" class="telemetry-sub">STRATOSPHERE</span>
         </div>
-        <div class="telemetry-item" id="hud-mode-display-item">
+        <div class="telemetry-item" id="pos-or-cargo-item" style="margin-left: 16px;">
+            <span id="pos-or-cargo-label" class="telemetry-label">POSITION</span>
+            <div id="position-badge">1ST</div>
+        </div>
+        <div class="telemetry-item" id="hud-mode-display-item" style="display:none;">
             <span class="telemetry-label">MODE</span>
             <div id="hud-mode-badge" style="font-size:12px; font-weight:800; color:#00ffff;">CIRCUIT</div>
         </div>
@@ -60,19 +61,33 @@
 
     <canvas id="compass-ribbon-canvas" class="compass-canvas" width="260" height="28"></canvas>
 
-    <div class="hud-panel">
-        <div class="telemetry-item" id="pos-or-cargo-item">
-            <span id="pos-or-cargo-label" class="telemetry-label">POSITION</span>
-            <div id="position-badge">1ST</div>
+    <div class="hud-panel hud-panel-right">
+        <div class="telemetry-item" id="hud-speed-group">
+            <span class="telemetry-label">AIRSPEED</span>
+            <div class="nitro-arc-container">
+                <div><span id="hud-speed" class="telemetry-value">0</span><span class="telemetry-unit">KM/H</span></div>
+            </div>
+            <!-- Delicate curved/radial nitro energy arc matching Slow Roads -->
+            <div class="nitro-arc-track" title="Nitro Capacity">
+                <div id="nitro-arc-bar" class="nitro-arc-fill"></div>
+            </div>
         </div>
-        <div class="telemetry-item" id="lap-or-target-item">
+        <div class="telemetry-item" id="lap-or-target-item" style="margin-left: 14px;">
             <span id="lap-or-target-label" class="telemetry-label">LAP</span>
-            <div id="hud-lap" class="telemetry-value">1 / 2</div>
+            <div id="hud-lap" class="telemetry-value" style="font-size: clamp(22px, 3.5vw, 34px);">1 / 2</div>
         </div>
-        <button id="btn-toggle-sidebar" class="hud-quick-btn" data-tooltip="Open Hangar, Manual & Settings (TAB)" data-tooltip-pos="bottom">MENU [TAB]</button>
-        <button id="btn-pause-game" data-tooltip="Pause Game & Flight Systems (ESC)" data-tooltip-pos="bottom" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; border-radius:8px; padding:6px 12px; font-weight:800; font-family:inherit; cursor:pointer;">PAUSE</button>
-        <button id="btn-audio-toggle" data-tooltip="Toggle Master Turbine & Sound Effects" data-tooltip-pos="bottom" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; border-radius:8px; padding:6px 10px; font-weight:800; font-family:inherit; cursor:pointer;">AUDIO: OFF</button>
+        <div class="hud-action-buttons">
+            <button id="btn-toggle-sidebar" class="hud-quick-btn" data-tooltip="Open Hangar, Manual & Settings (TAB)" data-tooltip-pos="bottom">MENU [TAB]</button>
+            <button id="btn-pause-game" data-tooltip="Pause Game & Flight Systems (ESC)" data-tooltip-pos="bottom">PAUSE</button>
+            <button id="btn-audio-toggle" data-tooltip="Toggle Master Turbine & Sound Effects" data-tooltip-pos="bottom">AUDIO: OFF</button>
+        </div>
     </div>
+</div>
+
+<!-- Center Bottom Minimal Flight State Indicator (Option C) -->
+<div id="hud-flight-state" class="floating-flight-state">
+    <span class="state-dot"></span>
+    <span id="hud-flight-state-text">AUTODRIVE</span>
 </div>
 
 <!-- Tactical Flight Assist Bar -->
@@ -590,6 +605,7 @@ import { PreloadScreen } from './js/ui/preload_screen.js';
 import { CustomizationSidebar } from './js/ui/sidebar.js';
 import { ControlsGuide } from './js/ui/controls_guide.js';
 import { Autopilot } from './js/engine/autopilot.js';
+import { GhostPath } from './js/engine/ghost_path.js';
 
 window.addEventListener('load', () => {
     // 1. Hardware Profiler & Coordinator
@@ -636,6 +652,15 @@ window.addEventListener('load', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0x07111f);
 
+    // Option C Photometric Tone Mapping & Color Pipeline
+    if (THREE.ACESFilmicToneMapping !== undefined) {
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.08;
+    }
+    if (THREE.sRGBEncoding !== undefined) {
+        renderer.outputEncoding = THREE.sRGBEncoding;
+    }
+
     if (tier.shadows) {
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -648,7 +673,9 @@ window.addEventListener('load', () => {
     const cameraRig = new CameraRig(camera);
 
     // 4. Lighting Rig
-    scene.add(new THREE.AmbientLight(0x334455, 1.2));
+    const ambientLight = new THREE.AmbientLight(0x556677, 1.2);
+    scene.add(ambientLight);
+
     const sun = new THREE.DirectionalLight(0xfff0dd, 2.2);
     sun.position.set(120, 220, 100);
     if (tier.shadows) {
@@ -668,8 +695,9 @@ window.addEventListener('load', () => {
     cyanRim.position.set(-100, -50, -80);
     scene.add(cyanRim);
 
-    // 5. Instantiate Player Drone & HUD
+    // 5. Instantiate Player Drone, Ghost Path & HUD
     const playerDrone = new Drone(scene, false, null, tier);
+    const ghostPath = new GhostPath(scene, tier);
     const hud = new RacingHUD();
     const autopilot = new Autopilot();
     let stuntsCompletedCount = 0;
@@ -805,6 +833,116 @@ window.addEventListener('load', () => {
         });
         hud.showToast(`ATMOSPHERE: ${skylineId.replace('_', ' ')}`, 'info');
     };
+
+    // Option C Continuous Dynamic Time-of-Day Cycling (Dawn -> Midday -> Sunset -> Blue Hour)
+    let currentPresetIndex = 1; // Default: ZEN_MIDDAY
+    let currentPresetKey = (CONFIG.TIME_PRESET_KEYS && CONFIG.TIME_PRESET_KEYS[currentPresetIndex]) || 'ZEN_MIDDAY';
+    let currentTimeFogDensity = (CONFIG.TIME_PRESETS && CONFIG.TIME_PRESETS.ZEN_MIDDAY) ? CONFIG.TIME_PRESETS.ZEN_MIDDAY.fogDensity : 0.0010;
+
+    let timeTransitionProgress = 1.0;
+    const timeTransitionDuration = 1.8;
+
+    const sourceSunPos = new THREE.Vector3();
+    const targetSunPos = new THREE.Vector3();
+    const sourceSunCol = new THREE.Color();
+    const targetSunCol = new THREE.Color();
+    const sourceAmbCol = new THREE.Color();
+    const targetAmbCol = new THREE.Color();
+    const sourceFogCol = new THREE.Color();
+    const targetFogCol = new THREE.Color();
+    let sourceSunInt = 2.2, targetSunInt = 2.2;
+    let sourceAmbInt = 1.2, targetAmbInt = 1.2;
+    let sourceFogDens = 0.0010, targetFogDens = 0.0010;
+    let sourceExp = 1.08, targetExp = 1.08;
+
+    function applyTimeOfDayInstant(preset) {
+        if (!preset) return;
+        const sunVec = CONFIG.getSunVector ? CONFIG.getSunVector(preset.sunElevation, preset.sunAzimuth) : { x: 120, y: 220, z: 100 };
+        sun.position.set(sunVec.x * 350, sunVec.y * 350, sunVec.z * 350);
+        sun.color.setHex(preset.sunColor);
+        sun.intensity = preset.lightIntensity;
+        ambientLight.color.setHex(preset.ambientColor);
+        ambientLight.intensity = preset.ambientIntensity;
+        scene.fog.color.setHex(preset.horizonColor);
+        scene.fog.density = preset.fogDensity;
+        currentTimeFogDensity = preset.fogDensity;
+        renderer.setClearColor(preset.horizonColor);
+        if (renderer.toneMappingExposure !== undefined) {
+            renderer.toneMappingExposure = preset.exposure || 1.08;
+        }
+    }
+
+    function setTimeOfDayPreset(presetKey, instant = false) {
+        const preset = CONFIG.TIME_PRESETS && CONFIG.TIME_PRESETS[presetKey];
+        if (!preset) return;
+        currentPresetKey = presetKey;
+        currentPresetIndex = CONFIG.TIME_PRESET_KEYS.indexOf(presetKey);
+
+        if (instant) {
+            applyTimeOfDayInstant(preset);
+            timeTransitionProgress = 1.0;
+        } else {
+            sourceSunPos.copy(sun.position);
+            const targetVec = CONFIG.getSunVector ? CONFIG.getSunVector(preset.sunElevation, preset.sunAzimuth) : { x: 120, y: 220, z: 100 };
+            targetSunPos.set(targetVec.x * 350, targetVec.y * 350, targetVec.z * 350);
+
+            sourceSunCol.copy(sun.color);
+            targetSunCol.setHex(preset.sunColor);
+
+            sourceAmbCol.copy(ambientLight.color);
+            targetAmbCol.setHex(preset.ambientColor);
+
+            sourceFogCol.copy(scene.fog.color);
+            targetFogCol.setHex(preset.horizonColor);
+
+            sourceSunInt = sun.intensity;
+            targetSunInt = preset.lightIntensity;
+
+            sourceAmbInt = ambientLight.intensity;
+            targetAmbInt = preset.ambientIntensity;
+
+            sourceFogDens = currentTimeFogDensity;
+            targetFogDens = preset.fogDensity;
+
+            sourceExp = renderer.toneMappingExposure !== undefined ? renderer.toneMappingExposure : 1.08;
+            targetExp = preset.exposure || 1.08;
+
+            timeTransitionProgress = 0.0;
+        }
+
+        hud.showToast(`ATMOSPHERE: ${preset.name}`, 'info');
+    }
+
+    function cycleTimeOfDay() {
+        if (!CONFIG.TIME_PRESET_KEYS || CONFIG.TIME_PRESET_KEYS.length === 0) return;
+        const nextIndex = (currentPresetIndex + 1) % CONFIG.TIME_PRESET_KEYS.length;
+        const nextKey = CONFIG.TIME_PRESET_KEYS[nextIndex];
+        setTimeOfDayPreset(nextKey, false);
+    }
+
+    function updateTimeOfDayTransition(dt) {
+        if (timeTransitionProgress >= 1.0) return;
+        timeTransitionProgress = Math.min(1.0, timeTransitionProgress + dt / timeTransitionDuration);
+        const s = timeTransitionProgress * timeTransitionProgress * (3.0 - 2.0 * timeTransitionProgress);
+
+        sun.position.copy(sourceSunPos).lerp(targetSunPos, s);
+        sun.color.copy(sourceSunCol).lerp(targetSunCol, s);
+        sun.intensity = sourceSunInt + (targetSunInt - sourceSunInt) * s;
+
+        ambientLight.color.copy(sourceAmbCol).lerp(targetAmbCol, s);
+        ambientLight.intensity = sourceAmbInt + (targetAmbInt - sourceAmbInt) * s;
+
+        scene.fog.color.copy(sourceFogCol).lerp(targetFogCol, s);
+        currentTimeFogDensity = sourceFogDens + (targetFogDens - sourceFogDens) * s;
+
+        renderer.setClearColor(scene.fog.color);
+        if (renderer.toneMappingExposure !== undefined) {
+            renderer.toneMappingExposure = sourceExp + (targetExp - sourceExp) * s;
+        }
+    }
+
+    window._setTimeOfDayPreset = setTimeOfDayPreset;
+    window._cycleTimeOfDay = cycleTimeOfDay;
 
     function setupSectorAndMode(sectorId, mode) {
         const sector = CONFIG.SECTORS.find(s => s.id === sectorId) || CONFIG.SECTORS[0];
@@ -1197,6 +1335,8 @@ window.addEventListener('load', () => {
         } else if (cameraRig.isPhotoMode && e.key === ' ') {
             cameraRig.takeSnapshot(renderer.domElement, `barch-snapshot-${Date.now()}.png`);
             hud.showStuntAlert('SNAPSHOT CAPTURED', 'SAVED TO DOWNLOADS');
+        } else if (e.key === 't' || e.key === 'T') {
+            cycleTimeOfDay();
         }
     });
 
@@ -1517,6 +1657,21 @@ window.addEventListener('load', () => {
         if (track && typeof track.update === 'function') {
             const activeSpeed = (window._gameState === 'RACING' || window._gameState === 'DIVING') ? playerDrone.speedKmh : 24.0;
             track.update(activeSpeed, dt);
+        }
+
+        // Analytical Slow Roads Ghost Path Trajectory Projection
+        if (ghostPath) {
+            ghostPath.update(playerDrone, track, dt, clock.getElapsedTime());
+        }
+
+        // Smooth Time-of-Day Transition & Solar Scattering Simulation
+        updateTimeOfDayTransition(dt);
+
+        // Exponential Canyon Height Fog: dense in low urban corridors, clearing to stratosphere clarity
+        if (scene.fog && playerDrone && playerDrone.position) {
+            const droneAltitude = playerDrone.position.y;
+            const altitudeClarity = Math.max(0.12, Math.min(1.0, 1.0 - (droneAltitude - 30) / 250.0));
+            scene.fog.density = currentTimeFogDensity * altitudeClarity;
         }
 
         // Camera Tracking & Scene Rendering (guarded against WebGL context loss)

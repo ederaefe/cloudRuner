@@ -34,7 +34,7 @@ export const CONFIG = {
             trackEdge: 0x1b4965,
             buildingSpread: 2200,
             buildingHeightMax: 65,
-            buildingColors: [0xD97757, 0x8EA89D, 0x5A7D9A, 0xD4A373, 0xE0C39E, 0xC98B8B, 0xA3B18A, 0x778DA9],
+            buildingColors: [0xF4F1EA, 0xE8E4DA, 0xC85A32, 0xD97746, 0x2B3A4A, 0xF4F1EA, 0xC85A32, 0xE8E4DA],
             beaconColors: [0x00ffff, 0xff0055, 0xffaa00],
             trimColor: 0x00ffff,
             windowGlow: 0xfff3b0
@@ -179,6 +179,93 @@ export const CONFIG = {
             lightIntensity: 0.75
         }
     ],
+
+    // Option C: Clean White & Terracotta Minimalist Brutalism Palette
+    BRUTALISM_PALETTE: {
+        TRAVERTINE: 0xF4F1EA,
+        LIMESTONE_WARM: 0xE8E4DA,
+        TERRACOTTA: 0xC85A32,
+        BURNT_CLAY: 0xD97746,
+        SLATE_ACCENT: 0x2B3A4A,
+        SHADOW_APERTURE: 0x1C222E,
+        COLORS: [0xF4F1EA, 0xE8E4DA, 0xC85A32, 0xD97746, 0x2B3A4A, 0xF4F1EA, 0xC85A32, 0xE8E4DA]
+    },
+
+    // 4 Continuous Option C Time-of-Day Celestial Presets
+    TIME_PRESETS: {
+        DAWN_CRISP: {
+            id: 'DAWN_CRISP',
+            name: 'Morning Crisp (Dawn)',
+            sunElevation: 16,
+            sunAzimuth: 45,
+            sunColor: 0xFFE2B8,
+            skyZenith: 0x1B3B6F,
+            horizonColor: 0xFBC490,
+            fogDensity: 0.0016,
+            lightIntensity: 1.5,
+            ambientColor: 0x2A3B5C,
+            ambientIntensity: 0.9,
+            exposure: 1.08,
+            description: 'Sun elevation 16°, peach sun #FFE2B8, sky zenith #1B3B6F, horizon #FBC490, long soft shadows'
+        },
+        ZEN_MIDDAY: {
+            id: 'ZEN_MIDDAY',
+            name: 'High Midday (Zen Brutalism)',
+            sunElevation: 72,
+            sunAzimuth: 160,
+            sunColor: 0xFFFDF5,
+            skyZenith: 0x3B82F6,
+            horizonColor: 0xBFDBFE,
+            fogDensity: 0.0010,
+            lightIntensity: 2.2,
+            ambientColor: 0x556677,
+            ambientIntensity: 1.2,
+            exposure: 1.08,
+            description: 'Sun elevation 72°, pure white sun #FFFDF5, sky zenith #3B82F6, horizon #BFDBFE, stark high-contrast brutalist shadows'
+        },
+        GOLDEN_SUNSET: {
+            id: 'GOLDEN_SUNSET',
+            name: 'Golden Terracotta (Sunset)',
+            sunElevation: 10,
+            sunAzimuth: 240,
+            sunColor: 0xFF6B35,
+            skyZenith: 0x311B92,
+            horizonColor: 0xFF8A65,
+            fogDensity: 0.0022,
+            lightIntensity: 1.6,
+            ambientColor: 0x3D2B3D,
+            ambientIntensity: 0.85,
+            exposure: 1.10,
+            description: 'Sun elevation 10°, burnt orange sun #FF6B35, sky zenith #311B92, horizon #FF8A65, warm terracotta glow'
+        },
+        BLUE_HOUR: {
+            id: 'BLUE_HOUR',
+            name: 'Sub-Orbital Twilight (Blue Hour)',
+            sunElevation: 3,
+            sunAzimuth: 300,
+            sunColor: 0x60A5FA,
+            skyZenith: 0x050814,
+            horizonColor: 0x06B6D4,
+            fogDensity: 0.0014,
+            lightIntensity: 1.1,
+            ambientColor: 0x0B192E,
+            ambientIntensity: 0.7,
+            exposure: 1.05,
+            description: 'Sun elevation 3°, indigo/ice blue sun #60A5FA, sky zenith #050814, horizon #06B6D4, serene sub-orbital twilight'
+        }
+    },
+    TIME_PRESET_KEYS: ['DAWN_CRISP', 'ZEN_MIDDAY', 'GOLDEN_SUNSET', 'BLUE_HOUR'],
+
+    getSunVector(elevationDeg, azimuthDeg) {
+        const elRad = (elevationDeg * Math.PI) / 180;
+        const azRad = (azimuthDeg * Math.PI) / 180;
+        const cosEl = Math.cos(elRad);
+        return {
+            x: cosEl * Math.cos(azRad),
+            y: Math.sin(elRad),
+            z: cosEl * Math.sin(azRad)
+        };
+    },
 
     // Procedural generation parameters (Tasks 11-20)
     PROCEDURAL: {

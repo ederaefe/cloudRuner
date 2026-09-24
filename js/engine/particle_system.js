@@ -91,21 +91,22 @@ export class ParticleSystem {
                 varying vec3 vColor;
                 
                 void main() {
-                    // Circular particle shape
+                    // Delicate luminous star-dust optical profile
                     vec2 center = gl_PointCoord - vec2(0.5);
                     float dist = length(center);
                     if (dist > 0.5) discard;
                     
-                    // Soft edge
-                    float alpha = 1.0 - smoothstep(0.3, 0.5, dist);
-                    alpha *= vLife; // Fade out over life
+                    // Intense sparkling pin-point core + delicate ethereal halo
+                    float core = exp(-dist * 10.0) * 1.8;
+                    float halo = smoothstep(0.48, 0.05, dist) * 0.45;
+                    float alpha = clamp((core + halo) * vLife, 0.0, 1.0);
                     
-                    // Type-specific color modifications
                     vec3 finalColor = vColor;
                     
-                    // Add glow for certain types
+                    // High-altitude star-dust luminescence for speed streaks
                     if (vType > 0.5 && vType < 1.5) { // SPEED_STREAK
-                        finalColor *= 1.5;
+                        finalColor = mix(finalColor, vec3(1.0, 1.0, 1.0), 0.65) * 1.6;
+                        alpha = clamp((core * 1.4 + halo) * vLife, 0.0, 1.0);
                     }
                     
                     gl_FragColor = vec4(finalColor, alpha);
@@ -228,8 +229,8 @@ export class ParticleSystem {
             _streakVel.x += (Math.random() - 0.5) * 4.0;
             _streakVel.y += (Math.random() - 0.5) * 2.0;
             
-            const color = new THREE.Color(speed > 240 ? 0x00ffff : (speed > 160 ? 0xaaccff : 0xffffff));
-            const size = 2.2 + Math.random() * 2.5;
+            const color = new THREE.Color(speed > 240 ? 0xffffff : (speed > 160 ? 0xe0f2fe : 0xffffff));
+            const size = 1.2 + Math.random() * 1.4;
             const lifetime = 0.35 + Math.random() * 0.25;
             
             this.emit(_streakPos, color, _streakVel, size, lifetime, PARTICLE_TYPES.SPEED_STREAK);
@@ -261,8 +262,8 @@ export class ParticleSystem {
                 (Math.random() - 0.5) * 4.0
             );
 
-            const color = new THREE.Color(absSpeed > 180 ? 0x00ffff : (absSpeed > 100 ? 0xaaccff : 0xffffff));
-            const size = 2.4 + Math.random() * 2.6;
+            const color = new THREE.Color(absSpeed > 180 ? 0xffffff : (absSpeed > 100 ? 0xe0f2fe : 0xffffff));
+            const size = 1.3 + Math.random() * 1.5;
             const lifetime = 0.30 + Math.random() * 0.20;
 
             this.emit(_streakPos, color, _streakVel, size, lifetime, PARTICLE_TYPES.SPEED_STREAK);

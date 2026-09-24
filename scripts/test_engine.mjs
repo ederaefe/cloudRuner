@@ -102,7 +102,7 @@ global.document = {
             style: {},
             dataset: {},
             innerHTML: '',
-            classList: { add: () => {}, remove: () => {}, contains: () => false },
+            classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} },
             addEventListener: () => {},
             querySelector: () => ({ addEventListener: () => {} }),
             appendChild: () => {},
@@ -125,7 +125,7 @@ global.document = {
             style: {},
             dataset: {},
             innerHTML: '',
-            classList: { add: () => {}, remove: () => {}, contains: () => false },
+            classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} },
             addEventListener: () => {},
             querySelector: () => ({ addEventListener: () => {} }),
             appendChild: () => {},
@@ -244,13 +244,13 @@ class MockMesh extends MockObject3D {
 }
 
 class MockGeometry {
-    constructor() { this.disposed = false; this.attributes = {}; }
+    constructor() { this.disposed = false; this.attributes = {}; this.index = null; }
     rotateX() { return this; }
     translate() { return this; }
     scale() { return this; }
     clone() { return new MockGeometry(); }
     setAttribute(name, attr) { this.attributes[name] = attr; }
-    setIndex() {}
+    setIndex(idx) { this.index = idx; }
     computeVertexNormals() {}
     setFromPoints() { return this; }
     dispose() { this.disposed = true; }
@@ -1134,6 +1134,99 @@ stagingTrack.skyBridges.forEach((sb, idx) => {
 });
 
 stagingTrack.dispose();
+
+// Test 37: Option C Procedural Monolith Geometry, Analytical Lighting Presets, GhostPath Ribbon & Floating Telemetry
+// 1. Procedural Shape Grammar Buffer Geometry
+const monolithGeo = TrackBuilder.createMonolithGeometry();
+assert(monolithGeo !== null && typeof monolithGeo === 'object', 'TrackBuilder.createMonolithGeometry produces buffer geometry');
+assert(monolithGeo.attributes.position && monolithGeo.attributes.position.array instanceof Float32Array, 'Monolith geometry has position attribute Float32Array');
+assert(monolithGeo.attributes.normal && monolithGeo.attributes.normal.array instanceof Float32Array, 'Monolith geometry has normal attribute Float32Array');
+assert(monolithGeo.attributes.uv && monolithGeo.attributes.uv.array instanceof Float32Array, 'Monolith geometry has uv attribute Float32Array');
+assert(monolithGeo.index !== null, 'Monolith geometry defines index buffer for multi-tier faces');
+
+const posArr = monolithGeo.attributes.position.array;
+let minY = Infinity, maxY = -Infinity;
+let minX = Infinity, maxX = -Infinity;
+let minZ = Infinity, maxZ = -Infinity;
+for (let i = 0; i < posArr.length; i += 3) {
+    const x = posArr[i], y = posArr[i + 1], z = posArr[i + 2];
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+    if (z < minZ) minZ = z;
+    if (z > maxZ) maxZ = z;
+}
+assert(minY === 0.0 && maxY === 1.0, 'Monolith geometry spans normalized vertical elevation [0.0, 1.0]');
+assert(Math.abs(maxX - 0.5) < 0.001 && Math.abs(minX - (-0.5)) < 0.001, 'Monolith geometry spans 1.0m normalized width footprint [-0.5, 0.5]');
+assert(Math.abs(maxZ - 0.5) < 0.001 && Math.abs(minZ - (-0.5)) < 0.001, 'Monolith geometry spans 1.0m normalized depth footprint [-0.5, 0.5]');
+assert(posArr.length >= 200, 'Monolith geometry contains comprehensive multi-tier vertex count');
+
+// 2. Continuous Option C Celestial & Solar Presets
+assert(CONFIG.TIME_PRESETS !== undefined, 'CONFIG defines TIME_PRESETS dictionary');
+assert(Array.isArray(CONFIG.TIME_PRESET_KEYS) && CONFIG.TIME_PRESET_KEYS.length === 4, 'CONFIG defines exactly 4 time preset keys');
+for (const key of CONFIG.TIME_PRESET_KEYS) {
+    const preset = CONFIG.TIME_PRESETS[key];
+    assert(preset !== undefined, `TIME_PRESETS defines preset ${key}`);
+    assert(typeof preset.sunElevation === 'number' && preset.sunElevation >= 0 && preset.sunElevation <= 90, `${key} defines valid sunElevation`);
+    assert(typeof preset.sunAzimuth === 'number', `${key} defines valid sunAzimuth`);
+    assert(typeof preset.sunColor === 'number' && typeof preset.skyZenith === 'number' && typeof preset.horizonColor === 'number', `${key} defines valid color hex values`);
+    assert(typeof preset.fogDensity === 'number' && preset.fogDensity > 0, `${key} defines valid fog density`);
+    const sunVec = CONFIG.getSunVector(preset.sunElevation, preset.sunAzimuth);
+    const mag = Math.hypot(sunVec.x, sunVec.y, sunVec.z);
+    assert(Math.abs(mag - 1.0) < 0.001, `${key} getSunVector returns unit vector with magnitude 1.0`);
+    assert(sunVec.y > 0, `${key} getSunVector has positive skyward elevation`);
+}
+assert(CONFIG.BRUTALISM_PALETTE && Array.isArray(CONFIG.BRUTALISM_PALETTE.COLORS), 'CONFIG defines BRUTALISM_PALETTE with color array');
+
+// 3. Slow Roads Ghost Path Trajectory Ribbon
+const { GhostPath } = await import('../js/engine/ghost_path.js');
+const gp = new GhostPath(scene, coordinator.tier);
+assert(gp.sampleCount === 36, 'GhostPath initializes 36 trajectory segments');
+assert(gp.predictionSeconds === 3.0, 'GhostPath sets 3.0 second projection horizon');
+assert(gp.positions.length === (36 + 1) * 2 * 3, 'GhostPath pre-allocates zero-GC positions typed array');
+assert(gp.colors.length === (36 + 1) * 2 * 4, 'GhostPath pre-allocates zero-GC colors typed array');
+assert(gp.uvs.length === (36 + 1) * 2 * 2, 'GhostPath pre-allocates zero-GC UVs typed array');
+assert(gp.mesh !== null && gp.headDot !== null, 'GhostPath instantiates ribbon mesh and pulsing head dot');
+
+gp.update(playerDrone, null, 0.016, 1.25);
+assert(Number.isFinite(gp.headDot.position.x) && Number.isFinite(gp.headDot.position.y) && Number.isFinite(gp.headDot.position.z), 'GhostPath head dot position remains finite after projection');
+assert(Number.isFinite(gp.positions[0]) && Number.isFinite(gp.positions[1]) && Number.isFinite(gp.positions[2]), 'GhostPath ribbon vertex 0 position is finite');
+gp.setVisible(false);
+assert(gp.mesh.visible === false && gp.headDot.visible === false, 'GhostPath setVisible(false) toggles visibility cleanly');
+gp.dispose();
+assert(gp.mesh === null && gp.headDot === null, 'GhostPath dispose cleans up 3D scene objects');
+
+// 4. RacingHUD Floating Telemetry & Mode Indicator
+hud.altSectorTxt = { textContent: '' };
+hud.nitroArcBar = { style: { width: '' } };
+hud.flightStateTxt = { textContent: '' };
+hud.flightStateEl = { classList: { toggle: (cls, v) => {} } };
+
+playerDrone.position.y = 100;
+hud.update(playerDrone, 1, 1, 4, false, 2, false);
+assert(hud.altSectorTxt.textContent === 'CANOPY SKYWAY', 'RacingHUD updates altitude sector to CANOPY SKYWAY at 100m');
+
+playerDrone.position.y = 300;
+hud.update(playerDrone, 1, 1, 4, false, 2, false);
+assert(hud.altSectorTxt.textContent === 'UPPER MESOSPHERE', 'RacingHUD updates altitude sector to UPPER MESOSPHERE at 300m');
+
+playerDrone.position.y = 600;
+hud.update(playerDrone, 1, 1, 4, false, 2, false);
+assert(hud.altSectorTxt.textContent === 'STRATOSPHERE', 'RacingHUD updates altitude sector to STRATOSPHERE at 600m');
+
+playerDrone.nitroAmount = 75;
+playerDrone.nitroMaxCapacity = 100;
+hud.update(playerDrone, 1, 1, 4, false, 2, false);
+assert(hud.nitroArcBar.style.width === '75%', 'RacingHUD updates curved nitro arc width to 75%');
+
+playerDrone.isAutopilot = true;
+hud.update(playerDrone, 1, 1, 4, false, 2, false);
+assert(hud.flightStateTxt.textContent === 'AUTODRIVE', 'RacingHUD updates flight state to AUTODRIVE when autopilot engaged');
+
+playerDrone.isAutopilot = false;
+hud.update(playerDrone, 1, 1, 4, false, 2, false);
+assert(hud.flightStateTxt.textContent === 'MANUAL', 'RacingHUD updates flight state to MANUAL when pilot takes steering');
 
     console.log(`\n========================================`);
     console.log(`ALL TESTS PASSED: ${passedTests}/${totalTests} ASSERTIONS VERIFIED`);

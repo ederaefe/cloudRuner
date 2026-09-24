@@ -48,6 +48,12 @@ export class RacingHUD {
         this.btnTouchAlt = document.getElementById('btn-touch-alt');
         this.btnTouchStop = document.getElementById('btn-touch-stop');
         this.btnTouchAssist = document.getElementById('btn-touch-assist');
+
+        // Option C True Slow Roads Floating Telemetry References
+        this.altSectorTxt = document.getElementById('hud-alt-sector');
+        this.nitroArcBar = document.getElementById('nitro-arc-bar');
+        this.flightStateEl = document.getElementById('hud-flight-state');
+        this.flightStateTxt = document.getElementById('hud-flight-state-text');
     }
 
     showToast(message, type = 'info', duration = 2200) {
@@ -173,6 +179,18 @@ export class RacingHUD {
         if (this.altTxt) {
             this.altTxt.textContent = Math.round(drone.position.y);
         }
+        if (this.altSectorTxt && drone && drone.position) {
+            const y = drone.position.y;
+            if (y > 550) {
+                this.altSectorTxt.textContent = 'STRATOSPHERE';
+            } else if (y > 220) {
+                this.altSectorTxt.textContent = 'UPPER MESOSPHERE';
+            } else if (y > 60) {
+                this.altSectorTxt.textContent = 'CANOPY SKYWAY';
+            } else {
+                this.altSectorTxt.textContent = 'DOWNTOWN CANYONS';
+            }
+        }
         if (this.lapTxt) {
             const maxLaps = totalLaps || (CONFIG.TRACK?.LAPS_TO_WIN || 2);
             this.lapTxt.textContent = `${currentLap} / ${maxLaps}`;
@@ -182,11 +200,16 @@ export class RacingHUD {
             this.posTxt.textContent = `${positionRank}${suffix}`;
         }
 
-        // Nitro gauge
+        // Nitro gauge & Delicate curved arc
+        const maxNitro = drone.nitroMaxCapacity || (CONFIG.NITRO?.MAX_CAPACITY || 100);
+        const nitroPct = Math.min(100, Math.max(0, Math.round((drone.nitroAmount / maxNitro) * 100)));
+
+        if (this.nitroArcBar) {
+            this.nitroArcBar.style.width = `${nitroPct}%`;
+        }
+
         if (this.nitroFill) {
-            const maxNitro = drone.nitroMaxCapacity || CONFIG.NITRO.MAX_CAPACITY;
-            const nitroPct = Math.round((drone.nitroAmount / maxNitro) * 100);
-            this.nitroFill.style.width = `${Math.min(100, Math.max(0, nitroPct))}%`;
+            this.nitroFill.style.width = `${nitroPct}%`;
 
             this.nitroFill.classList.remove('stage2', 'stage3');
             if (drone.nitroStage === 3) {
@@ -268,6 +291,15 @@ export class RacingHUD {
             }
             if (this.btnTouchAssist) {
                 this.btnTouchAssist.classList.toggle('active', !!st.flyAssistEnabled);
+            }
+        }
+
+        // True Slow Roads Center Bottom Flight State Indicator (AUTODRIVE / MANUAL)
+        if (this.flightStateEl && this.flightStateTxt) {
+            const isAuto = (drone && drone.isAutopilot) || (st && st.autopilotEnabled);
+            this.flightStateTxt.textContent = isAuto ? 'AUTODRIVE' : 'MANUAL';
+            if (this.flightStateEl.classList && typeof this.flightStateEl.classList.toggle === 'function') {
+                this.flightStateEl.classList.toggle('manual', !isAuto);
             }
         }
     }

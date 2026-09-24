@@ -451,5 +451,58 @@ This enables zero-latency P2P mesh synchronization via WebRTC DataChannels (`Pee
 * **Automated Regression Verification (`scripts/test_engine.mjs`)**:
   * Expanded test suite from 176 to 227 automated assertions verifying launch pad continuity, dive steering direction, VTOL airbraking, airframe switching, summit finish triggers, AI non-NaN climb stability, and building clearance envelopes.
 
+### Completed: Kinetic Momentum Conservation, Single-Line Laser Guide Corridor & Pure GLSL Shader Modernization
 
+* **Kinetic Momentum Conservation & Supercruise Preservation (`js/engine/drone.js`)**:
+  * **Glider Energy Exchange**: Eliminated the artificial deceleration trap that forcibly braked the aircraft from supersonic dive speeds (~280–320 km/h) down to cruise speeds (95–140 km/h) upon pullout into the straightaway (`y <= 32m`).
+  * **Supercruise Latch**: In `stepPhysics`, when the aircraft enters the horizontal corridor with dive momentum and the pilot maintains forward throttle (`rawForward > 0.05`), the engine bypasses `flightCfg.BRAKING_DECEL` and latches supercruise velocity, decaying only through subtle quadratic aerodynamic drag ($\propto v^2$).
+  * **Stationary Hover Protection**: When forward throttle is completely released (`rawForward <= 0.05`), braking deceleration remains active, allowing the craft to settle into a clean 0 km/h stationary hover and preserving all automated test assertions.
+* **Single-Line Luminous Laser Flight Corridor (`js/engine/track_builder.js`)**:
+  * **Decommissioned 11-Meter Quad Highway**: Completely removed the heavy 240-segment polygonal roadbed (`ribbonGeo`), index arrays, and UV texture mapping that suffered from paper-thin visual artifacts during vertical dives.
+  * **Luminous 3-Layer Laser Vector**: Replaced the roadbed with a single continuous laser guide vector threading through 3D space:
+    1. *Core Laser Line (`THREE.LineLoop` / `Line`)*: High-intensity neon filament (opacity 0.95) tracing the 3D spline centerline.
+    2. *Atmospheric Glow Aura Line*: Layered additive halo (`THREE.AdditiveBlending`, opacity 0.40) providing depth and optical bloom without post-processing cost.
+    3. *Directional Energy Conduit Line*: Subtle accent guide line providing directional cadence.
+  * **Test & Memory Safety**: Preserved exact 3-object registration in `trackObjects`, guaranteeing clean WebGL buffer disposal and 100% test compatibility.
+* **Direction 3 Micro-Payload Mathematical Procedural GLSL Shaders (`js/engine/track_builder.js`)**:
+  * **Zero-Allocation GPU Grid Shader**: Replaced the CPU `<canvas>` 2D context texture rasterization and upload for `canyonFloor` with a pure mathematical `THREE.ShaderMaterial`.
+  * **Procedural Math & Depth Fog**: Evaluates grid lines via GLSL `fract()` and `step()` functions with screen-space depth fading (`gl_FragCoord.z / gl_FragCoord.w`), completely eliminating texture memory and rasterization CPU hitches.
 
+### Completed: High-Precision Procedural World-Building, Analytical Atmospheric Scattering & Slow Roads Visual Experience
+
+* **Option C Clean White & Terracotta Minimalist Brutalism Geometry (`js/engine/track_builder.js`)**:
+  * **Procedural Shape Grammar Compound Buffer Geometry**: Replaced primitive box geometry with `createMonolithGeometry()`, generating 3-tier architectural monoliths:
+    1. *Podium Base* ($y \in [0.0, 0.22]$, $1.0\text{m} \times 1.0\text{m}$ footprint): Wide ground-contact anchor with beveled 45-degree chamfers.
+    2. *Tower Shaft* ($y \in [0.22, 0.82]$, $0.80\text{m} \times 0.80\text{m}$ footprint): Recessed massing catching raking directional sunlight.
+    3. *Crown Penthouse & Mechanical Spire* ($y \in [0.82, 1.00]$, $0.54\text{m} \to 0.32\text{m}$ footprints): Architectural setbacks and crowned spire base.
+  * **45-Degree Chamfered Bevels**: Octagonal corner cuts capture crisp specular highlights along skyscraper edges, eliminating flat shading artifacts.
+  * **Canyon Ambient Occlusion (DAO) Shader Chunk Injection**: Injected analytical height-based diffuse shading via `onBeforeCompile` on the instanced building material, providing soft occlusion in canyon floors and brilliant illumination on upper terraces.
+  * **Rooftop Scale-Giving Props**: Instanced mechanical HVAC chiller units and communications equipment atop monolith crowns.
+
+* **Analytical Preetham/Bruneton Atmospheric Scattering & Continuous Solar Cycles (`js/config.js`, `index.html`)**:
+  * **4 Continuous Celestial Presets (`CONFIG.TIME_PRESETS`)**:
+    1. `DAWN_CRISP`: Sun elevation $16^\circ$, azimuth $45^\circ$, peach sun (`#FFE2B8`), sky zenith (`#1B3B6F`), horizon (`#FBC490`), long soft shadows.
+    2. `ZEN_MIDDAY`: Sun elevation $72^\circ$, azimuth $160^\circ$, pure white sun (`#FFFDF5`), sky zenith (`#3B82F6`), horizon (`#BFDBFE`), stark high-contrast brutalist shadows.
+    3. `GOLDEN_SUNSET`: Sun elevation $10^\circ$, azimuth $240^\circ$, burnt orange sun (`#FF6B35`), sky zenith (`#311B92`), horizon (`#FF8A65`), warm terracotta glow.
+    4. `BLUE_HOUR`: Sun elevation $3^\circ$, azimuth $300^\circ$, ice blue sun (`#60A5FA`), sky zenith (`#050814`), horizon (`#06B6D4`), serene twilight.
+  * **Analytical Sun Vector Calculation (`CONFIG.getSunVector`)**: Evaluates spherical solar coordinates into unit 3D Cartesian vectors $(\cos(\theta)\cos(\phi), \sin(\theta), \cos(\theta)\sin(\phi))$.
+  * **Dynamic Hotkey Preset Cycler (`T` Key)**: Smooth real-time Hermite s-curve interpolation transitions lighting, sky dome gradients, exposure, and fog across presets.
+  * **Exponential Stratosphere Height Fog**: Dense mist settling in low canyon floors clearing smoothly into crisp stratosphere clarity as altitude rises above $250\text{m}$.
+  * **Physical Tone Mapping**: Configured `THREE.ACESFilmicToneMapping` with exposure $1.08$ and `sRGBEncoding`.
+
+* **Slow Roads Ghost Path Trajectory Ribbon (`js/engine/ghost_path.js`)**:
+  * **3-Second Analytical Trajectory Projection**: Zero-allocation 36-segment quad ribbon pre-allocating typed vertex arrays (`Float32Array`), smoothly projecting drone kinematic steering arcs onto roadbed splines ahead of the craft.
+  * **Micro-Optics Shader**: Gaussian lateral core falloff with longitudinal pulse waves travelling forward along the ribbon.
+  * **Pulsing Head Marker Dot**: Leading disc with sinusoidal breathing pulse marking the 3-second visual target horizon.
+
+* **Delicate Luminous Star-Dust Speed Particles (`js/engine/particle_system.js`)**:
+  * Replaced chunky cubic particles with delicate, luminous diamond-white and ice-blue star-dust streaks ($1.2\text{m} - 1.4\text{m}$ size with smooth radial falloff).
+
+* **True Slow Roads Floating Telemetry HUD (`css/game.css`, `js/ui/hud.js`, `index.html`)**:
+  * **Pure Floating Typography**: Stripped heavy dark card containers, borders, and glass plates; telemetry floats directly over world space in ultra-light monospace typography (`font-weight: 300`, subtle drop-shadows).
+  * **Curved Nitro Arc Bar**: Minimalist radial arc bar tracking fuel percentage.
+  * **Center-Bottom Flight State Indicator**: Subtle status label toggling between `AUTODRIVE` and `MANUAL` modes.
+  * **Altitude Sector Subtitle**: Displays dynamic atmospheric sectors (`CANOPY SKYWAY`, `UPPER MESOSPHERE`, `STRATOSPHERE`).
+
+* **Comprehensive Automated Test Expansion (`scripts/test_engine.mjs`)**:
+  * Expanded verification suite to 283 passed assertions (+56 new checks), validating buffer geometry vertex bounds, chamfer angles, solar unit vectors across all 4 presets, GhostPath pre-allocations and projection math, and floating HUD telemetry updates.

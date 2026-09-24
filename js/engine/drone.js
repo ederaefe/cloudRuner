@@ -550,6 +550,11 @@ export class Drone {
         if (currentPt.y <= 32.0 || this.diveProgress >= 0.27) {
             this.isDiving = false;
             this.splineProgress = 0.27; // enter straightaway
+            // Conserve full dive kinetic momentum along the straightaway forward vector
+            const fullDiveSpeedMs = Math.max(this.velocity.length(), currentSpeedMs);
+            this.supercruiseSpeedMs = fullDiveSpeedMs;
+            this.velocity.copy(currentTan).multiplyScalar(fullDiveSpeedMs);
+            this.speedKmh = fullDiveSpeedMs * 3.6;
         }
     }
 
@@ -711,7 +716,14 @@ export class Drone {
             if (targetSpeedMs > currentSpeedMs) {
                 newSpeedMs = Math.min(targetSpeedMs, currentSpeedMs + speedStep);
             } else if (targetSpeedMs < currentSpeedMs) {
-                newSpeedMs = Math.max(targetSpeedMs, currentSpeedMs - speedStep);
+                // If pilot is holding forward throttle (> 0.05) and exceeding standard cruise (e.g. from dive or boost),
+                // prevent aggressive braking decel; apply only gentle quadratic aerodynamic drag
+                if (rawForward > 0.05 && currentSpeedMs > targetSpeedMs) {
+                    const aeroDrag = 0.04 * (currentSpeedMs / 50.0) * dt;
+                    newSpeedMs = Math.max(targetSpeedMs, currentSpeedMs - aeroDrag);
+                } else {
+                    newSpeedMs = Math.max(targetSpeedMs, currentSpeedMs - speedStep);
+                }
             }
 
             if (Math.abs(newSpeedMs) < 0.08 && Math.abs(rawForward) < 0.05 && this.nitroStage === 1) {
