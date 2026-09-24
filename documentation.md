@@ -527,3 +527,16 @@ This enables zero-latency P2P mesh synchronization via WebRTC DataChannels (`Pee
 
 * **Automated Verification Harness (scripts/test_engine.mjs)**:
   * Expanded verification suite to 288 passed assertions (+5 new checks), validating single-line corridor line types, dive momentum conservation, supercruise throttle maintenance, and ADAS zero-deadzone inline centering.
+
+### Completed: QA Architecture Audit & Surgical Clutter Purge
+
+* **Surgical DOM & CSS Clutter Elimination (`index.html`, `css/game.css`, `js/ui/hud.js`)**:
+  * **Purged Legacy Duplicates**: Completely removed legacy bottom `#nitro-container` (which duplicated the top-hud radial nitro arc), `#peripheral-horizon-ladder` (combat jet crosshairs that conflicted with the serene Slow Roads aesthetic), and the bulky `#assist-control-bar`.
+  * **Pruned Dead CSS**: Removed over 120 lines of dead styling from `css/game.css` (`.horizon-pitch-bar`, `.horizon-crosshair`, `.nitro-track`, etc.).
+  * **Cleaned HUD Controller**: Removed references to deleted DOM nodes (`nitroFill`, `nitroValTxt`, `horizonBar`) in `js/ui/hud.js` while maintaining the smooth floating Slow Roads typography and curved nitro arc.
+* **Atmospheric Lighting Harmonization (`index.html`)**:
+  * **Dynamic Sky/Ground Hemisphere Bounce**: Replaced hardcoded static directional cyan rim light (`0x0E7C7B`) with `THREE.HemisphereLight`, deriving sky zenith and ground bounce colors dynamically from `CONFIG.TIME_PRESETS`.
+  * **Harmonized Solar Transitions**: Unified `setTimeOfDayPreset` and `updateTimeOfDayTransition` to smoothly blend sun elevation, directional color, hemisphere bounce, exposure, and fog across all 4 continuous presets without pop or seam.
+* **Slow Roads Roadside Aggregate Grounding (`js/engine/track_builder.js`)**:
+  * **Instanced Boulder Scatter**: Added 180 instanced low-poly stone boulders along the road shoulders outside the laser flight corridor, utilizing warm limestone and terracotta aggregate palettes (`#E2E8F0`, `#CBD5E1`, `#94A3B8`, `#64748B`, `#D8B4A6`) with zero runtime memory allocations.
+
