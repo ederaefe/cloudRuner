@@ -758,18 +758,28 @@ export class Drone {
             this.velocity.lerp(_tangentScratch, dt * (adasCfg.ESC_LATERAL_STABILITY * 12.0));
         }
 
-        // ADAS: Spline Lane-Assist + Adaptive Yaw Alignment (zen track follow)
+        // ADAS: Spline Centerline Tracking & Adaptive Path Alignment
         const trackSpline = this.trackSpline || trackBuilder?.spline;
-        if (trackSpline && this.velocity.length() > 1.0 && !stuntFsm.isDriftActive?.()) {
-            // Find the nearest point on the spline (coarse binary search across 40 samples)
+        if (trackSpline && this.velocity.length() > 0.5 && !stuntFsm.isDriftActive?.()) {
+            // Local continuous search around current progress (prevents loop-jumping jitter)
             let nearestT = this.splineProgress || 0;
             let nearestDistSq = Infinity;
-            const steps = 40;
-            for (let si = 0; si < steps; si++) {
-                const t = si / steps;
+            const localRange = 0.08;
+            const localSteps = 32;
+            for (let si = 0; si <= localSteps; si++) {
+                const t = ((nearestT - localRange + (si / localSteps) * (localRange * 2)) % 1.0 + 1.0) % 1.0;
                 const pt = trackSpline.getPointAt(t);
                 const dSq = this.position.distanceToSquared(pt);
                 if (dSq < nearestDistSq) { nearestDistSq = dSq; nearestT = t; }
+            }
+            // Coarse global recovery fallback if displaced far off track
+            if (nearestDistSq > 150 * 150) {
+                for (let si = 0; si < 20; si++) {
+                    const t = si / 20;
+                    const pt = trackSpline.getPointAt(t);
+                    const dSq = this.position.distanceToSquared(pt);
+                    if (dSq < nearestDistSq) { nearestDistSq = dSq; nearestT = t; }
+                }
             }
             this.splineProgress = nearestT;
 
@@ -778,43 +788,46 @@ export class Drone {
                 const nearestPt = trackSpline.getPointAt(nearestT);
                 const trackTangent = trackSpline.getTangentAt(nearestT).normalize();
 
-                // Lane-assist: lateral offset → gentle corrective position nudge
+                // 3D vector to laser path centerline
                 _tangentScratch.subVectors(nearestPt, this.position);
-                _tangentScratch.y = 0; // horizontal only
-                const lateralDist = _tangentScratch.length();
-                if (lateralDist > 2.0) {
-                    const assistStrength = (adasCfg.LANE_ASSIST_FORCE || 5.5) *
-                        Math.min(1.0, lateralDist / 30.0) * dt * 0.4;
-                    this.position.addScaledVector(_tangentScratch.normalize(), assistStrength);
+                const tangentDot = _tangentScratch.dot(trackTangent);
+                _crossScratch.copy(_tangentScratch).addScaledVector(trackTangent, -tangentDot);
+                const lateralOffset = _crossScratch.length();
+
+                // High-authority aerodynamic centering pull directly into the line center
+                if (lateralOffset > 0.05 && inputState.flyAssistEnabled !== false) {
+                    const lateralDir = _crossScratch.normalize();
+                    const centeringSpeed = Math.min(22.0, lateralOffset * 4.5);
+                    this.velocity.addScaledVector(lateralDir, centeringSpeed * dt * 3.2);
                 }
 
-                // Adaptive yaw: blend a fraction of track tangent into drone heading
-                // — makes turns feel like the world is cooperating, not fighting you
-                const alignGain = adasCfg.TRACK_ALIGN_GAIN || 0.28;
-                const speedRatio = Math.min(1.0, this.speedKmh / (flightCfg.MAX_CRUISE_SPEED || 95.0));
-                const blendAmount = alignGain * speedRatio * dt * 2.5;
-                _fwdVector.set(0, 0, 1).applyQuaternion(this.quaternion);
-                _fwdVector.lerp(trackTangent, blendAmount).normalize();
-                // Only apply if roughly going the same direction (dot > 0.5)
-                if (_fwdVector.dot(trackTangent) > 0.5) {
-                    _crossScratch.crossVectors(new THREE.Vector3(0, 1, 0), _fwdVector);
-                    if (_crossScratch.lengthSq() < 0.001) {
-                        _crossScratch.set(1, 0, 0);
-                    } else {
-                        _crossScratch.normalize();
+                // Synchronize Euler heading with 3D track tangent (eliminates mesh/velocity disagreement)
+                if (inputState.flyAssistEnabled !== false) {
+                    const trackHeading = Math.atan2(trackTangent.x, trackTangent.z);
+                    if (stuntFsm && typeof stuntFsm.currentYaw === 'number') {
+                        let diff = (trackHeading - stuntFsm.currentYaw + Math.PI * 3) % (Math.PI * 2) - Math.PI;
+                        const alignGain = (adasCfg.TRACK_ALIGN_GAIN || 0.35) * (this.isAutopilot ? 3.0 : 1.2);
+                        const alignStep = diff * Math.min(1.0, alignGain * dt * 4.0);
+                        stuntFsm.currentYaw += alignStep;
+                        _eulerScratch.set(stuntFsm.currentPitch || 0, stuntFsm.currentYaw, stuntFsm.currentRoll || 0, 'YXZ');
+                        this.quaternion.setFromEuler(_eulerScratch);
                     }
-                    _quatScratch.setFromAxisAngle(new THREE.Vector3(0, 1, 0),
-                        Math.atan2(_fwdVector.x, _fwdVector.z));
                 }
             }
         }
 
-        // ADAS: Static Hover Altitude Hold & Auto-Elevation Glide
+        // ADAS: Smooth Altitude Switching & 3D Path Elevation Tracking
         if (!inputState.hoverStopActive) {
-            let targetY = inputState.targetAltitude || adasCfg.HOVER_HEIGHT_DEFAULT;
+            let targetY = this.position.y;
+            if (inputState.altitudeHoldEnabled) {
+                targetY = inputState.targetAltitude || adasCfg.HOVER_HEIGHT_DEFAULT;
+            } else if (trackSpline) {
+                const nearestPt = trackSpline.getPointAt(this.splineProgress || 0);
+                targetY = nearestPt ? nearestPt.y : this.position.y;
+            }
 
             // Auto-elevation toward upcoming holographic ring
-            if (trackBuilder && trackBuilder.gates && trackBuilder.gates.length > 0) {
+            if (trackBuilder && trackBuilder.gates && trackBuilder.gates.length > 0 && !inputState.altitudeHoldEnabled) {
                 const targetGate = trackBuilder.gates[(this.nextGateIndex || 0) % trackBuilder.gates.length];
                 if (targetGate && targetGate.position) {
                     const distToGate = this.position.distanceTo(targetGate.position);
@@ -824,10 +837,12 @@ export class Drone {
                 }
             }
 
+            // Smooth critically damped vertical acceleration
             const altErr = targetY - this.position.y;
-            const altCfg = CONFIG.ASSIST?.ALTITUDE_HOLD || { P_GAIN: 2.2, D_GAIN: 0.85, MAX_VERT_SPEED: 22.0 };
-            const targetVy = THREE.MathUtils.clamp(altErr * altCfg.P_GAIN - this.velocity.y * altCfg.D_GAIN, -altCfg.MAX_VERT_SPEED, altCfg.MAX_VERT_SPEED);
-            this.velocity.y += (targetVy - this.velocity.y) * (1 - Math.exp(-(adasCfg.AUTO_ELEVATION_RATE || 6.0) * dt));
+            const maxVertRate = Math.max(28.0, Math.abs(this.velocity.y));
+            const targetVy = THREE.MathUtils.clamp(altErr * 4.5, -maxVertRate, maxVertRate);
+            const elevationRate = inputState.altitudeHoldEnabled ? 8.0 : 6.0;
+            this.velocity.y += (targetVy - this.velocity.y) * (1.0 - Math.exp(-elevationRate * dt));
         }
 
         // ADAS: Gate Trajectory Magnetism
@@ -853,7 +868,14 @@ export class Drone {
 
         // Apply position delta
         this.position.addScaledVector(this.velocity, dt);
-        this.speedKmh = Math.hypot(this.velocity.x, this.velocity.z) * 3.6;
+        
+        // Speed calculation: horizontal airspeed with vertical speed contribution on climbs/dives
+        if (this.isDiving || this.isAscending) {
+            this.speedKmh = this.velocity.length() * 3.6;
+        } else {
+            const vertContribution = Math.abs(this.velocity.y) > 8.0 ? Math.pow(this.velocity.y * 0.5, 2) : 0;
+            this.speedKmh = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z + vertContribution) * 3.6;
+        }
 
         // Course realignment stub (player drives freely in hovercar mode)
         this.checkCourseRealignment(dt, trackBuilder);
@@ -862,14 +884,16 @@ export class Drone {
     applyGroundEffect(dt, trackBuilder) {
         const floorY = (trackBuilder?.canyonFloor?.position.y !== undefined) ? trackBuilder.canyonFloor.position.y : -24.0;
         const groundClearance = this.position.y - floorY;
-        const groundEffectThreshold = 4.2; // meters
+        const groundEffectThreshold = 5.0; // meters
 
-        if (groundClearance < groundEffectThreshold && groundClearance > 0) {
-            const normalizedHeight = (groundEffectThreshold - groundClearance) / groundEffectThreshold;
-            this.groundEffectLift = Math.pow(normalizedHeight, 2) * 16.0;
-            this.position.y += this.groundEffectLift * dt;
-            if (this.velocity.y < 0) {
-                this.velocity.y *= Math.max(0.0, 1.0 - normalizedHeight * 0.8);
+        if (groundClearance < groundEffectThreshold) {
+            const normalizedHeight = Math.max(0.0, (groundEffectThreshold - groundClearance) / groundEffectThreshold);
+            this.groundEffectLift = Math.pow(normalizedHeight, 2) * 28.0;
+            this.velocity.y += this.groundEffectLift * dt;
+            // Physical non-penetration floor cushion
+            if (this.position.y < floorY + 1.2) {
+                this.position.y = floorY + 1.2;
+                if (this.velocity.y < 0) this.velocity.y = 0;
             }
         } else {
             this.groundEffectLift = 0;
