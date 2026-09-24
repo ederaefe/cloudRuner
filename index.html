@@ -90,52 +90,11 @@
     <span id="hud-flight-state-text">AUTODRIVE</span>
 </div>
 
-<!-- Tactical Flight Assist Bar -->
-<div id="assist-control-bar" class="assist-control-bar">
-    <button id="btn-hud-auto" class="assist-pill-btn" data-tooltip="Autopilot Hand-off (O): Browser flies autonomously" data-tooltip-pos="bottom">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>
-        <span id="hud-auto-label">AUTOPILOT [O]</span>
-    </button>
-    <div class="alt-hold-group">
-        <button id="btn-hud-alt-down" class="assist-step-btn" title="Altitude -5m (G or [)">-</button>
-        <button id="btn-hud-alt" class="assist-pill-btn" data-tooltip="Fixed Altitude Hold (H): Lock elevation" data-tooltip-pos="bottom">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="8 7 12 3 16 7"/><polyline points="8 17 12 21 16 17"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <span id="hud-alt-hold-label">ALT HOLD: OFF</span>
-        </button>
-        <button id="btn-hud-alt-up" class="assist-step-btn" title="Altitude +5m (T or ])">+</button>
-    </div>
-    <button id="btn-hud-stop" class="assist-pill-btn btn-pill-stop" data-tooltip="VTOL Hover Stop (B): Emergency airbrake & hover in place" data-tooltip-pos="bottom">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><rect x="9" y="9" width="6" height="6" fill="currentColor"/></svg>
-        <span>HOVER STOP [B]</span>
-    </button>
-    <button id="btn-hud-assist" class="assist-pill-btn active" data-tooltip="Flight Assist (J): Stability & wall repulsion" data-tooltip-pos="bottom">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z"/><polyline points="9 12 11 14 15 10"/></svg>
-        <span id="hud-assist-label">ASSIST: ON [J]</span>
-    </button>
-</div>
-
 <!-- Non-Blocking Contextual Notification Toast Stack (Task 35) -->
 <div id="hud-toast-stack" class="toast-stack-container"></div>
 
 <!-- Slow Roads Style Minimalist Frosted Countdown Overlay (Task 28) -->
 <div id="hud-countdown" class="hud-countdown-pill hidden">3</div>
-
-<!-- Tactical Peripheral Pitch/Roll Ladder (Task 7) -->
-<div id="peripheral-horizon-ladder" class="horizon-ladder-container">
-    <div id="horizon-pitch-bar" class="horizon-pitch-bar"></div>
-    <div class="horizon-crosshair"></div>
-</div>
-
-<!-- Center Bottom Nitro Energy Gauge -->
-<div id="nitro-container">
-    <div class="nitro-header">
-        <span>NITRO CAPACITY</span>
-        <span id="nitro-val-txt">40%</span>
-    </div>
-    <div class="nitro-track">
-        <div id="nitro-fill-bar" class="nitro-fill"></div>
-    </div>
-</div>
 
 <!-- Stunt Combo Banner Notification -->
 <div id="stunt-alert">

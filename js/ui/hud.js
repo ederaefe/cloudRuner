@@ -14,16 +14,10 @@ export class RacingHUD {
         this.lapTxt = document.getElementById('hud-lap');
         this.posTxt = document.getElementById('position-badge');
 
-        this.nitroFill = document.getElementById('nitro-fill-bar');
-        this.nitroValTxt = document.getElementById('nitro-val-txt');
-
         this.stuntBanner = document.getElementById('stunt-alert');
         this.stuntTitle = document.getElementById('stunt-title-txt');
         this.stuntBonus = document.getElementById('stunt-bonus-txt');
         this.stuntTimeout = null;
-
-        // Task 7: Peripheral Horizon Pitch/Roll Ladder
-        this.horizonBar = document.getElementById('horizon-pitch-bar');
 
         // Task 50: Minimalist Top-Edge Compass Ribbon Canvas
         this.compassCanvas = document.getElementById('compass-ribbon-canvas');
@@ -206,45 +200,6 @@ export class RacingHUD {
 
         if (this.nitroArcBar) {
             this.nitroArcBar.style.width = `${nitroPct}%`;
-        }
-
-        if (this.nitroFill) {
-            this.nitroFill.style.width = `${nitroPct}%`;
-
-            this.nitroFill.classList.remove('stage2', 'stage3');
-            if (drone.nitroStage === 3) {
-                this.nitroFill.classList.add('stage3');
-            } else if (drone.nitroStage === 2) {
-                this.nitroFill.classList.add('stage2');
-            }
-
-            if (this.nitroValTxt) {
-                if (drone.nitroStage === 3) {
-                    this.nitroValTxt.textContent = 'HYPER-OVERDRIVE';
-                    this.nitroValTxt.style.color = '#00ffff';
-                } else if (drone.nitroStage === 2) {
-                    this.nitroValTxt.textContent = 'AFTERBURNER';
-                    this.nitroValTxt.style.color = '#E8580A';
-                } else if (isWingmanActive && isDrafting) {
-                    this.nitroValTxt.textContent = 'TEAMWORK TETHER';
-                    this.nitroValTxt.style.color = '#00e5ff';
-                } else if (isDrafting) {
-                    this.nitroValTxt.textContent = 'SLIPSTREAM DRAFTING';
-                    this.nitroValTxt.style.color = '#F4A426';
-                } else {
-                    this.nitroValTxt.textContent = `${nitroPct}%`;
-                    this.nitroValTxt.style.color = 'rgba(255, 255, 255, 0.85)';
-                }
-            }
-        }
-
-        // Task 7: Peripheral Horizon Ladder Update
-        if (this.horizonBar && drone && drone.group && drone.group.quaternion) {
-            const euler = new THREE.Euler().setFromQuaternion(drone.group.quaternion, 'YXZ');
-            const pitch = euler.x;
-            const roll = euler.z;
-            const pitchOffset = Math.max(-45, Math.min(45, pitch * 50));
-            this.horizonBar.style.transform = `translateY(${pitchOffset}px) rotate(${-roll}rad)`;
         }
 
         // Task 50: Minimalist Top-Edge Compass Ribbon Update

@@ -454,105 +454,61 @@ export class TrackBuilder {
     }
 
     createTrackRibbon() {
-        // Option C Precision Cambered Roadbed with 3D Retaining Curbs & Hazard Markings
+        // Minimalist Single Laser Vector Corridor - eliminates wide roadbed ribbon
         const segments = 240;
-        const trackWidth = (CONFIG.TRACK && CONFIG.TRACK.RIBBON_WIDTH) || 12.0;
-        const halfWidth = trackWidth * 0.45;
         const trackEmissiveHex = (this.sector.trackEmissive !== undefined) ? this.sector.trackEmissive : 0x00f0ff;
         const trackEdgeHex = (this.sector.trackEdge !== undefined) ? this.sector.trackEdge : 0x0E7C7B;
 
-        const crossSteps = 5; // Transverse resolution for parabolic roadbed camber
-        const positions = [];
-        const uvs = [];
-        const indices = [];
-
-        const leftPts = [];
-        const rightPts = [];
-        const _worldUp = new THREE.Vector3(0, 1, 0);
+        const corePts = [];
+        const glowPts = [];
+        const conduitPts = [];
 
         for (let i = 0; i <= segments; i++) {
             const t = i / segments;
             const pt = this.spline.getPointAt(t);
-            const tan = this.spline.getTangentAt(t).normalize();
-
-            let norm = new THREE.Vector3().crossVectors(tan, _worldUp);
-            if (norm.lengthSq() < 0.001) norm.set(1, 0, 0);
-            else norm.normalize();
-
-            const center = new THREE.Vector3(pt.x, pt.y - 1.1, pt.z);
-
-            // Generate transverse vertices with parabolic camber crown
-            for (let j = 0; j < crossSteps; j++) {
-                const u = j / (crossSteps - 1); // 0.0 to 1.0 across roadbed
-                const lateralOffset = (u - 0.5) * 2 * halfWidth;
-
-                // Parabolic roadbed camber: +0.22m at center (u = 0.5), tapering gracefully to 0 at edges
-                const camberY = 0.22 * (1.0 - Math.pow(2 * u - 1, 2));
-
-                // 3D Retaining Curb elevation at road edges
-                const curbHeight = (j === 0 || j === crossSteps - 1) ? 0.35 : 0;
-
-                const vertPos = center.clone()
-                    .addScaledVector(norm, lateralOffset)
-                    .add(new THREE.Vector3(0, camberY + curbHeight, 0));
-
-                positions.push(vertPos.x, vertPos.y, vertPos.z);
-                uvs.push(u, t * 60);
-
-                if (j === 0) {
-                    leftPts.push(vertPos.clone().add(new THREE.Vector3(0, 0.06, 0)));
-                } else if (j === crossSteps - 1) {
-                    rightPts.push(vertPos.clone().add(new THREE.Vector3(0, 0.06, 0)));
-                }
-            }
-
-            if (i < segments) {
-                const rowA = i * crossSteps;
-                const rowB = (i + 1) * crossSteps;
-                for (let j = 0; j < crossSteps - 1; j++) {
-                    indices.push(rowA + j, rowB + j, rowA + j + 1);
-                    indices.push(rowA + j + 1, rowB + j, rowB + j + 1);
-                }
-            }
+            // Core laser line: primary guiding beam centered on flight path
+            corePts.push(new THREE.Vector3(pt.x, pt.y - 0.4, pt.z));
+            // Atmospheric glow halo: concentric bloom beam for enhanced visibility
+            glowPts.push(new THREE.Vector3(pt.x, pt.y - 0.38, pt.z));
+            // Navigational depth conduit: secondary grounding guide line beneath
+            conduitPts.push(new THREE.Vector3(pt.x, pt.y - 1.2, pt.z));
         }
 
-        const ribbonGeo = new THREE.BufferGeometry();
-        ribbonGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
-        ribbonGeo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
-        ribbonGeo.setIndex(indices);
-        if (typeof ribbonGeo.computeVertexNormals === 'function') {
-            ribbonGeo.computeVertexNormals();
-        }
+        const LineClass = THREE.LineLoop || THREE.Line;
 
-        // Elegant translucent ethereal roadbed surface
-        const ribbonMat = new THREE.MeshBasicMaterial({
+        // 1. High-intensity core laser line
+        const coreMat = new THREE.LineBasicMaterial({
             color: trackEmissiveHex,
             transparent: true,
-            opacity: 0.20,
-            side: THREE.DoubleSide,
-            depthWrite: false
-        });
-
-        const ribbonMesh = new THREE.Mesh(ribbonGeo, ribbonMat);
-        this.scene.add(ribbonMesh);
-
-        // 3D Retaining Curbs with high-visibility hazard markings along chicanes/turns
-        const LineClass = THREE.LineLoop || THREE.Line;
-        const railMat = new THREE.LineBasicMaterial({
-            color: trackEdgeHex,
-            transparent: true,
-            opacity: 0.70,
+            opacity: 0.95,
             linewidth: 2
         });
+        const coreLine = new LineClass(new THREE.BufferGeometry().setFromPoints(corePts), coreMat);
 
-        const leftRail = new LineClass(new THREE.BufferGeometry().setFromPoints(leftPts), railMat);
-        const rightRail = new LineClass(new THREE.BufferGeometry().setFromPoints(rightPts), railMat);
+        // 2. Diffuse atmospheric halo glow
+        const glowMat = new THREE.LineBasicMaterial({
+            color: trackEmissiveHex,
+            transparent: true,
+            opacity: 0.35,
+            linewidth: 4
+        });
+        const glowLine = new LineClass(new THREE.BufferGeometry().setFromPoints(glowPts), glowMat);
 
-        this.scene.add(leftRail);
-        this.scene.add(rightRail);
+        // 3. Grounding navigational conduit
+        const conduitMat = new THREE.LineBasicMaterial({
+            color: trackEdgeHex,
+            transparent: true,
+            opacity: 0.20,
+            linewidth: 1
+        });
+        const conduitLine = new LineClass(new THREE.BufferGeometry().setFromPoints(conduitPts), conduitMat);
 
-        // Maintain exact 3-object registration for zero memory leaks & test suite compatibility
-        this.trackObjects.push(ribbonMesh, leftRail, rightRail);
+        this.scene.add(coreLine);
+        this.scene.add(glowLine);
+        this.scene.add(conduitLine);
+
+        // Maintain exact 3-object registration for zero GC/memory leaks & test suite verification
+        this.trackObjects.push(coreLine, glowLine, conduitLine);
     }
 
     createHolographicGates() {

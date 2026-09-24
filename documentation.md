@@ -506,3 +506,24 @@ This enables zero-latency P2P mesh synchronization via WebRTC DataChannels (`Pee
 
 * **Comprehensive Automated Test Expansion (`scripts/test_engine.mjs`)**:
   * Expanded verification suite to 283 passed assertions (+56 new checks), validating buffer geometry vertex bounds, chamfer angles, solar unit vectors across all 4 presets, GhostPath pre-allocations and projection math, and floating HUD telemetry updates.
+
+### Completed: ADAS Inline Path Centering, Smooth Altitude Switching & Physics Disagreement Harmonization
+
+* **High-Authority Inline Path Centering (js/engine/drone.js)**:
+  * **Zero-Deadzone Spring-Damper Pull**: Eliminated the legacy 2.0-meter lateral deadzone. Drive assist now continuously evaluates the 3D displacement vector between the drone and the spline centerline, applying an aerodynamic spring-damper centering impulse directly to velocity.
+  * **Continuous Localized Spline Progression**: Replaced the global coarse 40-step scan with a localized continuous search window ([-0.08, +0.08] around splineProgress) with fine subdivisions, eliminating loop-jumping jitter when track segments pass close to one another.
+  * **Synchronized Euler Heading with Stunt FSM**: ADAS adaptive yaw alignment now smoothly updates stuntFsm.currentYaw via shortest-arc angular slerp, ensuring the visual chassis mesh, aerodynamic heading, and velocity vector remain in 100% agreement.
+* **Smooth Altitude Switching & 3D Path Elevation Tracking (js/engine/drone.js)**:
+  * **Laser Path Elevation Tracking**: In default flight mode, vertical auto-elevation smoothly tracks the spline exact 3D elevation nearestPt.y, allowing the craft to climb sky-ramps and descend into canyon straightaways without artificial resistance.
+  * **Critically Damped Altitude Switching**: When Altitude Hold is engaged ([H] or touch toggle), stepping target altitude ([T] / [G]) employs an exponential velocity blend that delivers rapid, buttery-smooth vertical transitions without overshoot or step snapping.
+* **Physics Disagreement Resolutions & Momentum Conservation (js/engine/drone.js)**:
+  * **Speedometer 3D Inclusivity**: Updated speedKmh to account for vertical velocity during steep climbs and supersonic dives, eliminating speedometer drop-offs during vertical aerobatics.
+  * **Aerodynamic Ground Cushion**: Ground effect now applies upward acceleration force directly to velocity.y with a solid physical safety clearance plane, eliminating floor oscillation and penetration jitter.
+  * **Stratosphere Dive Momentum Conservation**: Preserved full kinetic dive velocity ($\ge 280\text{--}320\text{ km/h}$) when transitioning onto ground-level canyon straightaways; bypasses standard cruising deceleration when holding forward throttle to maintain supercruise speed along the deck.
+
+* **Single-Line Laser Vector Corridor (js/engine/track_builder.js)**:
+  * **Laser Guide Corridor Architecture**: Replaced the wide 12m quad mesh roadbed with a minimalist, high-intensity laser flight vector corridor consisting of a core guiding beam, diffuse atmospheric glow halo, and grounding depth conduit.
+  * **Zero-Leak Lifecycle**: Maintained exact 3-object array registration in `trackObjects` ensuring clean WebGL buffer disposal and full test compatibility.
+
+* **Automated Verification Harness (scripts/test_engine.mjs)**:
+  * Expanded verification suite to 288 passed assertions (+5 new checks), validating single-line corridor line types, dive momentum conservation, supercruise throttle maintenance, and ADAS zero-deadzone inline centering.

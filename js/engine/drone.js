@@ -769,7 +769,9 @@ export class Drone {
             for (let si = 0; si <= localSteps; si++) {
                 const t = ((nearestT - localRange + (si / localSteps) * (localRange * 2)) % 1.0 + 1.0) % 1.0;
                 const pt = trackSpline.getPointAt(t);
-                const dSq = this.position.distanceToSquared(pt);
+                const dSq = typeof this.position.distanceToSquared === 'function'
+                    ? this.position.distanceToSquared(pt)
+                    : Math.pow(this.position.distanceTo(pt), 2);
                 if (dSq < nearestDistSq) { nearestDistSq = dSq; nearestT = t; }
             }
             // Coarse global recovery fallback if displaced far off track
@@ -777,7 +779,9 @@ export class Drone {
                 for (let si = 0; si < 20; si++) {
                     const t = si / 20;
                     const pt = trackSpline.getPointAt(t);
-                    const dSq = this.position.distanceToSquared(pt);
+                    const dSq = typeof this.position.distanceToSquared === 'function'
+                        ? this.position.distanceToSquared(pt)
+                        : Math.pow(this.position.distanceTo(pt), 2);
                     if (dSq < nearestDistSq) { nearestDistSq = dSq; nearestT = t; }
                 }
             }

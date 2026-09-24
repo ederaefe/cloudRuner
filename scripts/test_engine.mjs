@@ -159,6 +159,7 @@ class MockVector3 {
         return this;
     }
     distanceTo(v) { return Math.hypot(this.x - v.x, this.y - v.y, this.z - v.z); }
+    distanceToSquared(v) { const dx = this.x - v.x, dy = this.y - v.y, dz = this.z - v.z; return dx * dx + dy * dy + dz * dz; }
     dot(v) { return this.x * v.x + this.y * v.y + this.z * v.z; }
     crossVectors(a, b) {
         const ax = a.x, ay = a.y, az = a.z, bx = b.x, by = b.y, bz = b.z;
@@ -278,7 +279,8 @@ global.THREE = {
     Scene: MockObject3D,
     Mesh: MockMesh,
     Points: class extends MockMesh {},
-    Line: MockMesh,
+    Line: class extends MockMesh { constructor(g, m) { super(g, m); this.isLine = true; } },
+    LineLoop: class extends MockMesh { constructor(g, m) { super(g, m); this.isLine = true; this.isLineLoop = true; } },
     InstancedMesh: class extends MockMesh {
         constructor(geo, mat, count) {
             super(geo, mat);
@@ -877,6 +879,7 @@ assert(Math.abs(stuntFsm.currentPitch) < 0.05, 'StuntFSM maintains locked level 
 const circleTrack = new TrackBuilder(scene, coordinator.tier, CONFIG.SECTORS[0]);
 assert(circleTrack.gates.length > 0 && circleTrack.gates[0].mesh.isMesh, 'TrackBuilder constructs floating circular rings');
 assert(circleTrack.trackObjects.length === 3, 'TrackBuilder maintains aerial flight corridor guide lines');
+assert(circleTrack.trackObjects[0].isLine === true, 'TrackBuilder creates single-line laser corridor without wide roadbed mesh');
 circleTrack.dispose();
 
 // Test ADAS configuration presence
@@ -1004,6 +1007,27 @@ stopDrone.speedKmh = 250;
 stopDrone.startDive();
 stopDrone.updateDivePhysics({ hoverStopActive: true }, 0.1, stagingTrack);
 assert(stopDrone.speedKmh < 250, 'VTOL hover stop actively airbrakes dive speed');
+
+// Dive pullout straightaway momentum supercruise
+const diveExitDrone = new Drone(scene, false);
+diveExitDrone.setTrackSpline(stagingTrack.spline);
+diveExitDrone.speedKmh = 280;
+diveExitDrone.startDive();
+diveExitDrone.diveProgress = 0.28; // triggers dive exit to straightaway
+diveExitDrone.updateDivePhysics({ forward: 1.0 }, 0.016, stagingTrack);
+assert(diveExitDrone.isDiving === false, 'Drone cleanly transitions out of stratosphere dive into straightaway');
+assert(diveExitDrone.speedKmh >= 270, 'Drone conserves full dive kinetic momentum upon reaching canyon floor');
+diveExitDrone.updatePhysics({ forward: 1.0, turn: 0, strafe: 0 }, stuntFsm, 0.05, stagingTrack);
+assert(diveExitDrone.speedKmh >= 265, 'Drone maintains supercruise momentum down straightaway under forward throttle');
+
+// ADAS Zero-Deadzone Inline Path Centering
+const adasDrone = new Drone(scene, false);
+adasDrone.setTrackSpline(stagingTrack.spline);
+adasDrone.position.set(10, 20, 100);
+adasDrone.velocity.set(0, 0, 0);
+adasDrone.updatePhysics({ forward: 0.5, flyAssistEnabled: true }, stuntFsm, 0.05, stagingTrack);
+assert(adasDrone.velocity.length() > 0, 'ADAS drive assist applies zero-deadzone inline centering velocity toward spline');
+
 
 // Airframe Mode switching (ATTACK vs SAR_VTOL)
 testCombatDrone.setAirframeMode('SAR_VTOL');
