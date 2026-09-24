@@ -1061,6 +1061,61 @@ export class TrackBuilder {
             this.instancedProps.push(instancedHvac);
         }
 
+        // Roadside Aggregate Stone Boulders (Slow Roads Micro-Grounding)
+        // Scatters low-poly instanced stone boulders along the road shoulders
+        const maxBuildings = (this.tier && this.tier.maxProps) ? this.tier.maxProps : 300;
+        const rockCount = Math.min(180, Math.floor(maxBuildings * 0.45));
+        const rockGeo = (typeof THREE.DodecahedronGeometry === 'function') 
+            ? new THREE.DodecahedronGeometry(1.6, 1) 
+            : new THREE.BoxGeometry(2.0, 1.4, 2.0);
+        const rockMat = new THREE.MeshStandardMaterial({
+            color: 0x94A3B8,
+            roughness: 0.95,
+            metalness: 0.05
+        });
+        const instancedRocks = new THREE.InstancedMesh(rockGeo, rockMat, rockCount);
+        instancedRocks.receiveShadow = this.tier.shadows;
+        instancedRocks.castShadow = this.tier.shadows;
+
+        const rockDummy = new THREE.Object3D();
+        const rockTempColor = new THREE.Color();
+        const rockPalette = [0xE2E8F0, 0xCBD5E1, 0x94A3B8, 0x64748B, 0xD8B4A6]; // Warm limestone & terracotta aggregate tones
+
+        for (let r = 0; r < rockCount; r++) {
+            const frac = 0.28 + (r / rockCount) * 0.52; // Along horizontal canyon run
+            const sp = this.spline.getPointAt(frac);
+            const tan = this.spline.getTangentAt(frac).normalize();
+            const norm = new THREE.Vector3().crossVectors(tan, _up).normalize();
+
+            const side = (r % 2 === 0) ? 1 : -1;
+            const lateralOffset = (CONFIG.TRACK?.RIBBON_WIDTH || 12) * 0.5 + 4.5 + ((r * 11) % 18);
+            const groundY = (this.canyonFloor?.position.y !== undefined) ? this.canyonFloor.position.y : -24.0;
+            const rockY = Math.max(groundY + 0.8, sp.y - 14.0 + ((r * 7) % 8));
+
+            const rx = sp.x + norm.x * lateralOffset * side + ((r * 13) % 9 - 4.5);
+            const rz = sp.z + norm.z * lateralOffset * side + ((r * 17) % 9 - 4.5);
+
+            rockDummy.position.set(rx, rockY, rz);
+            const s = 0.8 + ((r * 19) % 15) * 0.12;
+            rockDummy.scale.set(s * 1.2, s * 0.75, s * 1.1);
+            if (rockDummy.rotation && typeof rockDummy.rotation.set === 'function') {
+                rockDummy.rotation.set((r * 0.4), (r * 0.7), (r * 0.2));
+            } else if (rockDummy.rotation) {
+                rockDummy.rotation.y = (r * 0.7);
+            }
+            rockDummy.updateMatrix();
+            instancedRocks.setMatrixAt(r, rockDummy.matrix);
+
+            rockTempColor.setHex(rockPalette[r % rockPalette.length]);
+            if (typeof instancedRocks.setColorAt === 'function') {
+                instancedRocks.setColorAt(r, rockTempColor);
+            }
+        }
+        instancedRocks.instanceMatrix.needsUpdate = true;
+        if (instancedRocks.instanceColor) instancedRocks.instanceColor.needsUpdate = true;
+        this.scene.add(instancedRocks);
+        this.instancedProps.push(instancedRocks);
+
         // Sky-Bridges spanning across canyon walls
         this.createSkyBridges();
     }
