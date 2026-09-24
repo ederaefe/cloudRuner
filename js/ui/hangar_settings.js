@@ -295,14 +295,28 @@ export class HangarSettingsManager {
 
     openHangar() {
         this.updateHangarUI();
+        if (typeof window !== 'undefined' && window._customizationSidebar) {
+            window._customizationSidebar.switchTab('hangar');
+            window._customizationSidebar.open();
+            return;
+        }
         if (this.hangarModal) this.hangarModal.classList.remove('hidden');
     }
 
     closeHangar() {
+        if (typeof window !== 'undefined' && window._customizationSidebar) {
+            window._customizationSidebar.close();
+            return;
+        }
         if (this.hangarModal) this.hangarModal.classList.add('hidden');
     }
 
     openSettings() {
+        if (typeof window !== 'undefined' && window._customizationSidebar) {
+            window._customizationSidebar.switchTab('settings');
+            window._customizationSidebar.open();
+            return;
+        }
         const sliderVol = document.getElementById('slider-master-vol');
         const chkHaptic = document.getElementById('chk-haptic');
         const chkInvertPitch = document.getElementById('chk-invert-pitch');
@@ -325,6 +339,10 @@ export class HangarSettingsManager {
     }
 
     closeSettings() {
+        if (typeof window !== 'undefined' && window._customizationSidebar) {
+            window._customizationSidebar.close();
+            return;
+        }
         if (this.settingsModal) this.settingsModal.classList.add('hidden');
         this.saveProfile();
     }

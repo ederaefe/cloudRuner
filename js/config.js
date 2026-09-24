@@ -387,7 +387,41 @@ export const CONFIG = {
         VERTICAL_THRUST: 38.0,
         INDUCED_DRAG: 0.032,
         DRAFTING_DISTANCE: 22.0,
-        DRAFTING_BOOST_RATE: 20.0
+        DRAFTING_BOOST_RATE: 20.0,
+        SPEED_SENSITIVE_STEER_MIN: 0.65, // Max yaw damping at Mach velocities (prevents spinouts)
+        KEYBOARD_STEER_FILTER: 12.0,     // Digital key interpolation rate (smooths binary snap)
+        AIRBRAKE_DEPLOY_RATE: 14.0,      // Physical airbrake flap deployment speed
+        AERO_DRIFT_FACTOR: 0.45          // Controlled slip angle allowance during hard braking turns
+    },
+
+    // Procedural High-Fidelity World Scenery Tokens
+    SCENERY: {
+        GANTRIES: {
+            COUNT: 6,
+            FRACTIONS: [0.30, 0.46, 0.58, 0.70, 0.76, 0.81],
+            ARCH_WIDTH: 28.0,
+            ARCH_HEIGHT: 18.0,
+            EMISSIVE_COLOR: 0x00f0ff
+        },
+        FOLIAGE: {
+            TIER_COUNTS: { 1: 80, 2: 180, 3: 360 },
+            PALETTE: [0x4A6B56, 0x5F7A61, 0x7E8F68, 0x3E5343], // Sage, olive, cedar botanical tones
+            MIN_RADIUS: 4.5,
+            MAX_RADIUS: 32.0
+        },
+        BOLLARDS: {
+            COUNT: 140,
+            HEIGHT: 2.2,
+            RADIUS: 0.28,
+            TRIM_COLOR: 0x00ffff
+        },
+        AEROSTATS: {
+            COUNT: 4,
+            ALTITUDES: [140.0, 210.0, 275.0, 340.0],
+            DRIFT_SPEED: 0.006,
+            HULL_COLOR: 0x222C38,
+            ACCENT_COLOR: 0x00e5ff
+        }
     },
 
     // Flight Assist, Fixed Altitude Hold, Autopilot & Hovercar ADAS

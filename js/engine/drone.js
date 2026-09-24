@@ -258,6 +258,27 @@ export class Drone {
         this.group.add(finL);
         this.finL = finL;
 
+        // 4b. Active Aerodynamic Speedbrake Spoiler Flaps
+        const airbrakeGeo = new THREE.BoxGeometry(0.55, 0.06, 0.48);
+        airbrakeGeo.translate(0, 0, -0.24); // Pivot from leading edge
+
+        const flapGroupR = new THREE.Group();
+        flapGroupR.position.set(0.48, 0.28, -0.6);
+        const flapMeshR = new THREE.Mesh(airbrakeGeo, this.matAccent);
+        flapMeshR.castShadow = true;
+        flapGroupR.add(flapMeshR);
+        this.group.add(flapGroupR);
+        this.airbrakeFlapR = flapGroupR;
+
+        const flapGroupL = new THREE.Group();
+        flapGroupL.position.set(-0.48, 0.28, -0.6);
+        const flapMeshL = new THREE.Mesh(airbrakeGeo, this.matAccent);
+        flapMeshL.castShadow = true;
+        flapGroupL.add(flapMeshL);
+        this.group.add(flapGroupL);
+        this.airbrakeFlapL = flapGroupL;
+        this.airbrakeDeployAngle = 0.0;
+
         // 5. Navigation Strobe Light (Blinking white/red)
         const strobeLight = new THREE.PointLight(0xff3333, 1.2, 8);
         strobeLight.position.set(0, 0.4, -2.0);
@@ -404,6 +425,12 @@ export class Drone {
     toggleAutopilot() {
         this.isAutopilot = !this.isAutopilot;
         this.autopilotBlend = this.isAutopilot ? 1.0 : 0.0;
+        if (typeof window !== 'undefined' && window._inputManager && window._inputManager.state) {
+            window._inputManager.state.autopilotEnabled = this.isAutopilot;
+            if (this.isAutopilot) {
+                window._inputManager.state.hoverStopActive = false;
+            }
+        }
         return this.isAutopilot;
     }
 
@@ -424,6 +451,7 @@ export class Drone {
         this.currentSteer = (typeof inputState.steerYaw === 'number')
             ? inputState.steerYaw
             : ((typeof inputState.turn === 'number') ? inputState.turn : 0);
+        this.lastInputState = inputState;
 
         // Substep physics loop (Task 1: Fixed-Timestep Accumulator at 120 Hz)
         while (this.physicsAccumulator >= FIXED_DT) {
@@ -480,6 +508,21 @@ export class Drone {
         this.diveLaneOffset = (this.stagingBasePos ? (this.stagingBasePos.x - (this.trackSpline?.getPointAt(0).x || 0)) : 0);
     }
 
+    abortDiveToStraightaway() {
+        if (!this.isDiving) return;
+        this.isDiving = false;
+        this.splineProgress = 0.27;
+        const curSpeed = Math.max(this.speedKmh / 3.6, 60.0);
+        this.supercruiseSpeedMs = curSpeed;
+        if (this.trackSpline) {
+            const currentTan = this.trackSpline.getTangentAt(0.27).normalize();
+            this.velocity.copy(currentTan).multiplyScalar(curSpeed);
+        }
+        if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('SET_DIVE_COMPLETE'));
+        }
+    }
+
     updateDivePhysics(inputState, dt, trackBuilder) {
         const spline = this.trackSpline || trackBuilder?.spline;
         if (!spline) return;
@@ -488,13 +531,14 @@ export class Drone {
         const rawForward = (inputState && typeof inputState.forward === 'number') ? inputState.forward : 0;
         const isThrottling = rawForward > 0.05;
 
-        // Kinematics: Boosted thrust dive (7-8s) vs pure passive gravity (10-11s)
-        const gravityAcc = 24.0; // m/s^2
-        const thrustAcc = isThrottling ? (44.0 + rawForward * 20.0) : 0.0;
+        // Kinematics: 13-second Stratosphere Plunge Accelerator Zone
+        // In the dive funnel corridor, gravitational acceleration propels the craft downward up to 320 km/h
+        const gravityAcc = 18.0; // m/s^2 calibrated for sustained 13-second descent
+        const thrustAcc = isThrottling ? (32.0 + rawForward * 16.0) : 0.0;
         const totalAcc = gravityAcc + thrustAcc;
 
         let currentSpeedMs = this.speedKmh / 3.6;
-        const maxDiveSpeedMs = isThrottling ? (320.0 / 3.6) : (180.0 / 3.6);
+        const maxDiveSpeedMs = isThrottling ? (320.0 / 3.6) : (210.0 / 3.6);
         currentSpeedMs = Math.min(maxDiveSpeedMs, currentSpeedMs + totalAcc * dt);
 
         // VTOL Emergency Hover Stop during dive: airbrake to controlled hover descent (~65 km/h)
@@ -507,19 +551,19 @@ export class Drone {
 
         this.speedKmh = currentSpeedMs * 3.6;
 
-        // Progress along dive funnel (spline t = 0 to pullout ~0.28)
-        const funnelLengthMeters = 860.0;
-        const deltaProgress = (currentSpeedMs * dt) / funnelLengthMeters * 0.28;
+        // Progress along dive funnel calibrated for full 13-second stratosphere descent
+        const funnelLengthMeters = 1080.0;
+        const deltaProgress = (currentSpeedMs * dt) / funnelLengthMeters * 0.27;
         this.diveProgress = (this.diveProgress || 0) + deltaProgress;
 
         const clampedT = Math.min(0.32, Math.max(0.001, this.diveProgress));
         const currentPt = spline.getPointAt(clampedT);
         const currentTan = spline.getTangentAt(clampedT).normalize();
 
-        // Lateral lane steering within the dive funnel (+- 16m)
+        // Full manual lateral lane steering authority within the dive funnel (+- 24m)
         const turnInput = (inputState && typeof inputState.turn === 'number') ? inputState.turn : 0;
-        this.diveLaneOffset = (this.diveLaneOffset || 0) + turnInput * dt * 26.0;
-        this.diveLaneOffset = THREE.MathUtils.clamp(this.diveLaneOffset, -16.0, 16.0);
+        this.diveLaneOffset = (this.diveLaneOffset || 0) + turnInput * dt * 28.0;
+        this.diveLaneOffset = THREE.MathUtils.clamp(this.diveLaneOffset, -24.0, 24.0);
 
         // Right-hand horizontal lateral vector: (0, 1, 0) x currentTan -> points along +X (Right)
         _crossScratch.crossVectors(new THREE.Vector3(0, 1, 0), currentTan);
@@ -555,6 +599,9 @@ export class Drone {
             this.supercruiseSpeedMs = fullDiveSpeedMs;
             this.velocity.copy(currentTan).multiplyScalar(fullDiveSpeedMs);
             this.speedKmh = fullDiveSpeedMs * 3.6;
+            if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+                window.dispatchEvent(new CustomEvent('SET_DIVE_COMPLETE'));
+            }
         }
     }
 
@@ -632,20 +679,21 @@ export class Drone {
                                   Math.abs(inputState.pitch || 0) > 0.08 ||
                                   Math.abs(inputState.roll || 0) > 0.08;
 
-        if (hasManualSteering && this.isAutopilot) {
+        if (hasManualSteering && (this.isAutopilot || inputState.autopilotEnabled)) {
             // Disengage autopilot on player intervention with smooth handoff
             this.isAutopilot = false;
+            inputState.autopilotEnabled = false;
         }
 
-        if (this.isAutopilot && this.trackSpline) {
+        // Keep this.isAutopilot bidirectionally synchronized with inputState.autopilotEnabled
+        if (typeof inputState.autopilotEnabled === 'boolean') {
+            this.isAutopilot = inputState.autopilotEnabled;
+        } else if (this.isAutopilot) {
+            inputState.autopilotEnabled = true;
+        }
+
+        if (this.isAutopilot) {
             this.autopilotBlend = Math.min(1.0, this.autopilotBlend + dt * 2.5);
-            // Autonomous spline following
-            const approxU = ((this.splineProgress || 0) + 0.018) % 1.0;
-            const targetPoint = this.trackSpline.getPointAt(approxU);
-            _tangentScratch.subVectors(targetPoint, this.position).normalize();
-            
-            _quatScratch.setFromUnitVectors(new THREE.Vector3(0, 0, 1), _tangentScratch);
-            this.quaternion.slerp(_quatScratch, dt * 3.5 * this.autopilotBlend);
         } else {
             this.autopilotBlend = Math.max(0.0, this.autopilotBlend - dt * 3.0);
         }
@@ -696,7 +744,22 @@ export class Drone {
 
         if (this.isTurbulenceActive) {
             targetSpeedKmh *= 0.78;
+            // Physical aerodynamic buffeting in atmospheric turbulence pockets (PHY-26)
+            const turbTime = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.005;
+            const turbRoll = Math.sin(turbTime * 3.1) * 0.05 + Math.cos(turbTime * 5.4) * 0.025;
+            const turbPitch = Math.cos(turbTime * 2.7) * 0.035;
+            const turbYaw = Math.sin(turbTime * 1.8) * 0.02;
+            if (stuntFsm) {
+                stuntFsm.currentRoll += turbRoll * dt * 6.0;
+                stuntFsm.currentPitch += turbPitch * dt * 6.0;
+                stuntFsm.currentYaw += turbYaw * dt * 4.0;
+            }
+            this.velocity.y += Math.sin(turbTime * 4.0) * 2.8 * dt;
         }
+
+        // Aerodynamic drift slip modulation during hard braking turns
+        const rawSteer = (typeof inputState.steerYaw === 'number') ? inputState.steerYaw : (inputState.turn || 0);
+        const isBrakingTurn = (rawForward < -0.1) && (Math.abs(rawSteer) > 0.35) && (this.speedKmh > 80.0);
 
         // Let Stunt FSM modulate speed and orientation
         stuntFsm.update(this, inputState, dt);
@@ -730,9 +793,21 @@ export class Drone {
                 newSpeedMs = 0;
             }
 
-            // Apply horizontal throttle only — altitude hold controller owns velocity.y
+            // Newtonian Momentum Accumulator & Centrifugal Slip (PHY-21)
             const savedVy = this.velocity.y;
-            this.velocity.copy(_fwdVector).multiplyScalar(newSpeedMs);
+            const currentFwdMag = this.velocity.dot(_fwdVector);
+
+            // Lateral drift component relative to craft forward heading
+            _tangentScratch.copy(this.velocity).addScaledVector(_fwdVector, -currentFwdMag);
+            _tangentScratch.y = 0;
+
+            // Aerodynamic grip dampens lateral slide
+            const gripRate = isBrakingTurn ? (CONFIG.FLIGHT?.AERO_DRIFT_FACTOR || 0.45) * 8.0 : 8.5;
+            this.velocity.addScaledVector(_tangentScratch, -gripRate * dt);
+
+            // Forward thrust acceleration along craft heading
+            const deltaFwd = newSpeedMs - currentFwdMag;
+            this.velocity.addScaledVector(_fwdVector, Math.sign(deltaFwd) * Math.min(Math.abs(deltaFwd), rate * dt * 2.5));
             this.velocity.y = savedVy;
         }
 
@@ -750,12 +825,14 @@ export class Drone {
             TRACK_ALIGN_GAIN: 0.28
         };
 
+        const driftFactor = isBrakingTurn ? (CONFIG.FLIGHT?.AERO_DRIFT_FACTOR || 0.45) : 1.0;
+
         if (stuntFsm && typeof stuntFsm.isDriftActive === 'function' ? !stuntFsm.isDriftActive() : true) {
             _fwdVector.set(0, 0, 1).applyQuaternion(this.quaternion);
             const fwdMag = this.velocity.dot(_fwdVector);
             _tangentScratch.copy(_fwdVector).multiplyScalar(fwdMag);
             _tangentScratch.y = this.velocity.y;
-            this.velocity.lerp(_tangentScratch, dt * (adasCfg.ESC_LATERAL_STABILITY * 12.0));
+            this.velocity.lerp(_tangentScratch, dt * (adasCfg.ESC_LATERAL_STABILITY * 12.0 * driftFactor));
         }
 
         // ADAS: Spline Centerline Tracking & Adaptive Path Alignment
@@ -944,7 +1021,10 @@ export class Drone {
         }
     }
 
-    updateVisualEffects(dt) {
+    updateVisualEffects(dt, inputOverride = null) {
+        if (inputOverride) {
+            this.lastInputState = inputOverride;
+        }
         const flightCfg = CONFIG.FLIGHT;
         // Use MAX_CRUISE_SPEED as the reference (BASE_SPEED is 0 in hovercar mode)
         const refSpeed = flightCfg.MAX_CRUISE_SPEED > 0 ? flightCfg.MAX_CRUISE_SPEED : 95.0;
@@ -1009,6 +1089,29 @@ export class Drone {
             this.finL.rotation.y = 0.1 - morph * 0.32;
             this.finR.rotation.z = -0.35 - morph * 0.14;
             this.finL.rotation.z = 0.35 - morph * 0.14;
+        }
+
+        // 5b. Active Aerodynamic Speedbrake Spoiler Flaps
+        if (this.airbrakeFlapR && this.airbrakeFlapL) {
+            let targetAirbrake = 0.0;
+            const isBraking = (this.lastInputState && this.lastInputState.forward < -0.1);
+            const isHoverStop = (this.lastInputState && this.lastInputState.hoverStopActive);
+            const isHighSpeedTurn = Math.abs(morph) > 0.65 && this.speedKmh > 110.0;
+
+            if (isHoverStop) {
+                targetAirbrake = 0.78; // High-drag vertical flare (~45°)
+            } else if (isBraking) {
+                const brakeIntensity = Math.min(1.0, Math.abs(this.lastInputState.forward));
+                targetAirbrake = 0.65 * brakeIntensity;
+            } else if (isHighSpeedTurn) {
+                targetAirbrake = 0.22 * Math.abs(morph);
+            }
+
+            const deployRate = (CONFIG.FLIGHT?.AIRBRAKE_DEPLOY_RATE || 14.0) * dt;
+            this.airbrakeDeployAngle = THREE.MathUtils.lerp(this.airbrakeDeployAngle || 0, targetAirbrake, deployRate);
+
+            this.airbrakeFlapR.rotation.x = -this.airbrakeDeployAngle;
+            this.airbrakeFlapL.rotation.x = -this.airbrakeDeployAngle;
         }
 
         // Rotor blur effect at high speeds

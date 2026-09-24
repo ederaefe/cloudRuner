@@ -55,18 +55,28 @@ export class InputManager {
         return this.state.targetAltitude;
     }
 
-    toggleAutopilot() {
+    toggleAutopilot(drone = null) {
         this.state.autopilotEnabled = !this.state.autopilotEnabled;
         if (this.state.autopilotEnabled) {
             this.state.hoverStopActive = false; // Disengage stop if autopilot turned on
         }
+        const activeDrone = drone || (typeof window !== 'undefined' ? window._playerDrone : null);
+        if (activeDrone) {
+            activeDrone.isAutopilot = this.state.autopilotEnabled;
+            activeDrone.autopilotBlend = this.state.autopilotEnabled ? 1.0 : 0.0;
+        }
         return this.state.autopilotEnabled;
     }
 
-    toggleHoverStop() {
+    toggleHoverStop(drone = null) {
         this.state.hoverStopActive = !this.state.hoverStopActive;
         if (this.state.hoverStopActive) {
             this.state.autopilotEnabled = false; // Disengage autopilot if stop engaged
+            const activeDrone = drone || (typeof window !== 'undefined' ? window._playerDrone : null);
+            if (activeDrone) {
+                activeDrone.isAutopilot = false;
+                activeDrone.autopilotBlend = 0.0;
+            }
         }
         return this.state.hoverStopActive;
     }

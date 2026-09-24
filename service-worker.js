@@ -5,7 +5,7 @@ Offline Cache API orchestrator for instant 0ms startup and offline playability
 ================================================================================
 */
 
-const CACHE_NAME = 'barch-aero-v4';
+const CACHE_NAME = 'barch-aero-v5';
 const STATIC_ASSETS = [
     './',
     './index.html',
@@ -19,6 +19,8 @@ const STATIC_ASSETS = [
     './js/input/touch_controls.js',
     './js/input/desktop_controls.js',
     './js/engine/drone.js',
+    './js/engine/autopilot.js',
+    './js/engine/ghost_path.js',
     './js/engine/stunt_fsm.js',
     './js/engine/track_builder.js',
     './js/engine/ai_racer.js',

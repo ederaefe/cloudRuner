@@ -210,8 +210,9 @@ class MockObject3D {
     constructor() {
         this.position = new MockVector3();
         this.quaternion = new MockQuaternion();
+        this.up = new MockVector3(0, 1, 0);
         this.scale = new MockVector3(1, 1, 1);
-        this.rotation = { x: 0, y: 0, z: 0 };
+        this.rotation = new MockEuler();
         this.children = [];
         this.matrix = {};
         this.visible = true;
@@ -268,11 +269,24 @@ class MockMaterial {
     dispose() { this.disposed = true; }
 }
 
+class MockMatrix4 {
+    constructor() { this.elements = new Float32Array(16); this.identity(); }
+    identity() { return this; }
+    makeTranslation(x, y, z) { return this; }
+    clone() { return new MockMatrix4(); }
+    copy(m) { return this; }
+    multiply(m) { return this; }
+    makeRotationX(t) { return this; }
+    makeRotationY(t) { return this; }
+    makeRotationZ(t) { return this; }
+    compose(p, q, s) { return this; }
+}
+
 global.THREE = {
     Vector3: MockVector3,
     Quaternion: MockQuaternion,
     Euler: MockEuler,
-    Matrix4: class { identity() { return this; } },
+    Matrix4: MockMatrix4,
     Color: class { constructor(v) { this.r = 1; this.g = 1; this.b = 1; this.setHex = () => {}; } },
     Object3D: MockObject3D,
     Group: MockObject3D,
@@ -1287,8 +1301,121 @@ assert(allAABBsFinite, 'All 1,600 building AABBs have finite, valid coordinates'
 assert(!anyBuildingInStagingFunnel, 'All 1,600 buildings maintain complete clearance around the stratosphere dive funnel');
 
 // Verify rooftop instanced props are created and bounded
-assert(denseCityTrack.instancedProps.length >= 4, 'TrackBuilder registers instanced city, helipads, spires, and boulders');
+assert(denseCityTrack.instancedProps.length >= 8, 'TrackBuilder registers instanced city, helipads, spires, boulders, gantries, foliage, bollards, and aerostats');
 denseCityTrack.dispose();
+
+// Test 28: Procedural World Scenery, Aerodynamic Components & Control Systems
+console.log('--- TESTING PROCEDURAL SCENERY, AIRBRAKES & CONTROLS ---');
+
+// 28.1 Config Scenery & Flight Tokens
+assert(CONFIG.SCENERY !== undefined, 'CONFIG defines SCENERY object');
+assert(CONFIG.SCENERY.GANTRIES && CONFIG.SCENERY.GANTRIES.COUNT > 0, 'CONFIG defines SCENERY.GANTRIES with non-zero count');
+assert(CONFIG.SCENERY.FOLIAGE && CONFIG.SCENERY.FOLIAGE.TIER_COUNTS[3] > 0, 'CONFIG defines SCENERY.FOLIAGE with tier 3 density');
+assert(CONFIG.SCENERY.BOLLARDS && CONFIG.SCENERY.BOLLARDS.COUNT > 0, 'CONFIG defines SCENERY.BOLLARDS count');
+assert(CONFIG.SCENERY.AEROSTATS && CONFIG.SCENERY.AEROSTATS.COUNT === 4, 'CONFIG defines SCENERY.AEROSTATS with 4 aerostats');
+assert(CONFIG.FLIGHT.SPEED_SENSITIVE_STEER_MIN === 0.65, 'CONFIG.FLIGHT defines SPEED_SENSITIVE_STEER_MIN (0.65)');
+assert(CONFIG.FLIGHT.KEYBOARD_STEER_FILTER === 12.0, 'CONFIG.FLIGHT defines KEYBOARD_STEER_FILTER (12.0)');
+assert(CONFIG.FLIGHT.AIRBRAKE_DEPLOY_RATE === 14.0, 'CONFIG.FLIGHT defines AIRBRAKE_DEPLOY_RATE (14.0)');
+
+// 28.2 Procedural Scenery Buffer Geometries
+const gantryGeo = TrackBuilder.createGantryGeometry();
+assert(gantryGeo && gantryGeo.attributes.position && gantryGeo.attributes.normal && gantryGeo.attributes.uv, 'TrackBuilder.createGantryGeometry produces valid indexed buffer geometry');
+
+const treeGeo = TrackBuilder.createTreeGeometry();
+assert(treeGeo && treeGeo.attributes.position && treeGeo.attributes.normal && treeGeo.attributes.uv, 'TrackBuilder.createTreeGeometry produces valid multi-cone tree geometry');
+
+const bollardGeo = TrackBuilder.createBollardGeometry();
+assert(bollardGeo && bollardGeo.attributes.position && bollardGeo.attributes.normal && bollardGeo.attributes.uv, 'TrackBuilder.createBollardGeometry produces valid bollard geometry');
+
+const aerostatGeo = TrackBuilder.createAerostatGeometry();
+assert(aerostatGeo && aerostatGeo.attributes.position && aerostatGeo.attributes.normal && aerostatGeo.attributes.uv, 'TrackBuilder.createAerostatGeometry produces valid aerostat zeppelin geometry');
+
+// 28.3 Instanced Scenery Mesh System & Kinetic Drift
+const sceneryTrack = new TrackBuilder(scene, highDensityTier, CONFIG.SECTORS[0]);
+assert(sceneryTrack.instancedGantries !== null, 'TrackBuilder creates instanced highway gantries mesh');
+assert(sceneryTrack.instancedFoliage !== null, 'TrackBuilder creates instanced stylized foliage mesh');
+assert(sceneryTrack.instancedBollards !== null, 'TrackBuilder creates instanced trackside bollards mesh');
+assert(sceneryTrack.instancedAerostats !== null, 'TrackBuilder creates instanced floating aerostats mesh');
+
+// Kinetic orbital drift updates without allocations or errors
+const initialAerostatAngle = sceneryTrack.aerostatAngles[0];
+sceneryTrack.update(180, 0.05);
+assert(sceneryTrack.aerostatAngles[0] > initialAerostatAngle, 'TrackBuilder.update advances kinetic orbital drift angle for aerostats');
+sceneryTrack.dispose();
+
+// 28.4 Modular Active Aerodynamic Airbrakes on Drone Fuselage
+const aeroDrone = new Drone(scene, false);
+assert(aeroDrone.airbrakeFlapR !== null && aeroDrone.airbrakeFlapL !== null, 'Drone builds articulated left and right airbrake spoiler flaps');
+assert(aeroDrone.airbrakeDeployAngle === 0, 'Airbrake flaps start fully flush in stowed position (0 rad)');
+
+// Airbrake deployment under braking deceleration
+aeroDrone.updateVisualEffects(0.1, { forward: -0.8 });
+assert(aeroDrone.airbrakeDeployAngle > 0.05, 'Airbrake flaps deploy upward during hard braking deceleration');
+
+// Airbrake retraction under forward throttle
+aeroDrone.updateVisualEffects(0.2, { forward: 1.0 });
+assert(aeroDrone.airbrakeDeployAngle < 0.25, 'Airbrake flaps smoothly retract flush during forward acceleration');
+
+// 28.5 Progressive Digital Steering Filter & Touch Joystick Curve
+const filterTestInput = new InputManager();
+const testDesktop = new DesktopControls(filterTestInput);
+testDesktop.keys['d'] = true;
+testDesktop.update(0.016);
+assert(testDesktop.filteredSteer > 0 && testDesktop.filteredSteer < 0.5, 'DesktopControls smoothly lerps steering rather than snapping instantly to 1.0');
+testDesktop.update(0.1);
+assert(testDesktop.filteredSteer > 0.5, 'DesktopControls progressively reaches deep steer deflection over time');
+testDesktop.resetKeys();
+assert(testDesktop.filteredSteer === 0, 'DesktopControls.resetKeys() zeroes filtered steer accumulator');
+
+const testTouch = new TouchControls(filterTestInput);
+testTouch.stickCenterX = 100;
+testTouch.stickCenterY = 100;
+testTouch.stickRadius = 65;
+// Within deadzone (distance = 3px < 5.2px)
+testTouch.updateStick(102, 100);
+assert(filterTestInput.state.steerYaw === 0, 'TouchControls deadzone suppresses micro-jitter near center');
+// Outside deadzone
+testTouch.updateStick(140, 100);
+assert(filterTestInput.state.steerYaw > 0, 'TouchControls power-curve responds smoothly to deliberate deflection');
+
+// 28.6 Speed-Sensitive Steering Rate Attenuation & Dynamic Aerodynamic Roll Banking
+const fsmDrone = new Drone(scene, false);
+const fsmInstance = new StuntFSM();
+const steerInput = { steerYaw: 1.0, isNitroHeld: false };
+
+// At 0 km/h: full yaw rate authority
+fsmDrone.speedKmh = 0;
+fsmInstance.currentYaw = 0;
+fsmInstance.currentRoll = 0;
+fsmInstance.update(fsmDrone, steerInput, 0.1);
+const lowSpeedYawDelta = Math.abs(fsmInstance.currentYaw);
+
+// At 260 km/h: yaw rate attenuated for high-speed stability
+fsmDrone.speedKmh = 260;
+fsmInstance.currentYaw = 0;
+fsmInstance.update(fsmDrone, steerInput, 0.1);
+const highSpeedYawDelta = Math.abs(fsmInstance.currentYaw);
+
+assert(highSpeedYawDelta < lowSpeedYawDelta * 0.75, 'StuntFSM attenuates yaw rate at high speeds to prevent twitchy oversteer');
+assert(Math.abs(fsmInstance.currentRoll) > 0, 'StuntFSM applies aerodynamic chassis banking into turn');
+
+// 28.7 Dynamic Camera Banking, Continuous FOV Scaling & Turbulence Buffeting
+const testCam = new global.THREE.PerspectiveCamera();
+const testRig = new CameraRig(testCam);
+fsmDrone.roll = 0.45; // Simulated turn bank
+fsmDrone.speedKmh = 350; // Terminal speed
+testRig.update(fsmDrone, 0.05);
+assert(Math.abs(testRig.cameraRoll) > 0, 'CameraRig dynamically banks camera roll with drone turn angle');
+assert(testRig.targetFov >= 92.0, 'CameraRig targets expanded FOV at supersonic speed');
+for (let i = 0; i < 20; i++) {
+    testRig.update(fsmDrone, 0.05);
+}
+assert(testCam.fov > 85.0, 'CameraRig expands FOV progressively toward terminal overdrive at high speed');
+
+fsmDrone.isTurbulenceActive = true;
+fsmDrone.turbulenceStrain = 0.8;
+testRig.update(fsmDrone, 0.05);
+assert(testCam.position.lengthSq() > 0, 'CameraRig buffeting applies dynamic shake in turbulence zones');
 
     console.log(`\n========================================`);
     console.log(`ALL TESTS PASSED: ${passedTests}/${totalTests} ASSERTIONS VERIFIED`);

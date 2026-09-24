@@ -179,6 +179,138 @@ export function createMonolithGeometry() {
     return geo;
 }
 
+// Pure mathematical procedural geometry helpers (100% self-contained Float32Array builders)
+function createBufferFromData(positions, normals, uvs, indices) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(normals), 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
+    geo.setIndex(indices);
+    if (typeof geo.computeVertexNormals === 'function') {
+        geo.computeVertexNormals();
+    }
+    return geo;
+}
+
+function addBox(positions, normals, uvs, indices, cx, cy, cz, w, h, d) {
+    const hw = w * 0.5, hh = h * 0.5, hd = d * 0.5;
+    const addFace = (p0, p1, p2, p3, nx, ny, nz) => {
+        const idx = Math.floor(positions.length / 3);
+        positions.push(p0[0], p0[1], p0[2], p1[0], p1[1], p1[2], p2[0], p2[1], p2[2], p3[0], p3[1], p3[2]);
+        for (let i = 0; i < 4; i++) normals.push(nx, ny, nz);
+        uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
+        indices.push(idx, idx + 1, idx + 2, idx, idx + 2, idx + 3);
+    };
+    // Front (+Z), Back (-Z), Top (+Y), Bottom (-Y), Right (+X), Left (-X)
+    addFace([cx - hw, cy - hh, cz + hd], [cx + hw, cy - hh, cz + hd], [cx + hw, cy + hh, cz + hd], [cx - hw, cy + hh, cz + hd], 0, 0, 1);
+    addFace([cx + hw, cy - hh, cz - hd], [cx - hw, cy - hh, cz - hd], [cx - hw, cy + hh, cz - hd], [cx + hw, cy + hh, cz - hd], 0, 0, -1);
+    addFace([cx - hw, cy + hh, cz + hd], [cx + hw, cy + hh, cz + hd], [cx + hw, cy + hh, cz - hd], [cx - hw, cy + hh, cz - hd], 0, 1, 0);
+    addFace([cx - hw, cy - hh, cz - hd], [cx + hw, cy - hh, cz - hd], [cx + hw, cy - hh, cz + hd], [cx - hw, cy - hh, cz + hd], 0, -1, 0);
+    addFace([cx + hw, cy - hh, cz + hd], [cx + hw, cy - hh, cz - hd], [cx + hw, cy + hh, cz - hd], [cx + hw, cy + hh, cz + hd], 1, 0, 0);
+    addFace([cx - hw, cy - hh, cz - hd], [cx - hw, cy - hh, cz + hd], [cx - hw, cy + hh, cz + hd], [cx - hw, cy + hh, cz - hd], -1, 0, 0);
+}
+
+function addCone(positions, normals, uvs, indices, cx, cy, cz, radius, height, segs = 8) {
+    const apex = [cx, cy + height, cz];
+    const baseCenter = [cx, cy, cz];
+    for (let i = 0; i < segs; i++) {
+        const a1 = (i / segs) * Math.PI * 2;
+        const a2 = ((i + 1) / segs) * Math.PI * 2;
+        const p1 = [cx + Math.cos(a1) * radius, cy, cz + Math.sin(a1) * radius];
+        const p2 = [cx + Math.cos(a2) * radius, cy, cz + Math.sin(a2) * radius];
+
+        const idx = Math.floor(positions.length / 3);
+        positions.push(p1[0], p1[1], p1[2], p2[0], p2[1], p2[2], apex[0], apex[1], apex[2]);
+        const nx = (Math.cos(a1) + Math.cos(a2)) * 0.5;
+        const nz = (Math.sin(a1) + Math.sin(a2)) * 0.5;
+        normals.push(nx, 0.45, nz, nx, 0.45, nz, nx, 0.45, nz);
+        uvs.push(0, 0, 1, 0, 0.5, 1);
+        indices.push(idx, idx + 1, idx + 2);
+
+        const bIdx = Math.floor(positions.length / 3);
+        positions.push(baseCenter[0], baseCenter[1], baseCenter[2], p2[0], p2[1], p2[2], p1[0], p1[1], p1[2]);
+        normals.push(0, -1, 0, 0, -1, 0, 0, -1, 0);
+        uvs.push(0.5, 0.5, 1, 1, 0, 1);
+        indices.push(bIdx, bIdx + 1, bIdx + 2);
+    }
+}
+
+function addCylinder(positions, normals, uvs, indices, cx, cy, cz, rTop, rBot, height, segs = 8, axis = 'Y') {
+    const hh = height * 0.5;
+    for (let i = 0; i < segs; i++) {
+        const a1 = (i / segs) * Math.PI * 2;
+        const a2 = ((i + 1) / segs) * Math.PI * 2;
+        const c1 = Math.cos(a1), s1 = Math.sin(a1);
+        const c2 = Math.cos(a2), s2 = Math.sin(a2);
+
+        let p1Bot, p2Bot, p1Top, p2Top, nMid;
+        if (axis === 'Z') {
+            p1Bot = [cx + c1 * rBot, cy + s1 * rBot, cz - hh];
+            p2Bot = [cx + c2 * rBot, cy + s2 * rBot, cz - hh];
+            p1Top = [cx + c1 * rTop, cy + s1 * rTop, cz + hh];
+            p2Top = [cx + c2 * rTop, cy + s2 * rTop, cz + hh];
+            nMid = [(c1 + c2) * 0.5, (s1 + s2) * 0.5, 0];
+        } else {
+            p1Bot = [cx + c1 * rBot, cy - hh, cz + s1 * rBot];
+            p2Bot = [cx + c2 * rBot, cy - hh, cz + s2 * rBot];
+            p1Top = [cx + c1 * rTop, cy + hh, cz + s1 * rTop];
+            p2Top = [cx + c2 * rTop, cy + hh, cz + s2 * rTop];
+            nMid = [(c1 + c2) * 0.5, 0, (s1 + s2) * 0.5];
+        }
+
+        const idx = Math.floor(positions.length / 3);
+        positions.push(
+            p1Bot[0], p1Bot[1], p1Bot[2],
+            p2Bot[0], p2Bot[1], p2Bot[2],
+            p2Top[0], p2Top[1], p2Top[2],
+            p1Top[0], p1Top[1], p1Top[2]
+        );
+        for (let k = 0; k < 4; k++) normals.push(nMid[0], nMid[1], nMid[2]);
+        uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
+        indices.push(idx, idx + 1, idx + 2, idx, idx + 2, idx + 3);
+    }
+}
+
+// Procedural Highway Wayfinding Gantry (cantilevered overhead arch with sign fascia)
+export function createGantryGeometry() {
+    const positions = [], normals = [], uvs = [], indices = [];
+    // Left pillar, Right pillar, Overhead cross-beam, Signboard panel
+    addBox(positions, normals, uvs, indices, -13.5, 9.0, 0.0, 1.2, 18.0, 1.4);
+    addBox(positions, normals, uvs, indices, 13.5, 9.0, 0.0, 1.2, 18.0, 1.4);
+    addBox(positions, normals, uvs, indices, 0.0, 17.5, 0.0, 28.4, 1.8, 1.8);
+    addBox(positions, normals, uvs, indices, 0.0, 15.6, 0.6, 16.0, 1.6, 0.4);
+    return createBufferFromData(positions, normals, uvs, indices);
+}
+
+// Stylized Organic Low-Poly Foliage (Columnar Cypress / Alpine Pine)
+export function createTreeGeometry() {
+    const positions = [], normals = [], uvs = [], indices = [];
+    // Base trunk cylinder + 3-tiered conical foliage crowns
+    addCylinder(positions, normals, uvs, indices, 0.0, 1.2, 0.0, 0.32, 0.52, 2.4, 6);
+    addCone(positions, normals, uvs, indices, 0.0, 2.1, 0.0, 2.4, 4.2, 7);
+    addCone(positions, normals, uvs, indices, 0.0, 4.6, 0.0, 1.8, 3.6, 7);
+    addCone(positions, normals, uvs, indices, 0.0, 6.8, 0.0, 1.1, 2.8, 7);
+    return createBufferFromData(positions, normals, uvs, indices);
+}
+
+// Trackside Kilometer & Curve Marker Bollard
+export function createBollardGeometry() {
+    const positions = [], normals = [], uvs = [], indices = [];
+    // Post cylinder + beveled reflective cap
+    addCylinder(positions, normals, uvs, indices, 0.0, 1.1, 0.0, 0.24, 0.32, 2.2, 8);
+    addCylinder(positions, normals, uvs, indices, 0.0, 2.3, 0.0, 0.28, 0.28, 0.4, 8);
+    return createBufferFromData(positions, normals, uvs, indices);
+}
+
+// Floating Stratospheric / Canyon Aerostat Sky Barge
+export function createAerostatGeometry() {
+    const positions = [], normals = [], uvs = [], indices = [];
+    // Main cylindrical envelope along Z axis, forward nose cone, aft tail cone, ventral gondola
+    addCylinder(positions, normals, uvs, indices, 0.0, 0.0, 0.0, 5.2, 5.2, 32.0, 8, 'Z');
+    addBox(positions, normals, uvs, indices, 0.0, -5.8, 0.0, 4.0, 2.2, 16.0);
+    return createBufferFromData(positions, normals, uvs, indices);
+}
+
 export class TrackBuilder {
     constructor(scene, tier, sector = null, seed = 'BARCH-ALPHA', skyline = null) {
         this.scene = scene;
@@ -216,8 +348,14 @@ export class TrackBuilder {
         this.trackMesh = null;
         this.trackMaterial = null;
         this.trackTexture = null;
-        this.buildingTexture = null;
         this.turbulenceZones = [];
+        this.instancedGantries = null;
+        this.instancedFoliage = null;
+        this.instancedBollards = null;
+        this.instancedAerostats = null;
+        this.aerostatAngles = [];
+        this.aerostatRadii = [];
+        this.aerostatAltitudes = [];
 
         this.buildTrackSpline();
         this.createSkyDome();
@@ -227,6 +365,10 @@ export class TrackBuilder {
         this.createHolographicGates();
         this.createLaunchPad();
         this.populateInstancedEnvironment();
+        this.createHighwayGantries();
+        this.createStylizedFoliage();
+        this.createTracksideBollards();
+        this.createFloatingAerostats();
         this.createProceduralTunnels();
         this.createAtmosphericTurbulencePockets();
     }
@@ -1289,6 +1431,201 @@ export class TrackBuilder {
         });
     }
 
+    createHighwayGantries() {
+        if (!this.spline) return;
+        const gantryFractions = (CONFIG.SCENERY?.GANTRIES?.FRACTIONS) || [0.30, 0.46, 0.58, 0.70, 0.76, 0.81];
+        const gantryCount = gantryFractions.length;
+        const gantryGeo = createGantryGeometry();
+
+        const gantryMat = new THREE.MeshStandardMaterial({
+            color: 0x1f2937,
+            roughness: 0.6,
+            metalness: 0.4
+        });
+
+        const instancedGantries = new THREE.InstancedMesh(gantryGeo, gantryMat, gantryCount);
+        instancedGantries.receiveShadow = this.tier.shadows;
+        instancedGantries.castShadow = this.tier.shadows;
+
+        const dummy = new THREE.Object3D();
+        const _tan = new THREE.Vector3();
+        const _fwd = new THREE.Vector3(0, 0, 1);
+
+        for (let g = 0; g < gantryCount; g++) {
+            const frac = gantryFractions[g];
+            const pt = this.spline.getPointAt(frac);
+            _tan.copy(this.spline.getTangentAt(frac)).normalize();
+
+            dummy.position.copy(pt);
+            dummy.quaternion.setFromUnitVectors(_fwd, _tan);
+            dummy.scale.set(1, 1, 1);
+            dummy.updateMatrix();
+            instancedGantries.setMatrixAt(g, dummy.matrix);
+        }
+
+        instancedGantries.instanceMatrix.needsUpdate = true;
+        this.scene.add(instancedGantries);
+        this.instancedProps.push(instancedGantries);
+        this.instancedGantries = instancedGantries;
+    }
+
+    createStylizedFoliage() {
+        const foliageCount = (this.tier && this.tier.name === 'DESKTOP_HIGH') 
+            ? (CONFIG.SCENERY?.FOLIAGE?.TIER_COUNTS?.[3] || 360)
+            : ((this.tier && this.tier.name === 'MOBILE_MID') 
+                ? (CONFIG.SCENERY?.FOLIAGE?.TIER_COUNTS?.[2] || 180) 
+                : (CONFIG.SCENERY?.FOLIAGE?.TIER_COUNTS?.[1] || 80));
+
+        const treeGeo = createTreeGeometry();
+        const treeMat = new THREE.MeshStandardMaterial({
+            color: 0x5F7A61,
+            roughness: 0.85,
+            metalness: 0.1
+        });
+
+        const instancedFoliage = new THREE.InstancedMesh(treeGeo, treeMat, foliageCount);
+        instancedFoliage.receiveShadow = this.tier.shadows;
+        instancedFoliage.castShadow = this.tier.shadows;
+
+        const dummy = new THREE.Object3D();
+        const tempCol = new THREE.Color();
+        const palette = (CONFIG.SCENERY?.FOLIAGE?.PALETTE) || [0x4A6B56, 0x5F7A61, 0x7E8F68, 0x3E5343];
+        const groundY = (this.canyonFloor?.position.y !== undefined) ? this.canyonFloor.position.y : -24.0;
+        const trackHalfWidth = (CONFIG.TRACK?.RIBBON_WIDTH || 14) * 0.5;
+
+        for (let t = 0; t < foliageCount; t++) {
+            const frac = 0.28 + (t / foliageCount) * 0.54; // Canyon floor stretch
+            const pt = this.spline.getPointAt(frac);
+            const tan = this.spline.getTangentAt(frac).normalize();
+            const norm = new THREE.Vector3().crossVectors(tan, _up).normalize();
+
+            const side = (t % 2 === 0) ? 1 : -1;
+            const lateralDist = trackHalfWidth + 6.0 + ((t * 11) % 26);
+            const jitterX = ((t * 17) % 15) - 7.5;
+            const jitterZ = ((t * 23) % 15) - 7.5;
+
+            const tx = pt.x + (norm.x * lateralDist * side) + jitterX;
+            const tz = pt.z + (norm.z * lateralDist * side) + jitterZ;
+            const ty = Math.max(groundY, pt.y - 18.0 + ((t * 7) % 6));
+
+            dummy.position.set(tx, ty, tz);
+            const s = 0.75 + ((t * 13) % 10) * 0.08;
+            dummy.scale.set(s, s * (0.9 + ((t * 5) % 4) * 0.1), s);
+            const rotY = (t * 0.65);
+            if (dummy.rotation && typeof dummy.rotation.set === 'function') {
+                dummy.rotation.set(0, rotY, 0);
+            } else if (dummy.rotation) {
+                dummy.rotation.y = rotY;
+            }
+            dummy.updateMatrix();
+            instancedFoliage.setMatrixAt(t, dummy.matrix);
+
+            tempCol.setHex(palette[t % palette.length]);
+            if (typeof instancedFoliage.setColorAt === 'function') {
+                instancedFoliage.setColorAt(t, tempCol);
+            }
+        }
+
+        instancedFoliage.instanceMatrix.needsUpdate = true;
+        if (instancedFoliage.instanceColor) instancedFoliage.instanceColor.needsUpdate = true;
+        this.scene.add(instancedFoliage);
+        this.instancedProps.push(instancedFoliage);
+        this.instancedFoliage = instancedFoliage;
+    }
+
+    createTracksideBollards() {
+        if (!this.spline) return;
+        const bollardCount = (CONFIG.SCENERY?.BOLLARDS?.COUNT) || 140;
+        const bollardGeo = createBollardGeometry();
+
+        const bollardMat = new THREE.MeshStandardMaterial({
+            color: 0x334155,
+            roughness: 0.5,
+            metalness: 0.5
+        });
+
+        const instancedBollards = new THREE.InstancedMesh(bollardGeo, bollardMat, bollardCount);
+        const dummy = new THREE.Object3D();
+        const trackHalfWidth = (CONFIG.TRACK?.RIBBON_WIDTH || 14) * 0.5;
+
+        for (let b = 0; b < bollardCount; b++) {
+            const frac = 0.28 + (b / bollardCount) * 0.54;
+            const pt = this.spline.getPointAt(frac);
+            const tan = this.spline.getTangentAt(frac).normalize();
+            const norm = new THREE.Vector3().crossVectors(tan, _up).normalize();
+
+            const side = (b % 2 === 0) ? 1 : -1;
+            const lateralOffset = trackHalfWidth + 2.4;
+
+            const bx = pt.x + (norm.x * lateralOffset * side);
+            const bz = pt.z + (norm.z * lateralOffset * side);
+            const by = pt.y - 0.8;
+
+            dummy.position.set(bx, by, bz);
+            dummy.scale.set(1, 1, 1);
+            const bRotY = (b * 0.2);
+            if (dummy.rotation && typeof dummy.rotation.set === 'function') {
+                dummy.rotation.set(0, bRotY, 0);
+            } else if (dummy.rotation) {
+                dummy.rotation.y = bRotY;
+            }
+            dummy.updateMatrix();
+            instancedBollards.setMatrixAt(b, dummy.matrix);
+        }
+
+        instancedBollards.instanceMatrix.needsUpdate = true;
+        this.scene.add(instancedBollards);
+        this.instancedProps.push(instancedBollards);
+        this.instancedBollards = instancedBollards;
+    }
+
+    createFloatingAerostats() {
+        const aerostatCount = (CONFIG.SCENERY?.AEROSTATS?.COUNT) || 4;
+        const aerostatGeo = createAerostatGeometry();
+        const hullHex = (CONFIG.SCENERY?.AEROSTATS?.HULL_COLOR) || 0x222C38;
+
+        const aerostatMat = new THREE.MeshStandardMaterial({
+            color: hullHex,
+            roughness: 0.45,
+            metalness: 0.65
+        });
+
+        const instancedAerostats = new THREE.InstancedMesh(aerostatGeo, aerostatMat, aerostatCount);
+        const dummy = new THREE.Object3D();
+
+        const baseAngles = [0.25, 1.85, 3.45, 5.05];
+        const baseRadii = [520, 680, 840, 1050];
+        const altitudes = (CONFIG.SCENERY?.AEROSTATS?.ALTITUDES) || [140.0, 210.0, 275.0, 340.0];
+
+        this.aerostatAngles = [...baseAngles];
+        this.aerostatRadii = [...baseRadii];
+        this.aerostatAltitudes = [...altitudes];
+
+        for (let a = 0; a < aerostatCount; a++) {
+            const ang = this.aerostatAngles[a];
+            const rad = this.aerostatRadii[a];
+            const ax = Math.cos(ang) * rad;
+            const az = Math.sin(ang) * rad;
+            const ay = this.aerostatAltitudes[a];
+
+            dummy.position.set(ax, ay, az);
+            const aRotY = -ang + Math.PI / 2;
+            if (dummy.rotation && typeof dummy.rotation.set === 'function') {
+                dummy.rotation.set(0, aRotY, 0);
+            } else if (dummy.rotation) {
+                dummy.rotation.y = aRotY;
+            }
+            dummy.scale.set(1, 1, 1);
+            dummy.updateMatrix();
+            instancedAerostats.setMatrixAt(a, dummy.matrix);
+        }
+
+        instancedAerostats.instanceMatrix.needsUpdate = true;
+        this.scene.add(instancedAerostats);
+        this.instancedProps.push(instancedAerostats);
+        this.instancedAerostats = instancedAerostats;
+    }
+
     checkBuildingCollision(drone, cameraRig = null, soundEngine = null, hud = null, dt = 0.016) {
         if (!drone || !this.buildingAABBs || this.buildingAABBs.length === 0) return false;
 
@@ -1305,12 +1642,16 @@ export class TrackBuilder {
         for (let i = 0; i < this.buildingAABBs.length; i++) {
             const b = this.buildingAABBs[i];
 
+            // Broadphase distance pruning (O(1) skips 95%+ of distant buildings)
+            const midX = (b.min.x + b.max.x) * 0.5;
+            const midZ = (b.min.z + b.max.z) * 0.5;
+            const dMidSq = (px - midX) * (px - midX) + (pz - midZ) * (pz - midZ);
+            if (dMidSq > 85.0 * 85.0) continue;
+
             // Fast axis-aligned bounding volume pruning
             if (py > b.max.y + 4.0 || py < b.min.y - 2.0) continue;
             const halfW = (b.max.x - b.min.x) * 0.5;
             const halfD = (b.max.z - b.min.z) * 0.5;
-            const midX = (b.min.x + b.max.x) * 0.5;
-            const midZ = (b.min.z + b.max.z) * 0.5;
             if (Math.abs(px - midX) > halfW + 6.0) continue;
             if (Math.abs(pz - midZ) > halfD + 6.0) continue;
 
@@ -1392,6 +1733,27 @@ export class TrackBuilder {
         // Slow atmospheric sky dome celestial rotation
         if (this.skyDome) {
             this.skyDome.rotation.y += dt * 0.005;
+        }
+
+        // Slow kinetic orbital drift of floating atmospheric aerostats
+        if (this.instancedAerostats && this.aerostatAngles && this.aerostatAngles.length > 0) {
+            const driftSpd = CONFIG.SCENERY?.AEROSTATS?.DRIFT_SPEED || 0.006;
+            const dummy = new THREE.Object3D();
+            for (let a = 0; a < this.aerostatAngles.length; a++) {
+                this.aerostatAngles[a] += dt * driftSpd;
+                const ang = this.aerostatAngles[a];
+                const rad = this.aerostatRadii[a];
+                const ax = Math.cos(ang) * rad;
+                const az = Math.sin(ang) * rad;
+                const ay = this.aerostatAltitudes[a];
+
+                dummy.position.set(ax, ay, az);
+                dummy.rotation.set(0, -ang + Math.PI / 2, 0);
+                dummy.scale.set(1, 1, 1);
+                dummy.updateMatrix();
+                this.instancedAerostats.setMatrixAt(a, dummy.matrix);
+            }
+            this.instancedAerostats.instanceMatrix.needsUpdate = true;
         }
     }
 
@@ -1535,3 +1897,7 @@ export class TrackBuilder {
 }
 
 TrackBuilder.createMonolithGeometry = createMonolithGeometry;
+TrackBuilder.createGantryGeometry = createGantryGeometry;
+TrackBuilder.createTreeGeometry = createTreeGeometry;
+TrackBuilder.createBollardGeometry = createBollardGeometry;
+TrackBuilder.createAerostatGeometry = createAerostatGeometry;

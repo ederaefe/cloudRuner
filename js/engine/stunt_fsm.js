@@ -110,6 +110,14 @@ export class StuntFSM {
             }
         }
 
+        // Speed-sensitive yaw rate attenuation: smooth, stable cornering at high speeds
+        const speed = drone.speedKmh || 0;
+        const topSpeed = flightCfg.TOP_SPEED_BOOST || 260.0;
+        const speedRatio = THREE.MathUtils.clamp(speed / topSpeed, 0.0, 1.0);
+        const minSteerAtten = flightCfg.SPEED_SENSITIVE_STEER_MIN ?? 0.65;
+        const steerAtten = 1.0 - (1.0 - minSteerAtten) * Math.pow(speedRatio, 1.2);
+        const effectiveYawRate = flightCfg.YAW_RATE * steerAtten;
+
         // Process active stunt states
         switch (this.state) {
             case STUNT_STATES.SNAP_ROLL_LEFT:
@@ -119,8 +127,8 @@ export class StuntFSM {
                 const rollDirection = (this.state === STUNT_STATES.SNAP_ROLL_LEFT) ? 1 : -1;
                 this.stuntRollProgress = rollDirection * Math.PI * 2 * progress;
 
-                // Standard yaw steering continues during snap roll
-                this.currentYaw -= inputState.steerYaw * flightCfg.YAW_RATE * dt;
+                // Speed-governed yaw steering continues during snap roll
+                this.currentYaw -= inputState.steerYaw * effectiveYawRate * dt;
 
                 if (progress >= 1.0) {
                     this.state = STUNT_STATES.NORMAL;
@@ -134,7 +142,7 @@ export class StuntFSM {
                 // Sustain 90 degree bank (+/- PI/2)
                 const targetKnifeBank = (inputState.steerYaw >= 0) ? -Math.PI / 2 : Math.PI / 2;
                 this.currentRoll = THREE.MathUtils.lerp(this.currentRoll, targetKnifeBank, dt * 8.0);
-                this.currentYaw -= inputState.steerYaw * flightCfg.YAW_RATE * 0.8 * dt;
+                this.currentYaw -= inputState.steerYaw * effectiveYawRate * 0.8 * dt;
 
                 // Award continuous streaming Nitro
                 drone.nitroAmount = Math.min(maxNitro, drone.nitroAmount + stuntCfg.KNIFE_EDGE_NITRO_RATE * dt);
@@ -165,13 +173,14 @@ export class StuntFSM {
 
             case STUNT_STATES.NORMAL:
             default: {
-                // Standard car-like yaw steering
-                this.currentYaw -= inputState.steerYaw * flightCfg.YAW_RATE * dt;
+                // Speed-sensitive car-like yaw steering
+                this.currentYaw -= inputState.steerYaw * effectiveYawRate * dt;
 
-                // Visual chassis banking: lean into the turn, ease back upright slowly (zen weight-shift)
-                const targetRoll = -inputState.steerYaw * flightCfg.BANKING_TILT;
+                // Dynamic aerodynamic roll banking: scale bank depth with speed and lateral force
+                const dynamicBanking = flightCfg.BANKING_TILT * (0.8 + 0.4 * speedRatio);
+                const targetRoll = -inputState.steerYaw * dynamicBanking;
                 const isSteering = Math.abs(inputState.steerYaw) > 0.08;
-                const rollRate = isSteering ? 4.5 : 2.2; // Lean in gently, ease out even slower
+                const rollRate = isSteering ? 5.0 : 2.6; // Responsive roll entry, smooth upright recovery
                 this.currentRoll = THREE.MathUtils.lerp(this.currentRoll, targetRoll, dt * rollRate);
 
                 // Locked level horizon: pitch held firmly at 0.0

@@ -16,9 +16,9 @@ export class PreloadScreen {
     }
 
     initDOMElements() {
-        this.barFill = document.getElementById('preload-bar-fill');
-        this.percentText = document.getElementById('preload-percent-txt');
-        this.statusText = document.getElementById('preload-status-txt');
+        this.barFill = document.getElementById('start-modal-bar-fill') || document.getElementById('preload-bar-fill');
+        this.percentText = document.getElementById('start-modal-percent-txt') || document.getElementById('preload-percent-txt');
+        this.statusText = document.getElementById('start-modal-status-txt') || document.getElementById('preload-status-txt');
         this.btnLaunch = document.getElementById('btn-launch-race');
     }
 

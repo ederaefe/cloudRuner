@@ -17,6 +17,7 @@ const _forwardLook = new THREE.Vector3();
 const _shakeOffset = new THREE.Vector3();
 const _acceleration = new THREE.Vector3();
 const _previousVelocity = new THREE.Vector3();
+const _camUp = new THREE.Vector3();
 
 export const CAMERA_MODES = {
     CHASE: 'CHASE',
@@ -46,6 +47,10 @@ export class CameraRig {
         this.photoCamYaw = 0;
         this.photoCamPitch = 0;
         this.photoCamDistance = 12.0;
+
+        // Dynamic banking & critically damped restorative spring [INP-19]
+        this.cameraRoll = 0.0;
+        this.cameraRollVelocity = 0.0;
 
         // Enhanced camera behavior
         this.forwardLean = 0.0;
@@ -141,6 +146,11 @@ export class CameraRig {
         _forwardLook.set(0, 0.4, 6.0).applyQuaternion(yawOnlyQuat);
         this.currentLookAt.copy(drone.position).add(_forwardLook);
         this.camera.position.copy(this.currentPos);
+        this.cameraRoll = 0.0;
+        this.cameraRollVelocity = 0.0;
+        if (this.camera.up && typeof this.camera.up.set === 'function') {
+            this.camera.up.set(0, 1, 0);
+        }
         this.camera.lookAt(this.currentLookAt);
         this.shakeAmount = 0;
         this.targetFov = camCfg.BASE_FOV;
@@ -311,23 +321,48 @@ export class CameraRig {
         if (drone.nitroStage === 3) {
             dist += 2.2;
             height += 0.4;
-            this.targetFov = camCfg.STAGE3_FOV;
         } else if (drone.nitroStage === 2) {
             dist += 1.2;
             height += 0.2;
-            this.targetFov = camCfg.STAGE2_FOV;
-        } else {
-            this.targetFov = camCfg.BASE_FOV;
         }
 
+        // Dynamic continuous FOV scaling: 58 deg base -> 92 deg boost -> 105 deg terminal overdrive [PHY-25]
+        const speed = Math.max(0, drone.speedKmh || 0);
+        let speedFov;
+        if (speed <= 220) {
+            speedFov = THREE.MathUtils.lerp(58.0, 78.0, speed / 220.0);
+        } else if (speed <= 340) {
+            speedFov = THREE.MathUtils.lerp(78.0, 92.0, (speed - 220.0) / 120.0);
+        } else {
+            speedFov = THREE.MathUtils.lerp(92.0, 105.0, Math.min(1.0, (speed - 340.0) / 120.0));
+        }
+        if (drone.isBoosting && speedFov < 88.0) {
+            speedFov = 88.0;
+        }
+        this.targetFov = speedFov;
+
         // Smooth FOV elasticity without redundant projection matrix computation
-        this.currentFov = THREE.MathUtils.lerp(this.currentFov, this.targetFov, dt * 5.0);
+        this.currentFov = THREE.MathUtils.lerp(this.currentFov, this.targetFov, Math.min(1.0, dt * 5.0));
         this.camera.fov = this.currentFov;
         this.camera.updateProjectionMatrix();
 
         // Build a yaw-only quaternion from the drone's euler to keep camera level
         const _euler = new THREE.Euler().setFromQuaternion(drone.quaternion, 'YXZ');
         const _yawOnlyQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, _euler.y, 0, 'YXZ'));
+
+        // Dynamic camera banking into turns with critically damped restorative spring [INP-19]
+        // Target bank is derived smoothly from drone lateral banking / roll without jitter
+        const targetRoll = -Math.sin(drone.roll || 0) * 0.12;
+        const rollDisplacement = targetRoll - this.cameraRoll;
+        const rollForce = rollDisplacement * 28.0 - this.cameraRollVelocity * 8.5;
+        this.cameraRollVelocity += rollForce * dt;
+        this.cameraRoll += this.cameraRollVelocity * dt;
+        this.cameraRoll = THREE.MathUtils.clamp(this.cameraRoll, -0.22, 0.22);
+
+        if (this.camera.up && typeof this.camera.up.copy === 'function') {
+            _camUp.set(-Math.sin(this.cameraRoll), Math.cos(this.cameraRoll), 0).applyQuaternion(_yawOnlyQuat);
+            this.camera.up.copy(_camUp);
+        }
 
         // Target position in world space (zero-allocation)
         _idealOffset.set(0, height, -dist).applyQuaternion(_yawOnlyQuat);
@@ -364,6 +399,15 @@ export class CameraRig {
                 (Math.random() - 0.5) * this.shakeAmount
             );
             this.shakeAmount = Math.max(0, this.shakeAmount - dt * 1.5);
+        }
+
+        // Dynamic buffeting in turbulence zones [PHY-26]
+        if (drone.isTurbulenceActive) {
+            const strain = (drone.turbulenceStrain !== undefined) ? drone.turbulenceStrain : 0.6;
+            const tScale = strain * 0.22;
+            _shakeOffset.x += (Math.random() - 0.5) * tScale;
+            _shakeOffset.y += Math.sin(performance.now() * 0.035) * (tScale * 0.7);
+            _shakeOffset.z += (Math.random() - 0.5) * tScale;
         }
 
         this.camera.position.copy(this.currentPos).add(_shakeOffset);

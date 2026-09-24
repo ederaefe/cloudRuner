@@ -143,7 +143,7 @@ export class CustomizationSidebar {
             <div class="manual-card">
                 <div class="manual-title">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg>
-                    AUTOPILOT HAND-OFF MODE <span class="manual-key">O</span> <span class="manual-key">U</span>
+                    AUTOPILOT HAND-OFF MODE <span class="manual-key">O</span> <span class="manual-key">U</span> <span class="manual-key">Z</span>
                 </div>
                 <div class="manual-desc">
                     Hands-off autonomous navigation. When engaged, the browser navigates the spline track, hits checkpoint gates, avoids skyscrapers, and modulates throttle and boost. Touching manual steering immediately overrides.
@@ -153,7 +153,7 @@ export class CustomizationSidebar {
             <div class="manual-card">
                 <div class="manual-title">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="8 7 12 3 16 7"/><polyline points="8 17 12 21 16 17"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                    FIXED ALTITUDE HOLD <span class="manual-key">H</span> (ADJUST: <span class="manual-key">T</span>/<span class="manual-key">G</span> or <span class="manual-key">[</span>/<span class="manual-key">]</span>)
+                    FIXED ALTITUDE HOLD <span class="manual-key">H</span> (ADJUST: <span class="manual-key">[</span>/<span class="manual-key">]</span> or <span class="manual-key">G</span>)
                 </div>
                 <div class="manual-desc">
                     Locks elevation to current or target altitude with PD thrust damping. Step target altitude up/down by 5 meters using hotkeys or the in-flight HUD step buttons.

@@ -165,7 +165,7 @@ export class RacingHUD {
         }, 1400);
     }
 
-    update(drone, currentLap, positionRank, totalRacers, isDrafting, totalLaps = null, isWingmanActive = false) {
+    update(drone, currentLap, positionRank, totalRacers, isDrafting, totalLaps = null, isWingmanActive = false, inputState = null, customLapText = null) {
         // Telemetry readout
         if (this.speedTxt) {
             this.speedTxt.textContent = Math.round(drone.speedKmh);
@@ -186,8 +186,12 @@ export class RacingHUD {
             }
         }
         if (this.lapTxt) {
-            const maxLaps = totalLaps || (CONFIG.TRACK?.LAPS_TO_WIN || 2);
-            this.lapTxt.textContent = `${currentLap} / ${maxLaps}`;
+            if (customLapText) {
+                this.lapTxt.textContent = customLapText;
+            } else {
+                const maxLaps = totalLaps || (CONFIG.TRACK?.LAPS_TO_WIN || 2);
+                this.lapTxt.textContent = `${currentLap} / ${maxLaps}`;
+            }
         }
         if (this.posTxt) {
             const suffix = positionRank === 1 ? 'ST' : (positionRank === 2 ? 'ND' : (positionRank === 3 ? 'RD' : 'TH'));

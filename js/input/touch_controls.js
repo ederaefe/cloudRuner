@@ -137,17 +137,26 @@ export class TouchControls {
         const normDist = Math.hypot(nx, ny);
 
         // Deadzone check: snap to complete stationary hover when thumb is near center
-        if (normDist < 0.08) {
+        const deadzone = 0.08;
+        if (normDist < deadzone) {
             this.input.state.steerYaw = 0;
             this.input.state.roll = 0;
             this.input.state.forward = 0;
             return;
         }
 
+        // Non-linear power curve for precision micro-corrections and smooth progressive deflection
+        const activeDist = Math.min(1.0, (normDist - deadzone) / (1.0 - deadzone));
+        const curvedDist = Math.pow(activeDist, 1.35);
+        const factor = curvedDist / normDist;
+
+        const curvedX = nx * factor;
+        const curvedY = ny * factor;
+
         // Steering: X controls car Yaw and subtle chassis Roll; Y controls forward throttle / brake
-        this.input.state.steerYaw = nx;
-        this.input.state.roll = nx;
-        this.input.state.forward = -ny; // Up is forward thrust (> 0), Down is brake/reverse (< 0)
+        this.input.state.steerYaw = curvedX;
+        this.input.state.roll = curvedX;
+        this.input.state.forward = -curvedY; // Up is forward thrust (> 0), Down is brake/reverse (< 0)
     }
 
     bindActionButtons() {
