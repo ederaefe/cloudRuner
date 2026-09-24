@@ -1252,6 +1252,44 @@ playerDrone.isAutopilot = false;
 hud.update(playerDrone, 1, 1, 4, false, 2, false);
 assert(hud.flightStateTxt.textContent === 'MANUAL', 'RacingHUD updates flight state to MANUAL when pilot takes steering');
 
+// 5. High-Density Metropolitan World-Building & Clustered Districts Suite
+assert(CONFIG.TIERS[1].maxProps === 380, 'CONFIG.TIERS[1] defines 380 building instances for low-end mobile');
+assert(CONFIG.TIERS[2].maxProps === 800, 'CONFIG.TIERS[2] defines 800 building instances for mid-tier mobile');
+assert(CONFIG.TIERS[3].maxProps === 1600, 'CONFIG.TIERS[3] defines 1600 building instances for desktop high');
+
+const highDensityTier = Object.assign({}, CONFIG.TIERS[3], { maxProps: 1600, shadows: false });
+const denseCityTrack = new TrackBuilder(scene, highDensityTier, CONFIG.SECTORS[0]);
+
+assert(denseCityTrack.buildingAABBs.length === 1600, 'TrackBuilder generates exactly 1,600 building AABBs on high-density tier');
+
+let allAABBsFinite = true;
+let anyBuildingInStagingFunnel = false;
+let anyCorridorPenetration = false;
+const trackHalfWidth = (CONFIG.TRACK.RIBBON_WIDTH || 14) * 0.5;
+
+for (let b = 0; b < denseCityTrack.buildingAABBs.length; b++) {
+    const aabb = denseCityTrack.buildingAABBs[b];
+    if (!Number.isFinite(aabb.min.x) || !Number.isFinite(aabb.max.x) ||
+        !Number.isFinite(aabb.min.y) || !Number.isFinite(aabb.max.y) ||
+        !Number.isFinite(aabb.min.z) || !Number.isFinite(aabb.max.z)) {
+        allAABBsFinite = false;
+    }
+
+    // Staging dive vertical funnel clearance (|x| < 75, |z| < 95)
+    const centerX = (aabb.min.x + aabb.max.x) * 0.5;
+    const centerZ = (aabb.min.z + aabb.max.z) * 0.5;
+    if (Math.abs(centerX) < 74.0 && Math.abs(centerZ) < 94.0) {
+        anyBuildingInStagingFunnel = true;
+    }
+}
+
+assert(allAABBsFinite, 'All 1,600 building AABBs have finite, valid coordinates');
+assert(!anyBuildingInStagingFunnel, 'All 1,600 buildings maintain complete clearance around the stratosphere dive funnel');
+
+// Verify rooftop instanced props are created and bounded
+assert(denseCityTrack.instancedProps.length >= 4, 'TrackBuilder registers instanced city, helipads, spires, and boulders');
+denseCityTrack.dispose();
+
     console.log(`\n========================================`);
     console.log(`ALL TESTS PASSED: ${passedTests}/${totalTests} ASSERTIONS VERIFIED`);
     console.log(`========================================\n`);

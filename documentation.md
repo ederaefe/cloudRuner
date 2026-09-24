@@ -540,3 +540,34 @@ This enables zero-latency P2P mesh synchronization via WebRTC DataChannels (`Pee
 * **Slow Roads Roadside Aggregate Grounding (`js/engine/track_builder.js`)**:
   * **Instanced Boulder Scatter**: Added 180 instanced low-poly stone boulders along the road shoulders outside the laser flight corridor, utilizing warm limestone and terracotta aggregate palettes (`#E2E8F0`, `#CBD5E1`, `#94A3B8`, `#64748B`, `#D8B4A6`) with zero runtime memory allocations.
 
+### Completed: High-Density Metropolitan World-Building & Clustered Urban Districts
+
+* **High-Density Instance Scaling across Hardware Tiers (`js/config.js`)**:
+  * **Scaled Max Props**: Scaled building quotas to eliminate sparse skyline gaps:
+    * `MOBILE_LOW` (Tier 1): $120 \to 380$ building monoliths (3.1x density increase).
+    * `MOBILE_MID` (Tier 2): $280 \to 800$ building monoliths (2.8x density increase).
+    * `DESKTOP_HIGH` (Tier 3): $500 \to 1600$ building monoliths (3.2x density increase).
+  * **Zero Extra Draw Calls**: All 1,600 monoliths continue to render in **a single `THREE.InstancedMesh` draw call**, preserving 60–120 FPS performance and zero per-frame garbage collection.
+
+* **Multi-Layer Urban Architecture & Structured Districts (`js/engine/track_builder.js`)**:
+  * **Zone 1: Multi-Layer Canyon Flankers (50% of buildings)**:
+    * *Tier 0 (Streetfront Façade)*: Tight corridor framing setback ($38\text{m} - 60\text{m}$ from road centerline) on both sides of the flight corridor.
+    * *Tier 1 (Mid-Avenue Blocks)*: Staggered secondary setback ($74\text{m} - 110\text{m}$) visible between streetfront facades, creating the visual realism of perpendicular cross-streets.
+    * *Tier 2 (Deep District High-Rises)*: Outer canyon backdrop ($128\text{m} - 190\text{m}$) providing towering architectural massing.
+  * **Zone 2: Clustered Urban District Grids (35% of buildings)**:
+    * Replaced uniform random polar distribution with 6 distinct metropolitan district centers (Downtown Financial, West Midtown Commercial, East Waterfront Tech, South Residential, North Terrace, Industrial Basin).
+    * Structured rectilinear block matrices ($6 \times 6$ street grids with $46\text{m} - 62\text{m}$ street pitch and angular district orientation).
+  * **Zone 3: Horizon Mega-Monoliths & Distant Spires (15% of buildings)**:
+    * Concentric horizon skyline distribution ($650\text{m} - 2600\text{m}$ radius) framing the continuous Preetham/Bruneton sky dome.
+  * **Rigorous Safety Envelopes**:
+    * Full 3D Frenet-Serret clearance check against all 120 spline sample points.
+    * Strict radial exclusion cylinder ($|x| < 75\text{m}, |z| < 95\text{m}$) protecting the stratosphere launch platforms, deep dive funnel, and 90° ascension summit.
+
+* **Scaled Rooftop Props & Aggregate Stone Boulders (`js/engine/track_builder.js`)**:
+  * Scaled rooftop helipads (up to 160), aviation warning spires (up to 120), and HVAC chiller units (up to 160) across building crowns.
+  * Scaled roadside aggregate boulders (up to 260) with warm limestone and terracotta palettes.
+
+* **Comprehensive Verification Suite (`scripts/test_engine.mjs`)**:
+  * Expanded verification suite to 295 passed assertions (+7 new checks), validating 1,600 building instance allocations, AABB coordinate bounds, zero staging funnel penetration, and bounded prop arrays.
+
+

@@ -775,9 +775,10 @@ export class TrackBuilder {
             : optionCPalette;
 
         // Pre-sample spline points for corridor framing and safety envelopes
-        const sampleCount = 96;
+        const sampleCount = 120;
         const splineSamples = [];
         const splineNormals = [];
+        const splineTangents = [];
         for (let s = 0; s < sampleCount; s++) {
             const t = s / sampleCount;
             const pt = this.spline.getPointAt(t);
@@ -790,50 +791,83 @@ export class TrackBuilder {
             }
             splineSamples.push(pt);
             splineNormals.push(norm);
+            splineTangents.push(tan);
         }
 
-        const canyonCount = Math.floor(count * 0.65);
-        const outerCount = count - canyonCount;
+        // Partition instances into:
+        // 1. Canyon Flankers (50%): 3-tier streetfront, mid-avenue, and deep canyon walls
+        // 2. Clustered Urban Districts (35%): Rectilinear city blocks & downtown high-rises
+        // 3. Horizon Mega-Monoliths (15%): Slender perimeter towers framing the sky
+        const canyonCount = Math.floor(count * 0.50);
+        const districtCount = Math.floor(count * 0.35);
+        const outerCount = count - canyonCount - districtCount;
         const tempColor = new THREE.Color();
+        const trackWidth = CONFIG.TRACK.RIBBON_WIDTH || 14;
 
-        // 1. Canyon-Aligned Flankers (Guaranteed Safety Envelope)
+        // 1. Multi-Layer Canyon Flankers (3 Setback Depth Tiers)
         for (let i = 0; i < canyonCount; i++) {
             const sampleIdx = Math.floor((i / canyonCount) * sampleCount) % sampleCount;
             const sp = splineSamples[sampleIdx];
             const norm = splineNormals[sampleIdx];
+            const tan = splineTangents[sampleIdx];
             const side = (i % 2 === 0) ? 1 : -1;
 
-            // Enforce open skyway setbacks: push buildings well clear of the flight corridor
-            const trackWidth = CONFIG.TRACK.RIBBON_WIDTH || 14;
-            // On high altitude dive and ascension sections, keep buildings extra far from vertical drop
-            const isHighAltitude = sp.y > 65;
-            const corridorSetback = isHighAltitude
-                ? (160 + ((i * 7) % 60))
-                : ((trackWidth * 0.5) + 65 + ((i * 7) % 35));
-            const lateralJitter = ((i * 13) % 15) - 7.5;
+            const isHighAltitude = sp.y > 60;
+            const tierLayer = i % 3; // 0: Streetfront Façade, 1: Mid-Avenue Block, 2: Deep High-Rise
 
-            const bw = 22 + ((i * 11) % 26);
-            const bd = 22 + ((i * 17) % 26);
-            // Cap height so tops stay well below flight elevation
-            const maxAllowedHeight = isHighAltitude ? 45 : Math.max(30, maxHeight - 30);
-            const bh = 45 + ((i * 23) % maxAllowedHeight);
+            let corridorSetback = 0;
+            let bw = 24, bd = 24, bh = 50;
 
-            const bx = sp.x + (norm.x * corridorSetback * side) + (norm.z * lateralJitter);
-            const bz = sp.z + (norm.z * corridorSetback * side) - (norm.x * lateralJitter);
+            if (tierLayer === 0) {
+                // Tier 0: Immediate Streetfront Façade (close corridor definition)
+                corridorSetback = isHighAltitude
+                    ? (170 + ((i * 7) % 50))
+                    : ((trackWidth * 0.5) + 38 + ((i * 7) % 22));
+                bw = 20 + ((i * 5) % 16);
+                bd = 20 + ((i * 7) % 16);
+                bh = isHighAltitude ? 40 : (38 + ((i * 13) % 48));
+            } else if (tierLayer === 1) {
+                // Tier 1: Mid-Avenue Depth Layer (peeking through cross-streets)
+                corridorSetback = isHighAltitude
+                    ? (220 + ((i * 9) % 60))
+                    : ((trackWidth * 0.5) + 74 + ((i * 11) % 36));
+                bw = 26 + ((i * 7) % 20);
+                bd = 26 + ((i * 11) % 20);
+                bh = isHighAltitude ? 45 : (54 + ((i * 17) % 65));
+            } else {
+                // Tier 2: Deep Urban High-Rise Wall (monolithic backdrop)
+                corridorSetback = isHighAltitude
+                    ? (280 + ((i * 13) % 70))
+                    : ((trackWidth * 0.5) + 128 + ((i * 13) % 65));
+                bw = 32 + ((i * 9) % 26);
+                bd = 32 + ((i * 13) % 26);
+                bh = isHighAltitude ? 50 : (70 + ((i * 19) % Math.max(45, maxHeight - 30)));
+            }
+
+            const lateralJitter = ((i * 13) % 20) - 10.0;
+            let bx = sp.x + (norm.x * corridorSetback * side) + (tan.x * lateralJitter);
+            let bz = sp.z + (norm.z * corridorSetback * side) + (tan.z * lateralJitter);
+
+            // Staging dive vertical funnel clearance (|x| < 75, |z| < 95)
+            if (Math.abs(bx) < 75 && Math.abs(bz) < 95) {
+                const pushSignX = bx >= 0 ? 1 : -1;
+                bx = pushSignX * (80 + ((i * 11) % 40));
+            }
             const by = -20;
 
             dummy.position.set(bx, by, bz);
             dummy.scale.set(bw, bh, bd);
+            // Subtle building rotation facing canyon axis
+            const faceAngle = Math.atan2(norm.z, norm.x) + ((i % 5 - 2) * 0.08);
             if (dummy.rotation && typeof dummy.rotation.set === 'function') {
-                dummy.rotation.set(0, (i * 0.2), 0);
+                dummy.rotation.set(0, faceAngle, 0);
             } else if (dummy.rotation) {
-                dummy.rotation.y = (i * 0.2);
+                dummy.rotation.y = faceAngle;
             }
             dummy.updateMatrix();
 
             instancedCity.setMatrixAt(i, dummy.matrix);
 
-            // Per-instance coordinated color
             const colorHex = palette[i % palette.length];
             tempColor.setHex(colorHex);
             if (typeof instancedCity.setColorAt === 'function') {
@@ -850,43 +884,128 @@ export class TrackBuilder {
             });
         }
 
-        // 2. Outer Urban Skyline Clusters (Strict 3D Radial Clearance)
-        for (let i = 0; i < outerCount; i++) {
-            const instIdx = canyonCount + i;
+        // 2. Clustered Urban Districts & City Blocks (Structured Street Grids)
+        const districtHubs = [
+            { x: 160, z: -180, rot: 0.15, baseH: 75 },   // Downtown Central Financial Hub
+            { x: -320, z: 240, rot: 0.40, baseH: 65 },   // West Midtown Commercial Sector
+            { x: 380, z: 200, rot: -0.25, baseH: 70 },  // East Waterfront Tech District
+            { x: -180, z: -380, rot: 0.50, baseH: 60 },  // South High-Rise Residential Hub
+            { x: 300, z: -420, rot: -0.35, baseH: 65 },  // North Terrace Civic Quarter
+            { x: -400, z: -180, rot: 0.20, baseH: 55 }   // Industrial Innovation Basin
+        ];
+
+        for (let j = 0; j < districtCount; j++) {
+            const instIdx = canyonCount + j;
+            const hub = districtHubs[j % districtHubs.length];
+            const blockIndex = Math.floor(j / districtHubs.length);
+
+            const gridCols = 6;
+            const col = (blockIndex % gridCols) - Math.floor(gridCols * 0.5);
+            const row = Math.floor(blockIndex / gridCols) - 2;
+
+            const streetSpacingX = 46 + ((j * 7) % 16);
+            const streetSpacingZ = 46 + ((j * 11) % 16);
+            const jitterX = ((j * 13) % 14) - 7;
+            const jitterZ = ((j * 17) % 14) - 7;
+
+            const localX = (col * streetSpacingX) + jitterX;
+            const localZ = (row * streetSpacingZ) + jitterZ;
+
+            const cosR = Math.cos(hub.rot);
+            const sinR = Math.sin(hub.rot);
+            let bx = hub.x + (localX * cosR - localZ * sinR);
+            let bz = hub.z + (localX * sinR + localZ * cosR);
+
+            const bw = 24 + ((j * 7) % 28);
+            const bd = 24 + ((j * 11) % 28);
+            const bh = Math.min(maxHeight + 20, hub.baseH + ((j * 19) % 65));
+
+            // Clearance check against all spline samples
+            let clearanceViolation = false;
+            const minClearance = (trackWidth * 0.5) + 36 + Math.max(bw, bd) * 0.5;
+            const minClearanceSq = minClearance * minClearance;
+
+            for (let s = 0; s < sampleCount; s++) {
+                const sp = splineSamples[s];
+                const dx = bx - sp.x;
+                const dz = bz - sp.z;
+                if (dx * dx + dz * dz < minClearanceSq) {
+                    // Push building outward safely along spline normal
+                    const norm = splineNormals[s];
+                    const pushDist = minClearance + 15;
+                    bx = sp.x + norm.x * pushDist;
+                    bz = sp.z + norm.z * pushDist;
+                    clearanceViolation = true;
+                    break;
+                }
+            }
+
+            // Staging dive vertical funnel clearance (|x| < 75, |z| < 95)
+            if (Math.abs(bx) < 75 && Math.abs(bz) < 95) {
+                const pushSignX = bx >= 0 ? 1 : -1;
+                bx = pushSignX * (80 + ((j * 11) % 45));
+            }
+
+            const by = -20;
+            dummy.position.set(bx, by, bz);
+            dummy.scale.set(bw, bh, bd);
+            if (dummy.rotation && typeof dummy.rotation.set === 'function') {
+                dummy.rotation.set(0, hub.rot + ((j % 4) * (Math.PI * 0.5)), 0);
+            } else if (dummy.rotation) {
+                dummy.rotation.y = hub.rot + ((j % 4) * (Math.PI * 0.5));
+            }
+            dummy.updateMatrix();
+
+            instancedCity.setMatrixAt(instIdx, dummy.matrix);
+
+            const colorHex = palette[(canyonCount + j) % palette.length];
+            tempColor.setHex(colorHex);
+            if (typeof instancedCity.setColorAt === 'function') {
+                instancedCity.setColorAt(instIdx, tempColor);
+            }
+
+            this.buildingAABBs.push({
+                min: new THREE.Vector3(bx - bw / 2, by, bz - bd / 2),
+                max: new THREE.Vector3(bx + bw / 2, by + bh, bz + bd / 2),
+                topCenter: new THREE.Vector3(bx, by + bh, bz),
+                width: bw,
+                depth: bd,
+                height: bh
+            });
+        }
+
+        // 3. Horizon Mega-Monoliths & Distant Skyline Spires
+        for (let k = 0; k < outerCount; k++) {
+            const instIdx = canyonCount + districtCount + k;
             let bx = 0, bz = 0, bw = 0, bd = 0, bh = 0;
             let valid = false;
             let attempts = 0;
 
-            while (!valid && attempts < 35) {
+            while (!valid && attempts < 25) {
                 attempts++;
-                const angle = (i / outerCount) * Math.PI * 2 + (attempts * 0.12);
-                const radius = 180 + Math.random() * (spread * 0.5);
+                const angle = (k / outerCount) * Math.PI * 2 + (attempts * 0.15);
+                const radius = 650 + Math.random() * (spread * 0.85);
                 bx = Math.cos(angle) * radius;
                 bz = Math.sin(angle) * radius;
-                bw = 26 + Math.random() * 34;
-                bd = 26 + Math.random() * 34;
-                bh = 65 + Math.random() * maxHeight;
+                bw = 32 + Math.random() * 40;
+                bd = 32 + Math.random() * 40;
+                bh = 80 + Math.random() * (maxHeight + 35);
 
                 let tooClose = false;
-                const minClearance = 44 + Math.max(bw, bd) * 0.5;
+                const minClearance = 50 + Math.max(bw, bd) * 0.5;
                 const minClearanceSq = minClearance * minClearance;
 
-                // Test against all spline samples to eliminate any path encroachment
                 for (let s = 0; s < sampleCount; s++) {
                     const sp = splineSamples[s];
                     const dx = bx - sp.x;
                     const dz = bz - sp.z;
                     if (dx * dx + dz * dz < minClearanceSq) {
-                        const buildingTop = -20 + bh;
-                        if (buildingTop > sp.y - 18.0) {
-                            tooClose = true;
-                            break;
-                        }
+                        tooClose = true;
+                        break;
                     }
                 }
 
-                // Staging drop clearance
-                if (Math.abs(bx) < 70 && Math.abs(bz) < 90) {
+                if (Math.abs(bx) < 75 && Math.abs(bz) < 95) {
                     tooClose = true;
                 }
 
@@ -895,26 +1014,33 @@ export class TrackBuilder {
                 }
             }
 
-            // Safe fallback perimeter placement if clearance search is exhausted
             if (!valid) {
-                const safeAngle = (i / outerCount) * Math.PI * 2;
-                bx = Math.cos(safeAngle) * (spread * 0.75 + 400);
-                bz = Math.sin(safeAngle) * (spread * 0.75 + 400);
+                const safeAngle = (k / outerCount) * Math.PI * 2;
+                bx = Math.cos(safeAngle) * (spread + 500);
+                bz = Math.sin(safeAngle) * (spread + 500);
+                bw = 36;
+                bd = 36;
+                bh = 100;
+            }
+
+            if (Math.abs(bx) < 75 && Math.abs(bz) < 95) {
+                const pushSignX = bx >= 0 ? 1 : -1;
+                bx = pushSignX * (80 + ((k * 11) % 40));
             }
 
             const by = -20;
             dummy.position.set(bx, by, bz);
             dummy.scale.set(bw, bh, bd);
             if (dummy.rotation && typeof dummy.rotation.set === 'function') {
-                dummy.rotation.set(0, (i * 0.45), 0);
+                dummy.rotation.set(0, (k * 0.35), 0);
             } else if (dummy.rotation) {
-                dummy.rotation.y = (i * 0.45);
+                dummy.rotation.y = (k * 0.35);
             }
             dummy.updateMatrix();
 
             instancedCity.setMatrixAt(instIdx, dummy.matrix);
 
-            const colorHex = palette[(canyonCount + i) % palette.length];
+            const colorHex = palette[(canyonCount + districtCount + k) % palette.length];
             tempColor.setHex(colorHex);
             if (typeof instancedCity.setColorAt === 'function') {
                 instancedCity.setColorAt(instIdx, tempColor);
@@ -937,15 +1063,15 @@ export class TrackBuilder {
         this.scene.add(instancedCity);
         this.instancedProps.push(instancedCity);
 
-        // 3. Instanced Rooftop Architectural Helipads & Communication Spires
+        // 4. Instanced Rooftop Architectural Helipads, Communication Spires & HVAC
         this.createRooftopDetails();
     }
 
     createRooftopDetails() {
         if (!this.buildingAABBs || this.buildingAABBs.length === 0) return;
 
-        // Select every 3rd building with sufficient roof width for helipads
-        const helipadCandidates = this.buildingAABBs.filter((b, idx) => idx % 3 === 0 && b.width >= 24 && b.depth >= 24);
+        // Select every 3rd building with sufficient roof width for helipads (bounded for performance)
+        const helipadCandidates = this.buildingAABBs.filter((b, idx) => idx % 3 === 0 && b.width >= 24 && b.depth >= 24).slice(0, 160);
         if (helipadCandidates.length > 0) {
             const padCount = helipadCandidates.length;
             const padGeo = new THREE.CylinderGeometry(5.5, 6.0, 0.6, 16);
@@ -995,8 +1121,8 @@ export class TrackBuilder {
             this.instancedProps.push(instancedRings);
         }
 
-        // Rooftop Communication Spires with Aviation Warning Beacons on tall towers
-        const spireCandidates = this.buildingAABBs.filter((b, idx) => idx % 4 === 1 && b.height > 85);
+        // Rooftop Communication Spires with Aviation Warning Beacons on tall towers (bounded)
+        const spireCandidates = this.buildingAABBs.filter((b, idx) => idx % 4 === 1 && b.height > 85).slice(0, 120);
         if (spireCandidates.length > 0) {
             const spireCount = spireCandidates.length;
             const spireGeo = new THREE.CylinderGeometry(0.25, 0.6, 16, 6);
@@ -1035,8 +1161,8 @@ export class TrackBuilder {
             this.instancedProps.push(instancedSpires, instancedBeacons);
         }
 
-        // Scale-Giving Rooftop Props: Instanced HVAC Chiller Units
-        const hvacCandidates = this.buildingAABBs.filter((b, idx) => idx % 3 === 2 && b.width >= 20 && b.depth >= 20);
+        // Scale-Giving Rooftop Props: Instanced HVAC Chiller Units (bounded)
+        const hvacCandidates = this.buildingAABBs.filter((b, idx) => idx % 3 === 2 && b.width >= 20 && b.depth >= 20).slice(0, 160);
         if (hvacCandidates.length > 0) {
             const hvacCount = hvacCandidates.length;
             const hvacGeo = new THREE.BoxGeometry(4.2, 1.6, 2.4);
@@ -1064,7 +1190,7 @@ export class TrackBuilder {
         // Roadside Aggregate Stone Boulders (Slow Roads Micro-Grounding)
         // Scatters low-poly instanced stone boulders along the road shoulders
         const maxBuildings = (this.tier && this.tier.maxProps) ? this.tier.maxProps : 300;
-        const rockCount = Math.min(180, Math.floor(maxBuildings * 0.45));
+        const rockCount = Math.min(260, Math.floor(maxBuildings * 0.40));
         const rockGeo = (typeof THREE.DodecahedronGeometry === 'function') 
             ? new THREE.DodecahedronGeometry(1.6, 1) 
             : new THREE.BoxGeometry(2.0, 1.4, 2.0);

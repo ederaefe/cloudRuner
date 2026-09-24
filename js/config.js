@@ -32,8 +32,8 @@ export const CONFIG = {
             gridColor: 0x5fa8d3,
             trackEmissive: 0x00e5ff,
             trackEdge: 0x1b4965,
-            buildingSpread: 2200,
-            buildingHeightMax: 65,
+            buildingSpread: 2600,
+            buildingHeightMax: 120,
             buildingColors: [0xF4F1EA, 0xE8E4DA, 0xC85A32, 0xD97746, 0x2B3A4A, 0xF4F1EA, 0xC85A32, 0xE8E4DA],
             beaconColors: [0x00ffff, 0xff0055, 0xffaa00],
             trimColor: 0x00ffff,
@@ -538,7 +538,7 @@ export const CONFIG = {
             dpr: 1.0,
             shadows: false,
             shadowMapSize: 0,
-            maxProps: 120,
+            maxProps: 380,
             particles: 30,
             speedLines: true,
             postProcess: false
@@ -548,7 +548,7 @@ export const CONFIG = {
             dpr: 1.25,
             shadows: true,
             shadowMapSize: 512,
-            maxProps: 280,
+            maxProps: 800,
             particles: 90,
             speedLines: true,
             postProcess: false
@@ -558,7 +558,7 @@ export const CONFIG = {
             dpr: Math.min((typeof window !== 'undefined' && window.devicePixelRatio) || 1.5, 2.0),
             shadows: true,
             shadowMapSize: 2048,
-            maxProps: 500,
+            maxProps: 1600,
             particles: 220,
             speedLines: true,
             postProcess: true
